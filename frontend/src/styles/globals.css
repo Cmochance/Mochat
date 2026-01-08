@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============ 水墨风格全局样式 ============ */
+
+:root {
+  /* 水墨色彩变量 */
+  --ink-black: #1a1a1a;
+  --ink-dark: #2d2d2d;
+  --ink-medium: #4a4a4a;
+  --ink-light: #6b6b6b;
+  --ink-faint: #8a8a8a;
+  
+  --paper-white: #f7f5f0;
+  --paper-cream: #ebe7df;
+  --paper-aged: #d9d3c7;
+  
+  --vermilion: #c73e3a;
+  --vermilion-light: #e85a56;
+  
+  --cyan-ink: #3d5a5b;
+}
+
+/* 基础样式 */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', serif;
+  background: linear-gradient(180deg, var(--paper-white) 0%, var(--paper-cream) 100%);
+  color: var(--ink-black);
+  min-height: 100vh;
+  line-height: 1.8;
+}
+
+/* 宣纸背景纹理 */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* 书法标题字体 */
+.font-title {
+  font-family: 'Ma Shan Zheng', serif;
+  font-weight: normal;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper-cream);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ink-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-medium);
+}
+
+/* ============ 组件样式 ============ */
+
+/* 水墨按钮 */
+.ink-btn {
+  @apply relative overflow-hidden px-6 py-2 rounded-sm;
+  @apply bg-ink-black text-paper-white;
+  @apply transition-all duration-300;
+  @apply hover:shadow-ink active:scale-95;
+}
+
+.ink-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.ink-btn:hover::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* 朱砂印章按钮 */
+.seal-btn {
+  @apply relative px-6 py-2;
+  @apply bg-vermilion text-paper-white;
+  @apply border-2 border-vermilion;
+  @apply transition-all duration-300;
+  @apply hover:bg-vermilion-light hover:shadow-ink;
+  @apply active:scale-95;
+}
+
+/* 输入框 */
+.ink-input {
+  @apply w-full px-4 py-3;
+  @apply bg-paper-white border-b-2 border-ink-light;
+  @apply text-ink-black placeholder-ink-faint;
+  @apply focus:outline-none focus:border-ink-black;
+  @apply transition-colors duration-300;
+}
+
+/* 卡片 */
+.ink-card {
+  @apply bg-paper-white rounded-sm shadow-ink;
+  @apply border border-paper-aged;
+  @apply transition-shadow duration-300;
+  @apply hover:shadow-ink-lg;
+}
+
+/* 墨晕动画 */
+@keyframes ink-drop {
+  0% {
+    transform: scale(0);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ink-drop {
+  animation: ink-drop 0.8s ease-out forwards;
+}
+
+/* 淡入动画 */
+@keyframes fade-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fade-slide-up 0.5s ease-out forwards;
+}
+
+/* 消息气泡 */
+.message-bubble {
+  @apply relative p-4 rounded-sm;
+  @apply bg-paper-white border border-paper-aged;
+}
+
+.message-bubble.user {
+  @apply bg-ink-black text-paper-white border-ink-black;
+}
+
+.message-bubble.assistant {
+  @apply bg-paper-white text-ink-black;
+}
+
+/* Thinking折叠块 */
+.thinking-block {
+  @apply border-l-4 border-cyan-ink bg-paper-cream/50;
+  @apply p-3 my-2 rounded-r-sm;
+  @apply text-sm text-ink-medium;
+}
+
+.thinking-toggle {
+  @apply flex items-center gap-2 cursor-pointer;
+  @apply text-cyan-ink hover:text-ink-black;
+  @apply transition-colors duration-200;
+}
+
+/* Markdown样式 */
+.markdown-content {
+  @apply leading-relaxed;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  @apply font-title mt-6 mb-3;
+}
+
+.markdown-content p {
+  @apply my-3;
+}
+
+.markdown-content code {
+  @apply font-mono text-sm px-1.5 py-0.5;
+  @apply bg-paper-aged rounded;
+}
+
+.markdown-content pre {
+  @apply my-4 p-4 rounded-sm overflow-x-auto;
+  @apply bg-ink-dark text-paper-white;
+}
+
+.markdown-content pre code {
+  @apply bg-transparent p-0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  @apply my-3 pl-6;
+}
+
+.markdown-content li {
+  @apply my-1;
+}
+
+.markdown-content blockquote {
+  @apply border-l-4 border-ink-light pl-4 my-4;
+  @apply text-ink-medium italic;
+}
+
+/* 加载动画 */
+.loading-ink {
+  @apply relative w-12 h-12;
+}
+
+.loading-ink::before,
+.loading-ink::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--ink-black);
+  transform: translate(-50%, -50%) scale(0);
+  animation: ink-pulse 1.5s infinite;
+}
+
+.loading-ink::after {
+  animation-delay: 0.5s;
+}
+
+@keyframes ink-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}

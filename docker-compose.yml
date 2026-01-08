@@ -1,0 +1,32 @@
+services:
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "9527:9527"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this-in-production}
+      - DATABASE_URL=sqlite+aiosqlite:////data/mochat.db
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}
+      - AI_MODEL=${AI_MODEL:-gpt-4}
+      - CORS_ORIGINS=http://localhost:3721,http://127.0.0.1:3721
+    volumes:
+      - mochat_data:/data
+    restart: unless-stopped
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3721:3721"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mochat_data:

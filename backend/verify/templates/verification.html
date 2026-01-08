@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>墨聊验证码</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'Noto Serif SC', serif;
+      background: linear-gradient(135deg, #f5f3ef 0%, #e8e4dc 100%);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 520px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      padding: 32px 40px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      color: #ffffff;
+      font-size: 32px;
+      font-weight: 400;
+      letter-spacing: 4px;
+      margin-bottom: 8px;
+    }
+    
+    .header p {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+    
+    .content {
+      padding: 40px;
+    }
+    
+    .greeting {
+      color: #333;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .purpose-text {
+      color: #555;
+      font-size: 15px;
+      line-height: 1.8;
+      margin-bottom: 24px;
+    }
+    
+    .code-box {
+      background: linear-gradient(135deg, #faf9f7 0%, #f5f3ef 100%);
+      border: 2px dashed #d4c5b0;
+      border-radius: 8px;
+      padding: 28px 20px;
+      text-align: center;
+      margin: 28px 0;
+    }
+    
+    .code {
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: 16px;
+      color: #1a1a1a;
+      font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+      text-indent: 16px;
+    }
+    
+    .expire-info {
+      color: #666;
+      font-size: 14px;
+      line-height: 1.8;
+      margin-bottom: 20px;
+    }
+    
+    .expire-info strong {
+      color: #c0392b;
+    }
+    
+    .warning {
+      background: #fff9f0;
+      border-left: 4px solid #e67e22;
+      padding: 14px 18px;
+      margin-top: 24px;
+      border-radius: 0 4px 4px 0;
+    }
+    
+    .warning p {
+      color: #8b6914;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    
+    .footer {
+      background: #faf9f7;
+      padding: 24px 40px;
+      text-align: center;
+      border-top: 1px solid #eee;
+    }
+    
+    .footer p {
+      color: #999;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    
+    .footer .brand {
+      color: #666;
+      font-weight: 500;
+    }
+    
+    /* 水墨装饰 */
+    .ink-decoration {
+      position: relative;
+    }
+    
+    .ink-decoration::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 40px;
+      width: 60px;
+      height: 60px;
+      background: radial-gradient(circle, rgba(0,0,0,0.03) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>墨聊</h1>
+      <p>MOCHAT · 水墨风格AI对话平台</p>
+    </div>
+    
+    <div class="content ink-decoration">
+      <p class="greeting">您好！</p>
+      <p class="purpose-text">{{purpose_text}}</p>
+      
+      <div class="code-box">
+        <div class="code">{{code}}</div>
+      </div>
+      
+      <p class="expire-info">
+        验证码有效期 <strong>5 分钟</strong>，请尽快完成验证。
+      </p>
+      
+      <div class="warning">
+        <p>⚠️ 安全提示：如非本人操作，请忽略此邮件。请勿将验证码泄露给任何人。</p>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p class="brand">© 2026 墨聊 Mochat</p>
+      <p>此邮件由系统自动发送，请勿直接回复</p>
+    </div>
+  </div>
+</body>
+</html>

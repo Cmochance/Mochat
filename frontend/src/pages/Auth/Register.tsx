@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { User, Lock, Mail, ArrowLeft } from 'lucide-react'
+import { User, Lock, Mail, ArrowLeft, Send, Shield } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { authService } from '../../services/authService'
@@ -14,18 +14,28 @@ export default function Register() {
     email: '',
     password: '',
     confirmPassword: '',
+    code: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const [codeSent, setCodeSent] = useState(false)
+
+  // 倒计时效果
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [countdown])
 
   // 验证密码格式
   const validatePassword = (password: string): { valid: boolean; message: string } => {
-    // 检查是否只包含数字、小写字母、大写字母
     if (!/^[a-zA-Z0-9]+$/.test(password)) {
       return { valid: false, message: '失败，密码不支持特殊符号！' }
     }
     
-    // 检查是否至少包含两种字符类型
     const hasLower = /[a-z]/.test(password)
     const hasUpper = /[A-Z]/.test(password)
     const hasDigit = /[0-9]/.test(password)
@@ -38,11 +48,53 @@ export default function Register() {
     return { valid: true, message: '' }
   }
 
+  // 验证邮箱格式
+  const isValidEmail = (email: string): boolean => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  }
+
+  // 发送验证码
+  const handleSendCode = useCallback(async () => {
+    if (!formData.email) {
+      setError('请先输入邮箱地址')
+      return
+    }
+    
+    if (!isValidEmail(formData.email)) {
+      setError('请输入有效的邮箱地址')
+      return
+    }
+
+    setSendingCode(true)
+    setError('')
+
+    try {
+      const response = await authService.sendVerificationCode(formData.email, 'register')
+      setCodeSent(true)
+      setCountdown(response.cooldown || 60)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '发送验证码失败，请稍后重试')
+    } finally {
+      setSendingCode(false)
+    }
+  }, [formData.email])
+
+  // 提交注册
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
-    // 验证密码
+    // 验证必填项
+    if (!formData.code) {
+      setError('请输入验证码')
+      return
+    }
+
+    if (formData.code.length !== 6 || !/^\d{6}$/.test(formData.code)) {
+      setError('请输入6位数字验证码')
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('两次输入的密码不一致')
       return
@@ -53,7 +105,6 @@ export default function Register() {
       return
     }
 
-    // 验证密码格式
     const passwordValidation = validatePassword(formData.password)
     if (!passwordValidation.valid) {
       setError(passwordValidation.message)
@@ -67,8 +118,8 @@ export default function Register() {
         username: formData.username,
         email: formData.email,
         password: formData.password,
+        code: formData.code,
       })
-      // 注册成功，跳转到登录页
       navigate('/auth/login', { 
         state: { message: '注册成功，请登录' } 
       })
@@ -142,15 +193,74 @@ export default function Register() {
               maxLength={50}
             />
 
-            <Input
-              label="邮箱"
-              type="email"
-              placeholder="请输入邮箱地址"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              icon={<Mail size={18} />}
-              required
-            />
+            {/* 邮箱 + 发送验证码 */}
+            <div>
+              <label className="block text-sm font-medium text-ink-dark mb-2">邮箱</label>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-light">
+                      <Mail size={18} />
+                    </span>
+                    <input
+                      type="email"
+                      placeholder="请输入邮箱地址"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                      className="w-full pl-10 pr-4 py-3 bg-paper-cream border border-ink-light/20 rounded-sm
+                        focus:outline-none focus:border-ink-dark focus:ring-1 focus:ring-ink-dark/20
+                        placeholder:text-ink-light/50 text-ink-dark transition-all"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={sendingCode || countdown > 0 || !formData.email}
+                  className={`
+                    px-4 py-3 rounded-sm font-medium text-sm whitespace-nowrap transition-all
+                    flex items-center gap-2
+                    ${countdown > 0 || sendingCode || !formData.email
+                      ? 'bg-ink-light/20 text-ink-light cursor-not-allowed'
+                      : 'bg-ink-dark text-paper-white hover:bg-ink-black'
+                    }
+                  `}
+                >
+                  <Send size={16} />
+                  {sendingCode ? '发送中...' : countdown > 0 ? `${countdown}秒` : '发送验证码'}
+                </button>
+              </div>
+              {codeSent && countdown > 0 && (
+                <p className="text-xs text-cyan-ink mt-2">
+                  验证码已发送至您的邮箱，请查收（5分钟内有效）
+                </p>
+              )}
+            </div>
+
+            {/* 验证码输入 */}
+            <div>
+              <label className="block text-sm font-medium text-ink-dark mb-2">验证码</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-light">
+                  <Shield size={18} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="请输入6位数字验证码"
+                  value={formData.code}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6)
+                    setFormData({ ...formData, code: value })
+                  }}
+                  required
+                  maxLength={6}
+                  className="w-full pl-10 pr-4 py-3 bg-paper-cream border border-ink-light/20 rounded-sm
+                    focus:outline-none focus:border-ink-dark focus:ring-1 focus:ring-ink-dark/20
+                    placeholder:text-ink-light/50 text-ink-dark transition-all tracking-[0.5em] font-mono text-lg"
+                />
+              </div>
+            </div>
 
             <div>
               <Input

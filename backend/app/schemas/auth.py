@@ -2,6 +2,7 @@
 认证相关的Pydantic模型
 """
 from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 from .user import UserResponse
 
 
@@ -10,6 +11,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=6, max_length=100)
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="邮箱验证码")
 
 
 class LoginRequest(BaseModel):
@@ -34,4 +36,11 @@ class LoginResponse(BaseModel):
 class ChangePasswordRequest(BaseModel):
     """修改密码请求模型"""
     old_password: str
+    new_password: str = Field(..., min_length=6, max_length=100)
+
+
+class ResetPasswordRequest(BaseModel):
+    """重置密码请求模型"""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$", description="邮箱验证码")
     new_password: str = Field(..., min_length=6, max_length=100)

@@ -162,9 +162,24 @@ export default function Login() {
             </Button>
           </motion.form>
 
+          {/* 忘记密码链接 */}
+          <motion.div
+            className="mt-4 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Link
+              to="/auth/forgot-password"
+              className="text-sm text-ink-light hover:text-ink-dark transition-colors"
+            >
+              忘记密码？
+            </Link>
+          </motion.div>
+
           {/* 注册链接 */}
           <motion.p
-            className="mt-8 text-center text-ink-light"
+            className="mt-6 text-center text-ink-light"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7 }}

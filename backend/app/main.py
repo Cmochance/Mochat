@@ -11,6 +11,13 @@ from .api import api_router
 from .services.auth_service import AuthService
 from .db.database import AsyncSessionLocal
 
+# 导入验证码模块
+import sys
+from pathlib import Path
+# 添加 verify 模块到路径
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from verify import verify_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -48,6 +55,9 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(api_router, prefix="/api")
+
+# 注册验证码模块路由
+app.include_router(verify_router, prefix="/api")
 
 
 @app.get("/")

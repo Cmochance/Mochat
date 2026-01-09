@@ -81,7 +81,7 @@ export default function SystemStats({ stats, loading }: SystemStatsProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-paper-cream rounded-sm">
             <p className="text-sm text-ink-light">平台名称</p>
-            <p className="text-lg font-medium text-ink-black">墨聊 Mochat</p>
+            <p className="text-lg font-medium text-ink-black">墨语 Mochat</p>
           </div>
           <div className="p-4 bg-paper-cream rounded-sm">
             <p className="text-sm text-ink-light">版本</p>

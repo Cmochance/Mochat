@@ -32,8 +32,8 @@ class VerifyConfig:
     
     # 邮件主题
     EMAIL_SUBJECTS = {
-        PURPOSE_REGISTER: "【墨聊】您的注册验证码",
-        PURPOSE_RESET_PASSWORD: "【墨聊】您的密码重置验证码",
+        PURPOSE_REGISTER: "【墨语】您的注册验证码",
+        PURPOSE_RESET_PASSWORD: "【墨语】您的密码重置验证码",
     }
 
 

@@ -91,7 +91,7 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
 
         {/* 提示文字 */}
         <p className="text-xs text-ink-faint mt-2 text-center">
-          墨聊AI可能会产生错误信息，请核实重要内容
+          墨语AI可能会产生错误信息，请核实重要内容
         </p>
       </div>
     </motion.div>

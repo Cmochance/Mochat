@@ -64,7 +64,7 @@ export default function Sidebar({
             <div className="w-10 h-10 rounded-full bg-paper-white flex items-center justify-center">
               <span className="text-ink-black font-title text-xl">墨</span>
             </div>
-            <span className="text-xl font-title">墨聊</span>
+            <span className="text-xl font-title">墨语</span>
           </div>
           <button
             className="lg:hidden p-2 hover:bg-ink-medium rounded-sm"

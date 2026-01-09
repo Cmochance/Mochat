@@ -39,7 +39,7 @@ class EmailService:
 <body>
   <div class="container">
     <div class="header">
-      <h1>墨聊 Mochat</h1>
+      <h1>墨语 Mochat</h1>
       <p>水墨风格AI对话平台</p>
     </div>
     
@@ -54,7 +54,7 @@ class EmailService:
     <p class="warning">如非本人操作，请忽略此邮件。请勿将验证码泄露给他人。</p>
     
     <div class="footer">
-      <p>© 2026 墨聊 Mochat. 水墨风格AI对话平台</p>
+      <p>© 2026 墨语 Mochat. 水墨风格AI对话平台</p>
       <p>此邮件由系统自动发送，请勿回复</p>
     </div>
   </div>
@@ -66,8 +66,8 @@ class EmailService:
     def _get_purpose_text(purpose: str) -> str:
         """获取用途说明文本"""
         texts = {
-            config.PURPOSE_REGISTER: "您正在注册 墨聊 账号，验证码为：",
-            config.PURPOSE_RESET_PASSWORD: "您正在重置 墨聊 账号密码，验证码为：",
+            config.PURPOSE_REGISTER: "您正在注册 墨语 账号，验证码为：",
+            config.PURPOSE_RESET_PASSWORD: "您正在重置 墨语 账号密码，验证码为：",
         }
         return texts.get(purpose, "您的验证码为：")
     
@@ -102,11 +102,11 @@ class EmailService:
             html_content = html_content.replace("{{purpose_text}}", cls._get_purpose_text(purpose))
             
             # 获取邮件主题
-            subject = config.EMAIL_SUBJECTS.get(purpose, "【墨聊】您的验证码")
+            subject = config.EMAIL_SUBJECTS.get(purpose, "【墨语】您的验证码")
             
             # 发送邮件
             params = {
-                "from": f"墨聊 Mochat <{config.FROM_EMAIL}>",
+                "from": f"墨语 Mochat <{config.FROM_EMAIL}>",
                 "to": [to_email],
                 "subject": subject,
                 "html": html_content,

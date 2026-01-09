@@ -73,7 +73,7 @@ export default function Welcome() {
           <div className="w-10 h-10 rounded-full bg-ink-black flex items-center justify-center">
             <span className="text-paper-white font-title text-xl">墨</span>
           </div>
-          <span className="text-2xl font-title text-ink-black">墨聊</span>
+          <span className="text-2xl font-title text-ink-black">墨语</span>
         </motion.div>
 
         <motion.div
@@ -109,7 +109,7 @@ export default function Welcome() {
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           <h1 className="text-6xl md:text-8xl font-title text-ink-black mb-6 leading-tight">
-            墨聊
+            墨语
           </h1>
           <p className="text-xl md:text-2xl text-ink-medium font-body mb-4">
             Mochat
@@ -193,7 +193,7 @@ export default function Welcome() {
 
       {/* 页脚 */}
       <footer className="relative z-10 text-center py-8 text-ink-light text-sm">
-        <p>© 2026 墨聊 Mochat. 水墨风格AI对话平台</p>
+        <p>© 2026 墨语 Mochat. 水墨风格AI对话平台</p>
       </footer>
     </div>
   )

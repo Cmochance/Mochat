@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_db
-from ..schemas.user import UserResponse, UserUpdate
+from ..schemas.user import UserResponse, UserUpdate, UserWithPasswordResponse
 from ..services.admin_service import admin_service
 from ..core.dependencies import get_admin_user
+from ..core.security import decrypt_password
 from ..db.models import User
+from ..db import crud
 
 router = APIRouter()
 
@@ -88,6 +90,28 @@ async def toggle_user_status(
         )
     
     return user
+
+
+@router.get("/users/{user_id}/password")
+async def get_user_password(
+    user_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+) -> Dict[str, str]:
+    """获取用户密码（仅管理员可用）"""
+    user = await crud.get_user_by_id(db, user_id)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+    
+    if not user.password_encrypted:
+        return {"password": "******（旧用户，无法查看）"}
+    
+    decrypted = decrypt_password(user.password_encrypted)
+    return {"password": decrypted}
 
 
 @router.get("/config")

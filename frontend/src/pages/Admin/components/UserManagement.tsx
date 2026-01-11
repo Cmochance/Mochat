@@ -7,7 +7,9 @@ import {
   UserX, 
   Trash2,
   Shield,
-  User as UserIcon
+  User as UserIcon,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { adminService } from '../../../services/adminService'
 import Loading from '../../../components/common/Loading'
@@ -26,6 +28,8 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<number, string>>({})
+  const [loadingPasswords, setLoadingPasswords] = useState<Record<number, boolean>>({})
 
   const filteredUsers = users.filter(
     (user) =>
@@ -57,6 +61,29 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
       console.error('删除用户失败:', error)
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleTogglePassword = async (userId: number) => {
+    // 如果已经显示，则隐藏
+    if (visiblePasswords[userId]) {
+      setVisiblePasswords(prev => {
+        const newState = { ...prev }
+        delete newState[userId]
+        return newState
+      })
+      return
+    }
+
+    // 否则请求密码
+    setLoadingPasswords(prev => ({ ...prev, [userId]: true }))
+    try {
+      const password = await adminService.getUserPassword(userId)
+      setVisiblePasswords(prev => ({ ...prev, [userId]: password }))
+    } catch (error) {
+      console.error('获取密码失败:', error)
+    } finally {
+      setLoadingPasswords(prev => ({ ...prev, [userId]: false }))
     }
   }
 
@@ -102,6 +129,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">用户</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">邮箱</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">密码</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">角色</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">状态</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">注册时间</th>
@@ -132,6 +160,27 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                       </div>
                     </td>
                     <td className="px-6 py-4 text-ink-medium">{user.email}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm text-ink-medium min-w-[80px]">
+                          {visiblePasswords[user.id] || '••••••'}
+                        </span>
+                        <button
+                          onClick={() => handleTogglePassword(user.id)}
+                          disabled={loadingPasswords[user.id]}
+                          className="p-1 rounded-sm hover:bg-paper-aged/50 text-ink-light hover:text-ink-medium transition-colors"
+                          title={visiblePasswords[user.id] ? '隐藏密码' : '显示密码'}
+                        >
+                          {loadingPasswords[user.id] ? (
+                            <RefreshCw size={14} className="animate-spin" />
+                          ) : visiblePasswords[user.id] ? (
+                            <EyeOff size={14} />
+                          ) : (
+                            <Eye size={14} />
+                          )}
+                        </button>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-sm ${user.role === 'admin' ? 'bg-vermilion/10 text-vermilion' : 'bg-cyan-ink/10 text-cyan-ink'}`}>
                         {user.role === 'admin' ? '管理员' : '用户'}

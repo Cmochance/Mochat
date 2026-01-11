@@ -33,6 +33,12 @@ export const adminService = {
     return response.data
   },
 
+  // 获取用户密码（仅管理员可用）
+  async getUserPassword(userId: number): Promise<string> {
+    const response = await api.get<{ password: string }>(`/admin/users/${userId}/password`)
+    return response.data.password
+  },
+
   // 获取配置
   async getConfigs(): Promise<Record<string, string>> {
     const response = await api.get<Record<string, string>>('/admin/config')

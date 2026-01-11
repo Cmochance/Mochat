@@ -37,6 +37,11 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+class UserWithPasswordResponse(UserResponse):
+    """用户响应模型（包含密码）"""
+    password: str = "******"
+
+
 class UserProfile(BaseModel):
     """用户个人资料"""
     id: int

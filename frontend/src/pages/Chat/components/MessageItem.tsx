@@ -43,6 +43,7 @@ export default function MessageItem({ message, index, isStreaming = false }: Mes
           <ThinkingBlock
             content={message.thinking}
             isStreaming={isStreaming}
+            hasContent={!!message.content}
           />
         )}
 

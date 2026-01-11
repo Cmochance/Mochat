@@ -59,13 +59,18 @@ export const chatService = {
     if (!reader) return
 
     const decoder = new TextDecoder()
+    let buffer = ''
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      const text = decoder.decode(value)
-      const lines = text.split('\n')
+      // 使用 stream: true 处理多字节字符
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      
+      // 保留最后一个可能不完整的行
+      buffer = lines.pop() || ''
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
@@ -76,6 +81,16 @@ export const chatService = {
             // 忽略解析错误
           }
         }
+      }
+    }
+
+    // 处理剩余的 buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.slice(6)) as StreamChunk
+        onChunk(data)
+      } catch {
+        // 忽略
       }
     }
   },
@@ -102,13 +117,18 @@ export const chatService = {
     if (!reader) return
 
     const decoder = new TextDecoder()
+    let buffer = ''
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      const text = decoder.decode(value)
-      const lines = text.split('\n')
+      // 使用 stream: true 处理多字节字符
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      
+      // 保留最后一个可能不完整的行
+      buffer = lines.pop() || ''
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
@@ -119,6 +139,16 @@ export const chatService = {
             // 忽略解析错误
           }
         }
+      }
+    }
+
+    // 处理剩余的 buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.slice(6)) as StreamChunk
+        onChunk(data)
+      } catch {
+        // 忽略
       }
     }
   },

@@ -144,7 +144,7 @@ export default function Chat() {
       clearStreaming()
     }
 
-    setStreaming(false)
+    // 注意：不在这里调用 setStreaming(false)，因为 clearStreaming() 已经处理了
     // 刷新会话列表（可能标题已更新）
     loadSessions()
   }

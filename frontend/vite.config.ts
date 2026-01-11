@@ -16,6 +16,16 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:9527',
         changeOrigin: true,
+        // SSE 流式传输支持
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            // 检测 SSE 响应，禁用缓冲
+            if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache'
+              proxyRes.headers['connection'] = 'keep-alive'
+            }
+          })
+        },
       },
     },
   },

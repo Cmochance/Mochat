@@ -1,15 +1,33 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown, ChevronRight, Brain } from 'lucide-react'
 
 interface ThinkingBlockProps {
   content: string
   isStreaming?: boolean
+  hasContent?: boolean  // 是否已经开始输出正式内容
 }
 
-export default function ThinkingBlock({ content, isStreaming = false }: ThinkingBlockProps) {
-  // 默认折叠
-  const [isExpanded, setIsExpanded] = useState(false)
+export default function ThinkingBlock({ content, isStreaming = false, hasContent = false }: ThinkingBlockProps) {
+  // 流式输出思考内容且没有正式内容时展开，否则折叠
+  const [isExpanded, setIsExpanded] = useState(!hasContent && isStreaming)
+  const hasAutoCollapsed = useRef(false)  // 标记是否已自动折叠过
+  
+  // 当开始输出正式内容时自动折叠
+  useEffect(() => {
+    if (hasContent && isStreaming && !hasAutoCollapsed.current) {
+      setIsExpanded(false)
+      hasAutoCollapsed.current = true
+    }
+  }, [hasContent, isStreaming])
+  
+  // 当开始新的流式输出时重置状态
+  useEffect(() => {
+    if (isStreaming && !hasContent) {
+      setIsExpanded(true)
+      hasAutoCollapsed.current = false
+    }
+  }, [isStreaming, hasContent])
 
   if (!content) return null
 

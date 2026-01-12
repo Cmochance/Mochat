@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_db
-from ..schemas.user import UserResponse, UserUpdate
+from ..schemas.user import UserResponse, UserUpdate, UserAdminResponse
 from ..services.admin_service import admin_service
 from ..core.dependencies import get_admin_user
 from ..db.models import User
@@ -23,14 +23,14 @@ async def get_system_stats(
     return await admin_service.get_system_stats(db)
 
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=List[UserAdminResponse])
 async def get_all_users(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取所有用户列表"""
+    """获取所有用户列表（包含密码哈希用于调试）"""
     return await admin_service.get_all_users(db, skip, limit)
 
 

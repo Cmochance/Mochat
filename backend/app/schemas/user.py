@@ -37,6 +37,14 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+class UserAdminResponse(UserResponse):
+    """管理员用户响应模型（包含密码哈希用于调试）"""
+    password_hash: str
+    
+    class Config:
+        from_attributes = True
+
+
 class UserProfile(BaseModel):
     """用户个人资料"""
     id: int

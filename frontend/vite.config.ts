@@ -17,6 +17,12 @@ export default defineConfig({
         target: 'http://localhost:9527',
         changeOrigin: true,
       },
+      // Uppic 独立图片上传服务代理
+      '/uppic': {
+        target: 'http://localhost:3900',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/uppic/, ''),
+      },
     },
   },
 })

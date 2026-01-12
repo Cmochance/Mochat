@@ -1,0 +1,3 @@
+# Uppic 模块依赖说明
+# 后端依赖见 backend/requirements.txt
+# 前端组件位于 frontend/ 目录，需在主项目中导入使用

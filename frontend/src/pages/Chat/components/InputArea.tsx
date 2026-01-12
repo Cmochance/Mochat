@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, ImagePlus, X, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../../../stores/authStore'
 // 从独立的 uppic 模块导入
-import { useImageUpload, type ImagePreview, type UploadResult } from '../../../../../modules/uppic/frontend'
+import { useImageUpload, type ImagePreview } from '@uppic'
 
 interface InputAreaProps {
   onSend: (content: string) => void
@@ -13,8 +13,10 @@ interface InputAreaProps {
 export default function InputArea({ onSend, disabled = false }: InputAreaProps) {
   const [content, setContent] = useState('')
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const dragCounterRef = useRef(0)
   
   const { user } = useAuthStore()
   
@@ -43,9 +45,22 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
     }
   }, [imagePreview])
 
+  // 处理文件选择（点击上传）
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    processFile(file)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // 统一的文件处理函数
+  const processFile = (file: File) => {
+    // 检查是否为图片
+    if (!file.type.startsWith('image/')) {
+      return
+    }
 
     const validation = validateImage(file)
     if (!validation.valid) {
@@ -55,10 +70,45 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
     const previewUrl = URL.createObjectURL(file)
     setImagePreview({ file, previewUrl })
     clearError()
+  }
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+  // 拖拽事件处理
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current++
+    if (!disabled && !isUploading && e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true)
     }
+  }
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false)
+    }
+  }
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    dragCounterRef.current = 0
+
+    if (disabled || isUploading) return
+
+    const files = e.dataTransfer.files
+    if (files.length === 0) return
+
+    const file = files[0]
+    processFile(file)
   }
 
   const removeImage = () => {
@@ -113,10 +163,35 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
 
   return (
     <motion.div
-      className="border-t border-paper-aged bg-paper-white/80 backdrop-blur-sm p-4"
+      className={`
+        border-t border-paper-aged bg-paper-white/80 backdrop-blur-sm p-4
+        relative transition-all duration-200
+        ${isDragging ? 'ring-2 ring-ink-medium ring-inset bg-paper-cream/50' : ''}
+      `}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
+      {/* 拖拽提示覆盖层 */}
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-paper-cream/95 flex items-center justify-center z-10 border-2 border-dashed border-ink-medium rounded-sm pointer-events-none"
+          >
+            <div className="flex flex-col items-center gap-2 text-ink-medium">
+              <ImagePlus size={32} className="animate-bounce" />
+              <span className="text-lg font-body">释放以上传图片</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-4xl mx-auto">
         {/* 图片预览区域 */}
         <AnimatePresence>
@@ -189,7 +264,7 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
             `}
             whileHover={!disabled && !isUploading ? { scale: 1.05 } : {}}
             whileTap={!disabled && !isUploading ? { scale: 0.95 } : {}}
-            title="上传图片"
+            title="上传图片 (支持拖拽)"
           >
             <ImagePlus size={20} />
           </motion.button>
@@ -201,7 +276,7 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="请输入消息，按 Enter 发送，Shift + Enter 换行..."
+              placeholder="请输入消息，按 Enter 发送，Shift + Enter 换行，支持拖拽图片..."
               disabled={disabled || isUploading}
               rows={1}
               className={`
@@ -244,7 +319,7 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
 
         {/* 提示文字 */}
         <p className="text-xs text-ink-faint mt-2 text-center">
-          墨语AI可能会产生错误信息，请核实重要内容 · 支持上传图片
+          墨语AI可能会产生错误信息，请核实重要内容 · 支持点击或拖拽上传图片
         </p>
       </div>
     </motion.div>

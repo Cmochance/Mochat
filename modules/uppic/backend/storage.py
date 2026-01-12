@@ -3,7 +3,7 @@ R2 云存储服务 - 生成预签名 URL 用于客户端直传
 """
 import boto3
 from botocore.config import Config
-from .config import settings
+from config import settings
 
 
 class R2StorageService:

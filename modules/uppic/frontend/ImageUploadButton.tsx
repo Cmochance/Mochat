@@ -111,7 +111,9 @@ export function ImageUploadButton({
 
   /**
    * 手动触发上传（当 autoUpload=false 时使用）
+   * 可通过 ref 暴露给父组件调用
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const triggerUpload = async (): Promise<UploadResult | null> => {
     if (!preview) return null
     
@@ -122,6 +124,8 @@ export function ImageUploadButton({
     }
     return result
   }
+  // TODO: 通过 useImperativeHandle 暴露 triggerUpload 给父组件
+  void triggerUpload // 防止 TS 报未使用
 
   // 默认按钮样式（水墨风格）
   const defaultButtonStyle = `

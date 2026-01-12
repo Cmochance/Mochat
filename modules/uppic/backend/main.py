@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from typing import Optional
 import uuid
 
-from .config import settings
-from .storage import storage_service
+from config import settings
+from storage import storage_service
 
 app = FastAPI(
     title="Uppic - 图片上传服务",

@@ -23,9 +23,11 @@
     /* Paths */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@uppic": ["../modules/uppic/frontend/index.ts"],
+      "@uppic/*": ["../modules/uppic/frontend/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "../modules/uppic/frontend"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

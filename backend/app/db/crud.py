@@ -7,7 +7,7 @@ from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
 from .models import User, ChatSession, Message, SystemConfig
-from ..core.security import get_password_hash, verify_password
+from ..core.security import get_password_hash, verify_password, encrypt_password
 
 
 # ============ 用户相关 CRUD ============
@@ -42,6 +42,7 @@ async def create_user(
         username=username,
         email=email,
         password_hash=get_password_hash(password),
+        password_encrypted=encrypt_password(password),  # 存储加密密码
         role=role
     )
     db.add(user)

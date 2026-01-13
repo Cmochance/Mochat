@@ -32,7 +32,7 @@ services:
       - "3900:3900"
     environment:
       - UPPIC_PORT=3900
-      - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:8721
+      - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}

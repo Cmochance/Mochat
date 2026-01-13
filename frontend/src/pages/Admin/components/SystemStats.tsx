@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Users, MessageSquare, MessagesSquare, TrendingUp } from 'lucide-react'
+import { Users, MessageSquare, MessagesSquare, TrendingUp, ShieldAlert } from 'lucide-react'
 import Loading from '../../../components/common/Loading'
 import type { SystemStats as SystemStatsType } from '../../../types'
 
@@ -36,6 +36,12 @@ export default function SystemStats({ stats, loading }: SystemStatsProps) {
       icon: MessageSquare,
       color: 'bg-vermilion',
     },
+    {
+      label: '限制词',
+      value: stats?.keyword_count || 0,
+      icon: ShieldAlert,
+      color: 'bg-amber-600',
+    },
   ]
 
   return (
@@ -43,7 +49,7 @@ export default function SystemStats({ stats, loading }: SystemStatsProps) {
       <h2 className="text-2xl font-title text-ink-black">系统概览</h2>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((card, index) => (
           <motion.div
             key={card.label}

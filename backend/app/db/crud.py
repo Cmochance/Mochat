@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
-from .models import User, ChatSession, Message, SystemConfig
+from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword
 from ..core.security import get_password_hash, verify_password, encrypt_password
 
 
@@ -239,3 +239,79 @@ async def set_config(db: AsyncSession, key: str, value: str) -> SystemConfig:
     await db.flush()
     await db.refresh(config)
     return config
+
+
+# ============ 限制词相关 CRUD ============
+
+async def get_all_keywords(
+    db: AsyncSession,
+    active_only: bool = False
+) -> List[RestrictedKeyword]:
+    """获取所有限制词"""
+    query = select(RestrictedKeyword).order_by(RestrictedKeyword.created_at.desc())
+    if active_only:
+        query = query.where(RestrictedKeyword.is_active == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_active_keywords(db: AsyncSession) -> List[str]:
+    """获取所有启用的限制词（仅返回关键词字符串列表）"""
+    result = await db.execute(
+        select(RestrictedKeyword.keyword)
+        .where(RestrictedKeyword.is_active == True)
+    )
+    return [row[0] for row in result.fetchall()]
+
+
+async def add_keyword(
+    db: AsyncSession,
+    keyword: str,
+    created_by: Optional[int] = None
+) -> Optional[RestrictedKeyword]:
+    """添加限制词"""
+    # 检查是否已存在
+    existing = await db.execute(
+        select(RestrictedKeyword).where(RestrictedKeyword.keyword == keyword)
+    )
+    if existing.scalar_one_or_none():
+        return None  # 已存在
+    
+    new_keyword = RestrictedKeyword(
+        keyword=keyword,
+        created_by=created_by
+    )
+    db.add(new_keyword)
+    await db.flush()
+    await db.refresh(new_keyword)
+    return new_keyword
+
+
+async def delete_keyword(db: AsyncSession, keyword_id: int) -> bool:
+    """删除限制词"""
+    result = await db.execute(
+        delete(RestrictedKeyword).where(RestrictedKeyword.id == keyword_id)
+    )
+    return result.rowcount > 0
+
+
+async def toggle_keyword_status(
+    db: AsyncSession,
+    keyword_id: int
+) -> Optional[RestrictedKeyword]:
+    """切换限制词状态"""
+    result = await db.execute(
+        select(RestrictedKeyword).where(RestrictedKeyword.id == keyword_id)
+    )
+    keyword = result.scalar_one_or_none()
+    if keyword:
+        keyword.is_active = not keyword.is_active
+        await db.flush()
+        await db.refresh(keyword)
+    return keyword
+
+
+async def get_keyword_count(db: AsyncSession) -> int:
+    """获取限制词总数"""
+    result = await db.execute(select(func.count(RestrictedKeyword.id)))
+    return result.scalar()

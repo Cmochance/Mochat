@@ -1,5 +1,5 @@
 import api from './api'
-import type { User, SystemStats } from '../types'
+import type { User, SystemStats, RestrictedKeyword } from '../types'
 
 export const adminService = {
   // 获取系统统计
@@ -50,5 +50,30 @@ export const adminService = {
     await api.put(`/admin/config/${key}`, value, {
       headers: { 'Content-Type': 'text/plain' },
     })
+  },
+
+  // ============ 限制词管理 ============
+
+  // 获取所有限制词
+  async getKeywords(): Promise<RestrictedKeyword[]> {
+    const response = await api.get<RestrictedKeyword[]>('/admin/keywords')
+    return response.data
+  },
+
+  // 添加限制词
+  async addKeyword(keyword: string): Promise<RestrictedKeyword> {
+    const response = await api.post<RestrictedKeyword>('/admin/keywords', { keyword })
+    return response.data
+  },
+
+  // 删除限制词
+  async deleteKeyword(keywordId: number): Promise<void> {
+    await api.delete(`/admin/keywords/${keywordId}`)
+  },
+
+  // 切换限制词状态
+  async toggleKeywordStatus(keywordId: number): Promise<RestrictedKeyword> {
+    const response = await api.post<RestrictedKeyword>(`/admin/keywords/${keywordId}/toggle`)
+    return response.data
   },
 }

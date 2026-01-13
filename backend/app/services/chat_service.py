@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import crud
 from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
+from .content_filter import content_filter, RESTRICTED_MESSAGE
 
 
 class ChatService:
@@ -86,6 +87,20 @@ class ChatService:
             yield {"type": "error", "data": "会话不存在或无权访问"}
             return
         
+        # 检查用户输入是否包含限制词
+        input_passed, filtered_input = await content_filter.filter_input(db, content)
+        if not input_passed:
+            # 保存用户原始消息
+            await crud.create_message(db, session_id, "user", content)
+            await db.commit()
+            # 返回限制消息
+            yield {"type": "content", "data": RESTRICTED_MESSAGE}
+            yield {"type": "done", "data": ""}
+            # 保存限制消息作为 AI 响应
+            await crud.create_message(db, session_id, "assistant", RESTRICTED_MESSAGE)
+            await db.commit()
+            return
+        
         # 保存用户消息
         await crud.create_message(db, session_id, "user", content)
         await db.commit()
@@ -100,13 +115,37 @@ class ChatService:
         # 调用AI服务获取流式响应
         thinking_full = ""
         content_full = ""
+        output_restricted = False
         
         async for chunk in ai_service.chat_stream(messages):
             if chunk["type"] == "thinking":
                 thinking_full += chunk["data"]
+                yield chunk
             elif chunk["type"] == "content":
                 content_full += chunk["data"]
-            yield chunk
+                # 实时检查输出内容
+                output_passed, _ = await content_filter.check_content(db, content_full)
+                if not output_passed:
+                    output_restricted = True
+                    break
+                yield chunk
+            else:
+                yield chunk
+        
+        # 如果输出被限制
+        if output_restricted:
+            yield {"type": "content", "data": f"\n\n{RESTRICTED_MESSAGE}"}
+            yield {"type": "done", "data": ""}
+            # 保存限制消息
+            await crud.create_message(
+                db, 
+                session_id, 
+                "assistant", 
+                RESTRICTED_MESSAGE,
+                thinking=thinking_full if thinking_full else None
+            )
+            await db.commit()
+            return
         
         # 保存AI响应
         if content_full:

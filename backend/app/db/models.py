@@ -62,3 +62,14 @@ class SystemConfig(Base):
     key = Column(String(50), primary_key=True)
     value = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class RestrictedKeyword(Base):
+    """限制词模型"""
+    __tablename__ = "restricted_keywords"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    keyword = Column(String(100), unique=True, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)

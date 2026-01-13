@@ -62,4 +62,13 @@ export interface SystemStats {
   user_count: number
   session_count: number
   message_count: number
+  keyword_count: number
+}
+
+// 限制词
+export interface RestrictedKeyword {
+  id: number
+  keyword: string
+  is_active: boolean
+  created_at: string
 }

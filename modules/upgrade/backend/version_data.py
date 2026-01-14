@@ -32,4 +32,8 @@ VERSION_HISTORY = [
         "version": "v1.4.1",
         "description": "优化对话框显示，避免对话过长导致页面崩坏。"
     },
+    {
+        "version": "v1.4.2",
+        "description": "添加导出为word文档，优化文档命名逻辑。"
+    },
 ]

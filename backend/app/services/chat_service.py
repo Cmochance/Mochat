@@ -11,6 +11,10 @@ from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
 from .content_filter import content_filter, RESTRICTED_MESSAGE
 
+# 默认配置值
+DEFAULT_MAX_TOKENS = 4096
+DEFAULT_TEMPERATURE = 0.7
+
 # Upword 服务地址（Docker 内部网络）
 UPWORD_SERVICE_URL = "http://upword:3901"
 
@@ -201,12 +205,35 @@ class ChatService:
                 msg_content = await ChatService.expand_doc_content(msg_content)
             messages.append({"role": msg.role, "content": msg_content})
         
+        # 从数据库获取配置
+        max_tokens = DEFAULT_MAX_TOKENS
+        temperature = DEFAULT_TEMPERATURE
+        
+        try:
+            max_tokens_str = await crud.get_config(db, "max_tokens")
+            if max_tokens_str:
+                max_tokens = int(max_tokens_str)
+        except (ValueError, TypeError):
+            pass
+        
+        try:
+            temperature_str = await crud.get_config(db, "temperature")
+            if temperature_str:
+                temperature = float(temperature_str)
+        except (ValueError, TypeError):
+            pass
+        
         # 调用AI服务获取流式响应
         thinking_full = ""
         content_full = ""
         output_restricted = False
         
-        async for chunk in ai_service.chat_stream(messages, model=model):
+        async for chunk in ai_service.chat_stream(
+            messages, 
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature
+        ):
             if chunk["type"] == "thinking":
                 thinking_full += chunk["data"]
                 yield chunk
@@ -288,11 +315,33 @@ class ChatService:
             yield {"type": "error", "data": "没有用户消息"}
             return
         
+        # 从数据库获取配置
+        max_tokens = DEFAULT_MAX_TOKENS
+        temperature = DEFAULT_TEMPERATURE
+        
+        try:
+            max_tokens_str = await crud.get_config(db, "max_tokens")
+            if max_tokens_str:
+                max_tokens = int(max_tokens_str)
+        except (ValueError, TypeError):
+            pass
+        
+        try:
+            temperature_str = await crud.get_config(db, "temperature")
+            if temperature_str:
+                temperature = float(temperature_str)
+        except (ValueError, TypeError):
+            pass
+        
         # 调用AI服务
         thinking_full = ""
         content_full = ""
         
-        async for chunk in ai_service.chat_stream(messages):
+        async for chunk in ai_service.chat_stream(
+            messages,
+            max_tokens=max_tokens,
+            temperature=temperature
+        ):
             if chunk["type"] == "thinking":
                 thinking_full += chunk["data"]
             elif chunk["type"] == "content":

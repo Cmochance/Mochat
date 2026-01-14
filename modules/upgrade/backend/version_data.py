@@ -25,7 +25,11 @@ VERSION_HISTORY = [
         "description": "优化公式输出格式问题，添加上传word文档功能。"
     },
     {
-        "version": "v1.4",
+        "version": "v1.4.0",
         "description": "优化对话定位逻辑，添加模型选择功能。"
+    },
+    {
+        "version": "v1.4.1",
+        "description": "优化对话框显示，避免对话过长导致页面崩坏。"
     },
 ]

@@ -258,6 +258,50 @@ export default function Chat() {
     loadSessions()
   }
 
+  // 重新生成最后一条 AI 消息
+  const handleRegenerate = async () => {
+    if (!currentSession || isStreaming) return
+
+    // 移除最后一条 AI 消息
+    const lastAiMessageIndex = messages.map((m, i) => m.role === 'assistant' ? i : -1)
+      .filter(i => i !== -1).pop()
+    
+    if (lastAiMessageIndex === undefined) return
+    
+    // 从 store 中移除最后一条 AI 消息
+    const updatedMessages = messages.filter((_, i) => i !== lastAiMessageIndex)
+    setMessages(updatedMessages)
+
+    setStreaming(true)
+    clearStreaming()
+
+    try {
+      await chatService.regenerateResponse(currentSession.id, (chunk: StreamChunk) => {
+        if (chunk.type === 'thinking') {
+          appendStreamingThinking(chunk.data)
+        } else if (chunk.type === 'content') {
+          appendStreamingContent(chunk.data)
+        } else if (chunk.type === 'done') {
+          const state = useChatStore.getState()
+          addMessage({
+            id: Date.now(),
+            role: 'assistant',
+            content: state.streamingContent,
+            thinking: state.streamingThinking || undefined,
+            created_at: new Date().toISOString(),
+          })
+          clearStreaming()
+        } else if (chunk.type === 'error') {
+          console.error('重新生成失败:', chunk.data)
+          clearStreaming()
+        }
+      })
+    } catch (error) {
+      console.error('重新生成失败:', error)
+      clearStreaming()
+    }
+  }
+
   return (
     <div className="h-screen flex bg-paper-gradient overflow-hidden">
       {/* 版本更新弹窗 (独立模块) */}
@@ -309,6 +353,7 @@ export default function Chat() {
           hasMore={hasMoreMessages}
           loadingMore={loadingMore}
           onLoadMore={loadMoreMessages}
+          onRegenerate={handleRegenerate}
         />
 
         {/* 输入区域 */}

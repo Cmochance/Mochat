@@ -7,19 +7,17 @@ import {
   Settings, 
   ArrowLeft,
   LogOut,
-  ShieldAlert,
-  Bot
+  ShieldAlert
 } from 'lucide-react'
 import UserManagement from './components/UserManagement'
 import SystemStats from './components/SystemStats'
 import ModelConfig from './components/ModelConfig'
 import KeywordManagement from './components/KeywordManagement'
-import ModelManagement from './components/ModelManagement'
 import { useAuthStore } from '../../stores/authStore'
 import { adminService } from '../../services/adminService'
 import type { User, SystemStats as SystemStatsType } from '../../types'
 
-type TabType = 'stats' | 'users' | 'models' | 'config' | 'keywords'
+type TabType = 'stats' | 'users' | 'config' | 'keywords'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -57,16 +55,15 @@ export default function Admin() {
   const tabs = [
     { id: 'stats' as const, label: '系统概览', icon: BarChart3 },
     { id: 'users' as const, label: '用户管理', icon: Users },
-    { id: 'models' as const, label: '模型管理', icon: Bot },
     { id: 'config' as const, label: '系统配置', icon: Settings },
     { id: 'keywords' as const, label: '内容限制', icon: ShieldAlert },
   ]
 
   return (
-    <div className="min-h-screen bg-paper-gradient">
+    <div className="h-screen flex flex-col bg-paper-gradient overflow-hidden">
       {/* 顶部导航 */}
       <motion.header
-        className="bg-ink-dark text-paper-white"
+        className="bg-ink-dark text-paper-white flex-shrink-0"
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
@@ -121,27 +118,28 @@ export default function Admin() {
       </motion.header>
 
       {/* 内容区 */}
-      <main className="container mx-auto px-6 py-8">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {activeTab === 'stats' && (
-            <SystemStats stats={stats} loading={loading} />
-          )}
-          {activeTab === 'users' && (
-            <UserManagement
-              users={users}
-              loading={loading}
-              onRefresh={loadData}
-            />
-          )}
-          {activeTab === 'models' && <ModelManagement />}
-          {activeTab === 'config' && <ModelConfig />}
-          {activeTab === 'keywords' && <KeywordManagement />}
-        </motion.div>
+      <main className="flex-1 overflow-y-auto">
+        <div className="container mx-auto px-6 py-8">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {activeTab === 'stats' && (
+              <SystemStats stats={stats} loading={loading} />
+            )}
+            {activeTab === 'users' && (
+              <UserManagement
+                users={users}
+                loading={loading}
+                onRefresh={loadData}
+              />
+            )}
+            {activeTab === 'config' && <ModelConfig />}
+            {activeTab === 'keywords' && <KeywordManagement />}
+          </motion.div>
+        </div>
       </main>
     </div>
   )

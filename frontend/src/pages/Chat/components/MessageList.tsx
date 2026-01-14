@@ -14,6 +14,7 @@ interface MessageListProps {
   hasMore?: boolean  // 是否还有更多历史消息
   loadingMore?: boolean  // 是否正在加载更多
   onLoadMore?: () => void  // 加载更多回调
+  onRegenerate?: () => void  // 重新生成最后一条AI消息
 }
 
 // 获取滚动位置存储的 key
@@ -29,6 +30,7 @@ export default function MessageList({
   hasMore = false,
   loadingMore = false,
   onLoadMore,
+  onRegenerate,
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -182,13 +184,22 @@ export default function MessageList({
 
         {/* 消息列表 */}
         <AnimatePresence>
-          {messages.map((message, index) => (
-            <MessageItem
-              key={message.id}
-              message={message}
-              index={index}
-            />
-          ))}
+          {messages.map((message, index) => {
+            // 找出最后一条 AI 消息的索引
+            const lastAiIndex = messages.map((m, i) => m.role === 'assistant' ? i : -1)
+              .filter(i => i !== -1).pop()
+            const isLastAiMessage = message.role === 'assistant' && index === lastAiIndex
+            
+            return (
+              <MessageItem
+                key={message.id}
+                message={message}
+                index={index}
+                isLastAiMessage={isLastAiMessage}
+                onRegenerate={onRegenerate}
+              />
+            )
+          })}
         </AnimatePresence>
 
         {/* 流式响应中的消息 */}

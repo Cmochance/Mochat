@@ -47,9 +47,7 @@ export const adminService = {
 
   // 设置配置
   async setConfig(key: string, value: string): Promise<void> {
-    await api.put(`/admin/config/${key}`, value, {
-      headers: { 'Content-Type': 'text/plain' },
-    })
+    await api.put(`/admin/config/${key}`, { value })
   },
 
   // ============ 限制词管理 ============

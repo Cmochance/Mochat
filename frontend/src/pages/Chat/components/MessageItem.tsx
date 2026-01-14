@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, X, FileText } from 'lucide-react'
+import { User, X, FileText, Copy, Check, RefreshCw } from 'lucide-react'
 import ThinkingBlock from './ThinkingBlock'
 import type { Message } from '../../../types'
 import ReactMarkdown from 'react-markdown'
@@ -49,6 +49,8 @@ interface MessageItemProps {
   message: Message
   index: number
   isStreaming?: boolean
+  isLastAiMessage?: boolean
+  onRegenerate?: () => void
 }
 
 // 图片消息组件（带 Lightbox）
@@ -185,13 +187,31 @@ function MarkdownContent({
   )
 }
 
-export default function MessageItem({ message, index, isStreaming = false }: MessageItemProps) {
+export default function MessageItem({ 
+  message, 
+  index, 
+  isStreaming = false,
+  isLastAiMessage = false,
+  onRegenerate
+}: MessageItemProps) {
   const isUser = message.role === 'user'
+  const [copied, setCopied] = useState(false)
   
   // 对用户消息解析文档标记
   const { displayContent, docFiles } = isUser 
     ? parseDocContent(message.content || '')
     : { displayContent: message.content || '', docFiles: [] }
+
+  // 复制消息内容
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content || '')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('复制失败:', err)
+    }
+  }
 
   return (
     <motion.div
@@ -244,7 +264,7 @@ export default function MessageItem({ message, index, isStreaming = false }: Mes
         {(displayContent || !isUser || isStreaming) && (
           <div
             className={`
-              p-4 rounded-sm
+              p-4 rounded-sm max-h-[400px] overflow-y-auto
               ${isUser
                 ? 'bg-ink-black text-paper-white'
                 : 'bg-paper-white border border-paper-aged text-ink-black'
@@ -258,8 +278,41 @@ export default function MessageItem({ message, index, isStreaming = false }: Mes
           </div>
         )}
 
+        {/* AI 消息操作按钮 */}
+        {!isUser && !isStreaming && message.content && (
+          <div className="flex items-center gap-1 mt-1.5">
+            {/* 复制按钮 */}
+            <motion.button
+              onClick={handleCopy}
+              className="p-1.5 text-ink-faint hover:text-ink-medium hover:bg-paper-aged/50 rounded transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="复制内容"
+            >
+              {copied ? (
+                <Check size={14} className="text-jade" />
+              ) : (
+                <Copy size={14} />
+              )}
+            </motion.button>
+
+            {/* 重新生成按钮（仅最后一条 AI 消息显示） */}
+            {isLastAiMessage && onRegenerate && (
+              <motion.button
+                onClick={onRegenerate}
+                className="p-1.5 text-ink-faint hover:text-ink-medium hover:bg-paper-aged/50 rounded transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="重新生成"
+              >
+                <RefreshCw size={14} />
+              </motion.button>
+            )}
+          </div>
+        )}
+
         {/* 时间戳 */}
-        <p className={`text-xs text-ink-faint mt-2 ${isUser ? 'text-right' : ''}`}>
+        <p className={`text-xs text-ink-faint mt-1 ${isUser ? 'text-right' : ''}`}>
           {new Date(message.created_at).toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',

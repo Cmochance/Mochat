@@ -118,15 +118,20 @@ async def get_configs(
     return await admin_service.get_all_configs(db)
 
 
+class ConfigUpdate(BaseModel):
+    value: str
+
+
 @router.put("/config/{key}")
 async def set_config(
     key: str,
-    value: str,
+    data: ConfigUpdate,
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
     """设置系统配置"""
-    await admin_service.set_config(db, key, value)
+    await admin_service.set_config(db, key, data.value)
+    await db.commit()
     return {"message": "配置更新成功"}
 
 

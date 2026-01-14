@@ -320,11 +320,20 @@ class AIService:
         self,
         messages: list[dict],
         system_prompt: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7
     ) -> AsyncGenerator[dict, None]:
         """
         流式对话，返回thinking和content分开的数据流
         支持多模态（图片）输入
+        
+        Args:
+            messages: 消息列表
+            system_prompt: 系统提示词
+            model: 模型名称
+            max_tokens: 最大输出 token 数
+            temperature: 温度参数
         
         Yields:
             dict: {"type": "thinking" | "content" | "done" | "error", "data": str}
@@ -367,7 +376,7 @@ class AIService:
         
         # 确定使用的模型
         use_model = model or self.default_model
-        logger.info(f"[AI] 使用模型: {use_model}")
+        logger.info(f"[AI] 使用模型: {use_model}, max_tokens: {max_tokens}, temperature: {temperature}")
         
         try:
             # 调用AI API（流式）
@@ -375,8 +384,8 @@ class AIService:
                 model=use_model,
                 messages=chat_messages,
                 stream=True,
-                temperature=0.7,
-                max_tokens=4096
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             
             thinking_buffer = ""

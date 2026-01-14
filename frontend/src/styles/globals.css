@@ -27,30 +27,47 @@
   box-sizing: border-box;
 }
 
+/* ========== 布局锁定 - 防止任何元素撑破视口 ========== */
 html {
-  scroll-behavior: smooth;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* 完全禁止滚动 */
 }
 
 body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* 完全禁止滚动 */
   font-family: 'Noto Serif SC', 'Source Han Serif CN', serif;
   background: linear-gradient(180deg, var(--paper-white) 0%, var(--paper-cream) 100%);
   color: var(--ink-black);
-  min-height: 100vh;
   line-height: 1.8;
 }
 
-/* 宣纸背景纹理 */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: -1;
+#root {
+  height: 100%; /* 固定高度，不使用 min-height */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+/* 修复第三方插件导致的布局崩坏 */
+/* 禁用 body 伪元素，防止插件注入遮罩 */
+body::before,
+body::after {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  content: none !important;
+}
+
+/* 针对沉浸式翻译等插件的样式重置 */
+#immersive-translate-popup {
+  z-index: -1 !important;
+  display: none !important;
 }
 
 /* 书法标题字体 */
@@ -233,6 +250,30 @@ body::before {
 .markdown-content blockquote {
   @apply border-l-4 border-ink-light pl-4 my-4;
   @apply text-ink-medium italic;
+}
+
+/* KaTeX 数学公式样式 */
+.markdown-content .katex {
+  font-size: 1.1em;
+}
+
+.markdown-content .katex-display {
+  @apply my-4 overflow-x-auto overflow-y-hidden;
+  text-align: center;
+}
+
+.markdown-content .katex-display > .katex {
+  white-space: nowrap;
+}
+
+/* 行内公式调整 */
+.markdown-content .katex:not(.katex-display .katex) {
+  padding: 0 0.15em;
+}
+
+/* 用户消息中的公式样式 */
+.message-bubble.user .katex {
+  color: var(--paper-white);
 }
 
 /* 加载动画 */

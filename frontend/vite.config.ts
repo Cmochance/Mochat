@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@uppic': path.resolve(__dirname, '../modules/uppic/frontend'),
+      '@upword': path.resolve(__dirname, '../modules/upword/frontend'),
     },
   },
   server: {
@@ -28,11 +29,17 @@ export default defineConfig({
           })
         },
       },
-      // Uppic 独立图片上传服务代理
+      // Uppic 独立图片上传服务代理 (Docker 端口 13900)
       '/uppic': {
-        target: 'http://localhost:3900',
+        target: 'http://localhost:13900',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/uppic/, ''),
+      },
+      // Upword 独立文档上传解析服务代理 (Docker 端口 13901)
+      '/upword': {
+        target: 'http://localhost:13901',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/upword/, ''),
       },
     },
   },

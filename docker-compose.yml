@@ -25,6 +25,23 @@ services:
       - mochat_data:/data
     restart: unless-stopped
 
+  # Upword 文档上传解析服务
+  upword:
+    build:
+      context: ./modules/upword/backend
+      dockerfile: Dockerfile
+    ports:
+      - "13901:3901"
+    environment:
+      - UPWORD_PORT=3901
+      - UPWORD_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-}
+      - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
+    restart: unless-stopped
+
   # Uppic 图片上传服务
   uppic:
     build:
@@ -34,7 +51,7 @@ services:
       - "13900:3900"
     environment:
       - UPPIC_PORT=3900
-      - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:8721
+      - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
@@ -48,10 +65,11 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - "8721:3721"
+      - "38721:3721"
     depends_on:
       - backend
       - uppic
+      - upword
     restart: unless-stopped
 
 volumes:

@@ -72,3 +72,17 @@ export interface RestrictedKeyword {
   is_active: boolean
   created_at: string
 }
+
+// 版本历史条目
+export interface VersionHistoryItem {
+  version: string
+  description: string
+}
+
+// 版本信息
+export interface VersionInfo {
+  current_version: string
+  last_seen_version: string | null
+  has_new_version: boolean
+  version_history: VersionHistoryItem[]
+}

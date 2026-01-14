@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, MessageSquare, Trash2, LogOut, Settings, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -27,6 +28,19 @@ export default function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const { logout, user } = useAuthStore()
+  
+  // 检测是否为大屏幕 - 大屏幕不需要遮罩层
+  const [isLargeScreen, setIsLargeScreen] = useState(true)
+  
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024)
+    }
+    
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -35,11 +49,11 @@ export default function Sidebar({
 
   return (
     <>
-      {/* 移动端遮罩 */}
+      {/* 移动端遮罩 - 只在小屏幕且侧边栏打开时渲染 */}
       <AnimatePresence>
-        {isOpen && (
+        {isOpen && !isLargeScreen && (
           <motion.div
-            className="fixed inset-0 bg-ink-black/50 z-20 lg:hidden"
+            className="fixed inset-0 bg-ink-black/50 z-20"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -64,7 +78,10 @@ export default function Sidebar({
             <div className="w-10 h-10 rounded-full bg-paper-white flex items-center justify-center">
               <span className="text-ink-black font-title text-xl">墨</span>
             </div>
-            <span className="text-xl font-title">墨语</span>
+            <div className="flex flex-col">
+              <span className="text-xl font-title leading-tight">墨语</span>
+              <span className="text-xs text-paper-cream/60">v1.3</span>
+            </div>
           </div>
           <button
             className="lg:hidden p-2 hover:bg-ink-medium rounded-sm"

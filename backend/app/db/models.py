@@ -18,6 +18,7 @@ class User(Base):
     password_encrypted = Column(String(500), nullable=True)  # AES加密的密码（管理员可查看）
     role = Column(String(20), default="user")  # user, admin
     is_active = Column(Boolean, default=True)
+    last_seen_version = Column(String(20), nullable=True)  # 用户已阅读的最新版本号
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

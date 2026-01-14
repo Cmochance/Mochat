@@ -35,7 +35,7 @@ export default function MessageList({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6">
+    <div className="flex-1 overflow-y-auto px-4 py-6 min-h-0">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* 空状态 */}
         {messages.length === 0 && !isStreaming && (
@@ -86,23 +86,29 @@ export default function MessageList({
               <span className="text-paper-white font-title">墨</span>
             </div>
             <div className="flex-1 p-4 bg-paper-white rounded-sm border border-paper-aged">
-              <div className="flex items-center gap-2 text-ink-light">
+              <div className="flex items-center text-ink-light">
+                <span className="text-sm">等待中</span>
                 <motion.span
-                  className="w-2 h-2 bg-ink-medium rounded-full"
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                />
+                  className="text-sm"
+                  animate={{ opacity: [0, 1, 1, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity, times: [0, 0.3, 0.6, 1] }}
+                >
+                  。
+                </motion.span>
                 <motion.span
-                  className="w-2 h-2 bg-ink-medium rounded-full"
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-                />
+                  className="text-sm"
+                  animate={{ opacity: [0, 0, 1, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity, times: [0, 0.3, 0.6, 1] }}
+                >
+                  。
+                </motion.span>
                 <motion.span
-                  className="w-2 h-2 bg-ink-medium rounded-full"
-                  animate={{ opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-                />
-                <span className="ml-2 text-sm">思考中...</span>
+                  className="text-sm"
+                  animate={{ opacity: [0, 0, 0, 1] }}
+                  transition={{ duration: 1.2, repeat: Infinity, times: [0, 0.3, 0.6, 1] }}
+                >
+                  。
+                </motion.span>
               </div>
             </div>
           </motion.div>

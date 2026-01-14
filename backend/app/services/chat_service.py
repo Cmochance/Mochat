@@ -1,6 +1,8 @@
 """
 对话业务服务 - 处理对话相关的业务逻辑
 """
+import re
+import httpx
 from typing import List, Optional, AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,9 +11,56 @@ from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
 from .content_filter import content_filter, RESTRICTED_MESSAGE
 
+# Upword 服务地址（Docker 内部网络）
+UPWORD_SERVICE_URL = "http://upword:3901"
+
 
 class ChatService:
     """对话业务服务类"""
+    
+    @staticmethod
+    async def expand_doc_content(content: str) -> str:
+        """
+        展开消息中的文档标记，从 upword 服务获取文档内容
+        
+        格式: <!-- DOC:filename:key --><!-- /DOC -->
+        展开为: <!-- DOC:filename -->文档内容<!-- /DOC -->
+        """
+        # 匹配格式: <!-- DOC:filename:key --><!-- /DOC -->
+        pattern = r'<!-- DOC:(.+?):(.+?) --><!-- /DOC -->'
+        matches = list(re.finditer(pattern, content))
+        
+        if not matches:
+            return content
+        
+        result = content
+        for match in matches:
+            filename = match.group(1)
+            object_key = match.group(2)
+            
+            try:
+                # 调用 upword 服务获取文档内容
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f"{UPWORD_SERVICE_URL}/api/parse",
+                        json={"objectKey": object_key}
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("success") and data.get("markdown"):
+                            # 替换为包含内容的格式
+                            doc_content = f"<!-- DOC:{filename} -->\n以下是用户上传的文档内容:\n\n{data['markdown']}\n<!-- /DOC -->"
+                            result = result.replace(match.group(0), doc_content)
+                            print(f"[ChatService] 成功获取文档内容: {filename}")
+                        else:
+                            print(f"[ChatService] 文档解析失败: {data.get('error')}")
+                    else:
+                        print(f"[ChatService] upword 服务响应错误: {response.status_code}")
+            except Exception as e:
+                print(f"[ChatService] 获取文档内容失败: {e}")
+        
+        return result
     
     @staticmethod
     async def create_session(
@@ -101,16 +150,19 @@ class ChatService:
             await db.commit()
             return
         
-        # 保存用户消息
+        # 保存用户消息（保存原始内容，不含文档实际内容）
         await crud.create_message(db, session_id, "user", content)
         await db.commit()
         
         # 获取历史消息构建上下文
         history = await crud.get_session_messages(db, session_id)
-        messages = [
-            {"role": msg.role, "content": msg.content}
-            for msg in history[-10:]  # 最近10条消息作为上下文
-        ]
+        messages = []
+        for msg in history[-10:]:  # 最近10条消息作为上下文
+            msg_content = msg.content
+            # 对于用户消息，展开文档标记获取实际内容
+            if msg.role == "user":
+                msg_content = await ChatService.expand_doc_content(msg_content)
+            messages.append({"role": msg.role, "content": msg_content})
         
         # 调用AI服务获取流式响应
         thinking_full = ""

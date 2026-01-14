@@ -1,11 +1,49 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, X } from 'lucide-react'
+import { User, X, FileText } from 'lucide-react'
 import ThinkingBlock from './ThinkingBlock'
 import type { Message } from '../../../types'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+
+// 解析文档标记，提取文件名和可见内容
+// 支持两种格式：
+// 1. 新格式（只有元数据）: <!-- DOC:filename:key --><!-- /DOC -->
+// 2. 旧格式（包含内容）: <!-- DOC:filename -->内容<!-- /DOC -->
+function parseDocContent(content: string): { 
+  displayContent: string
+  docFiles: string[] 
+} {
+  const docFiles: string[] = []
+  
+  // 匹配新格式: <!-- DOC:filename:key --><!-- /DOC -->
+  const newPattern = /<!-- DOC:([^:]+?):[^>]+? --><!-- \/DOC -->/g
+  let match
+  while ((match = newPattern.exec(content)) !== null) {
+    docFiles.push(match[1])
+  }
+  
+  // 匹配旧格式: <!-- DOC:filename -->...<!-- /DOC -->
+  const oldPattern = /<!-- DOC:([^:>]+?) -->[\s\S]*?<!-- \/DOC -->/g
+  while ((match = oldPattern.exec(content)) !== null) {
+    // 避免重复添加
+    if (!docFiles.includes(match[1])) {
+      docFiles.push(match[1])
+    }
+  }
+  
+  // 移除所有文档标记，只保留用户的文字消息
+  let displayContent = content
+    .replace(/<!-- DOC:[^>]+? --><!-- \/DOC -->/g, '')  // 新格式
+    .replace(/<!-- DOC:[^>]+? -->[\s\S]*?<!-- \/DOC -->/g, '')  // 旧格式
+    .trim()
+  
+  return { displayContent, docFiles }
+}
 
 interface MessageItemProps {
   message: Message
@@ -88,6 +126,8 @@ function MarkdownContent({
   return (
     <div className={isUser ? '' : 'markdown-content'}>
       <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           // 代码块渲染
           code({ className, children, ...props }) {
@@ -147,6 +187,11 @@ function MarkdownContent({
 
 export default function MessageItem({ message, index, isStreaming = false }: MessageItemProps) {
   const isUser = message.role === 'user'
+  
+  // 对用户消息解析文档标记
+  const { displayContent, docFiles } = isUser 
+    ? parseDocContent(message.content || '')
+    : { displayContent: message.content || '', docFiles: [] }
 
   return (
     <motion.div
@@ -180,21 +225,38 @@ export default function MessageItem({ message, index, isStreaming = false }: Mes
           />
         )}
 
+        {/* 文档标签（用户消息上方） */}
+        {isUser && docFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 justify-end">
+            {docFiles.map((fileName, i) => (
+              <div 
+                key={i}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ink-black/80 text-paper-white text-sm rounded-sm"
+              >
+                <FileText size={14} />
+                <span className="max-w-[200px] truncate">{fileName}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* 消息气泡 */}
-        <div
-          className={`
-            p-4 rounded-sm
-            ${isUser
-              ? 'bg-ink-black text-paper-white'
-              : 'bg-paper-white border border-paper-aged text-ink-black'
-            }
-          `}
-        >
-          <MarkdownContent 
-            content={message.content || (isStreaming ? '▌' : '')} 
-            isUser={isUser}
-          />
-        </div>
+        {(displayContent || !isUser || isStreaming) && (
+          <div
+            className={`
+              p-4 rounded-sm
+              ${isUser
+                ? 'bg-ink-black text-paper-white'
+                : 'bg-paper-white border border-paper-aged text-ink-black'
+              }
+            `}
+          >
+            <MarkdownContent 
+              content={displayContent || (isStreaming ? '▌' : '')} 
+              isUser={isUser}
+            />
+          </div>
+        )}
 
         {/* 时间戳 */}
         <p className={`text-xs text-ink-faint mt-2 ${isUser ? 'text-right' : ''}`}>

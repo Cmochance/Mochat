@@ -3,7 +3,9 @@ import { motion } from 'framer-motion'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea from './components/InputArea'
+import VersionModal from '../../components/common/VersionModal'
 import { chatService } from '../../services/chatService'
+import { versionService } from '../../services/versionService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
 import type { StreamChunk } from '../../types'
@@ -31,7 +33,32 @@ export default function Chat() {
     removeSession,
   } = useChatStore()
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // 侧边栏状态 - 默认关闭，根据屏幕大小在挂载后调整
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  
+  // 版本弹窗状态
+  const [showVersionModal, setShowVersionModal] = useState(false)
+  
+  // 挂载时根据屏幕大小设置侧边栏状态
+  useEffect(() => {
+    const isLargeScreen = window.innerWidth >= 1024
+    setSidebarOpen(isLargeScreen)
+  }, [])
+
+  // 检查是否需要显示版本更新弹窗
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const versionInfo = await versionService.getVersionInfo()
+        if (versionInfo.has_new_version) {
+          setShowVersionModal(true)
+        }
+      } catch (error) {
+        console.error('检查版本失败:', error)
+      }
+    }
+    checkVersion()
+  }, [])
 
   // 加载会话列表
   useEffect(() => {
@@ -62,7 +89,23 @@ export default function Chat() {
     setLoading(true)
     try {
       const data = await chatService.getMessages(sessionId)
-      setMessages(data)
+      // 过滤用户消息中的文档内容，只保留元数据
+      // 防止从后端获取的完整文档内容导致布局问题
+      // 支持两种格式：
+      // 1. 新格式（只有元数据）: <!-- DOC:filename:key --><!-- /DOC --> - 无需处理
+      // 2. 旧格式（包含内容）: <!-- DOC:filename -->内容<!-- /DOC --> - 需要过滤
+      const filteredData = data.map(msg => {
+        if (msg.role === 'user' && msg.content) {
+          // 移除旧格式中的文档内容，只保留文件名
+          const filtered = msg.content.replace(
+            /<!-- DOC:([^:>]+?) -->[\s\S]*?<!-- \/DOC -->/g,
+            '<!-- DOC:$1 --><!-- /DOC -->'
+          )
+          return { ...msg, content: filtered }
+        }
+        return msg
+      })
+      setMessages(filteredData)
     } catch (error) {
       console.error('加载消息失败:', error)
     } finally {
@@ -106,11 +149,15 @@ export default function Chat() {
   }
 
   const sendMessageToSession = async (sessionId: number, content: string) => {
-    // 添加用户消息
+    // 新版本：消息中已经只包含元数据，不需要再过滤
+    // 格式: <!-- DOC:filename:key --><!-- /DOC -->
+    const displayContent = content
+    
+    // 添加用户消息（显示版本，不含文档内容）
     addMessage({
       id: Date.now(),
       role: 'user',
-      content,
+      content: displayContent,
       created_at: new Date().toISOString(),
     })
 
@@ -151,6 +198,11 @@ export default function Chat() {
 
   return (
     <div className="h-screen flex bg-paper-gradient overflow-hidden">
+      {/* 版本更新弹窗 */}
+      {showVersionModal && (
+        <VersionModal onClose={() => setShowVersionModal(false)} />
+      )}
+
       {/* 侧边栏 */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -163,11 +215,11 @@ export default function Chat() {
         username={user?.username || '用户'}
       />
 
-      {/* 主内容区 */}
-      <main className="flex-1 flex flex-col min-w-0">
+      {/* 主内容区 - 严格高度约束 */}
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
         {/* 头部 */}
         <motion.header
-          className="h-16 border-b border-paper-aged bg-paper-white/80 backdrop-blur-sm flex items-center px-6"
+          className="h-16 border-b border-paper-aged bg-paper-white/80 backdrop-blur-sm flex items-center px-6 flex-shrink-0"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >

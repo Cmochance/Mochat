@@ -4,7 +4,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from typing import List, Optional
 
 from ..db.database import get_db
 from ..db import crud
@@ -14,40 +13,9 @@ from ..db.models import User
 
 router = APIRouter()
 
-# ============ 版本信息 ============
-
-CURRENT_VERSION = "v1.3"
-
-VERSION_HISTORY = [
-    {
-        "version": "v1.0",
-        "description": "搭建网站框架，成功部署并投入使用。"
-    },
-    {
-        "version": "v1.1",
-        "description": "添加上传图片功能。"
-    },
-    {
-        "version": "v1.2",
-        "description": "风控设置，设置系统提示词掐断和后台添加遗漏违禁词功能。"
-    },
-    {
-        "version": "v1.3",
-        "description": "优化公式输出格式问题，添加上传word文档功能。"
-    },
-]
-
-
-class VersionInfo(BaseModel):
-    """版本信息响应"""
-    current_version: str
-    last_seen_version: Optional[str]
-    has_new_version: bool
-    version_history: List[dict]
-
 
 class VersionAckRequest(BaseModel):
-    """版本确认请求"""
+    """版本确认请求 - 供 upgrade 模块调用"""
     version: str
 
 
@@ -95,23 +63,7 @@ async def update_profile(
     return current_user
 
 
-# ============ 版本 API ============
-
-@router.get("/version", response_model=VersionInfo)
-async def get_version_info(
-    current_user: User = Depends(get_current_active_user)
-):
-    """获取版本信息"""
-    last_seen = current_user.last_seen_version
-    has_new = last_seen != CURRENT_VERSION
-    
-    return VersionInfo(
-        current_version=CURRENT_VERSION,
-        last_seen_version=last_seen,
-        has_new_version=has_new,
-        version_history=VERSION_HISTORY
-    )
-
+# ============ 版本 API（供 upgrade 模块调用）============
 
 @router.post("/version/ack")
 async def acknowledge_version(
@@ -119,6 +71,9 @@ async def acknowledge_version(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """确认已阅读版本更新"""
+    """
+    确认已阅读版本更新
+    此 API 供 upgrade 模块调用，用于更新用户的 last_seen_version
+    """
     await crud.update_user(db, current_user.id, last_seen_version=request.version)
     return {"success": True, "message": "版本已确认"}

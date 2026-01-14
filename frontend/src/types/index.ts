@@ -73,16 +73,4 @@ export interface RestrictedKeyword {
   created_at: string
 }
 
-// 版本历史条目
-export interface VersionHistoryItem {
-  version: string
-  description: string
-}
-
-// 版本信息
-export interface VersionInfo {
-  current_version: string
-  last_seen_version: string | null
-  has_new_version: boolean
-  version_history: VersionHistoryItem[]
-}
+// 版本相关类型已移至 modules/upgrade/frontend/types.ts

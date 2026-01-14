@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, MessageSquare, Trash2, LogOut, Settings, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../../stores/authStore'
+import { getCurrentVersion } from '@upgrade'
 import type { ChatSession } from '../../../types'
 
 interface SidebarProps {
@@ -32,6 +33,9 @@ export default function Sidebar({
   // 检测是否为大屏幕 - 大屏幕不需要遮罩层
   const [isLargeScreen, setIsLargeScreen] = useState(true)
   
+  // 当前版本号
+  const [version, setVersion] = useState('v1.3')
+  
   useEffect(() => {
     const checkScreenSize = () => {
       setIsLargeScreen(window.innerWidth >= 1024)
@@ -40,6 +44,11 @@ export default function Sidebar({
     checkScreenSize()
     window.addEventListener('resize', checkScreenSize)
     return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
+
+  // 获取当前版本号
+  useEffect(() => {
+    getCurrentVersion('/upgrade').then(setVersion)
   }, [])
 
   const handleLogout = () => {
@@ -80,7 +89,7 @@ export default function Sidebar({
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-title leading-tight">墨语</span>
-              <span className="text-xs text-paper-cream/60">v1.3</span>
+              <span className="text-xs text-paper-cream/60">{version}</span>
             </div>
           </div>
           <button

@@ -207,6 +207,56 @@ async def get_session_messages(
     return result.scalars().all()
 
 
+async def get_session_messages_paginated(
+    db: AsyncSession,
+    session_id: int,
+    limit: int = 10,
+    before_id: Optional[int] = None
+) -> tuple[List[Message], bool]:
+    """
+    分页获取会话消息（从新到旧）
+    
+    Args:
+        session_id: 会话 ID
+        limit: 获取数量
+        before_id: 获取此 ID 之前的消息（用于加载更早的消息）
+    
+    Returns:
+        (消息列表, 是否还有更多消息)
+    """
+    query = select(Message).where(Message.session_id == session_id)
+    
+    if before_id:
+        query = query.where(Message.id < before_id)
+    
+    # 按时间倒序获取，这样能拿到最新的 N 条
+    query = query.order_by(Message.id.desc()).limit(limit + 1)
+    
+    result = await db.execute(query)
+    messages = list(result.scalars().all())
+    
+    # 判断是否还有更多消息
+    has_more = len(messages) > limit
+    if has_more:
+        messages = messages[:limit]
+    
+    # 反转为正序（从旧到新）
+    messages.reverse()
+    
+    return messages, has_more
+
+
+async def get_session_message_count(
+    db: AsyncSession,
+    session_id: int
+) -> int:
+    """获取会话消息总数"""
+    result = await db.execute(
+        select(func.count(Message.id)).where(Message.session_id == session_id)
+    )
+    return result.scalar() or 0
+
+
 async def get_message_count(db: AsyncSession) -> int:
     """获取消息总数"""
     result = await db.execute(select(func.count(Message.id)))

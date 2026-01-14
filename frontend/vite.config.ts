@@ -10,6 +10,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       '@uppic': path.resolve(__dirname, '../modules/uppic/frontend'),
       '@upword': path.resolve(__dirname, '../modules/upword/frontend'),
+      '@upgrade': path.resolve(__dirname, '../modules/upgrade/frontend'),
     },
   },
   server: {
@@ -40,6 +41,12 @@ export default defineConfig({
         target: 'http://localhost:13901',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/upword/, ''),
+      },
+      // Upgrade 独立版本更新服务代理 (Docker 端口 13902)
+      '/upgrade': {
+        target: 'http://localhost:13902',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/upgrade/, ''),
       },
     },
   },

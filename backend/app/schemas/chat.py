@@ -59,3 +59,10 @@ class ChatStreamChunk(BaseModel):
 class SessionWithMessages(SessionResponse):
     """带消息的会话响应"""
     messages: List[MessageResponse] = []
+
+
+class MessagesPaginatedResponse(BaseModel):
+    """分页消息响应模型"""
+    messages: List[MessageResponse]
+    has_more: bool
+    total: int

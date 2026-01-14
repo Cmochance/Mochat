@@ -1,6 +1,13 @@
 import api from './api'
 import type { ChatSession, Message, StreamChunk } from '../types'
 
+// 分页消息响应
+interface MessagesPaginatedResponse {
+  messages: Message[]
+  has_more: boolean
+  total: number
+}
+
 export const chatService = {
   // 获取会话列表
   async getSessions(): Promise<ChatSession[]> {
@@ -25,9 +32,19 @@ export const chatService = {
     await api.delete(`/chat/sessions/${sessionId}`)
   },
 
-  // 获取会话消息
-  async getMessages(sessionId: number): Promise<Message[]> {
-    const response = await api.get<Message[]>(`/chat/sessions/${sessionId}/messages`)
+  // 获取会话消息（分页）
+  async getMessages(
+    sessionId: number,
+    limit: number = 10,
+    beforeId?: number
+  ): Promise<MessagesPaginatedResponse> {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (beforeId) {
+      params.append('before_id', String(beforeId))
+    }
+    const response = await api.get<MessagesPaginatedResponse>(
+      `/chat/sessions/${sessionId}/messages?${params.toString()}`
+    )
     return response.data
   },
 

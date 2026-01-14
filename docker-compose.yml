@@ -59,6 +59,20 @@ services:
       - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
     restart: unless-stopped
 
+  # Upgrade 版本更新通知服务
+  upgrade:
+    build:
+      context: ./modules/upgrade/backend
+      dockerfile: Dockerfile
+    ports:
+      - "13902:3902"
+    environment:
+      - UPGRADE_PORT=3902
+      - UPGRADE_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   # 前端服务
   frontend:
     build:
@@ -70,6 +84,7 @@ services:
       - backend
       - uppic
       - upword
+      - upgrade
     restart: unless-stopped
 
 volumes:

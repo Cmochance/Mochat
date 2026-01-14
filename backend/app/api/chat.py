@@ -13,6 +13,7 @@ from ..schemas.chat import (
     SessionResponse, 
     SessionUpdate,
     MessageResponse,
+    MessagesPaginatedResponse,
     ChatRequest
 )
 from ..services.chat_service import chat_service
@@ -77,20 +78,31 @@ async def delete_session(
     return {"message": "删除成功"}
 
 
-@router.get("/sessions/{session_id}/messages", response_model=List[MessageResponse])
+@router.get("/sessions/{session_id}/messages", response_model=MessagesPaginatedResponse)
 async def get_messages(
     session_id: int,
+    limit: int = 10,
+    before_id: int = None,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取会话的消息历史"""
-    messages = await chat_service.get_session_messages(db, session_id, current_user)
-    if messages is None:
+    """
+    获取会话的消息历史（支持分页）
+    
+    Args:
+        session_id: 会话 ID
+        limit: 获取数量（默认 10）
+        before_id: 获取此 ID 之前的消息（用于加载更早的消息）
+    """
+    result = await chat_service.get_session_messages_paginated(
+        db, session_id, current_user, limit, before_id
+    )
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="会话不存在"
         )
-    return messages
+    return result
 
 
 @router.post("/completions")

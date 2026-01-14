@@ -3,9 +3,8 @@ import { motion } from 'framer-motion'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea from './components/InputArea'
-import VersionModal from '../../components/common/VersionModal'
+import { useVersion, VersionModal } from '@upgrade'
 import { chatService } from '../../services/chatService'
-import { versionService } from '../../services/versionService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
 import type { StreamChunk } from '../../types'
@@ -23,6 +22,7 @@ export default function Chat() {
     setSessions,
     setCurrentSession,
     setMessages,
+    prependMessages,
     addMessage,
     setLoading,
     setStreaming,
@@ -36,28 +36,13 @@ export default function Chat() {
   // 侧边栏状态 - 默认关闭，根据屏幕大小在挂载后调整
   const [sidebarOpen, setSidebarOpen] = useState(false)
   
-  // 版本弹窗状态
-  const [showVersionModal, setShowVersionModal] = useState(false)
+  // 版本更新通知 (使用独立模块)
+  const { versionInfo, showModal: showVersionModal, closeModal: closeVersionModal } = useVersion()
   
   // 挂载时根据屏幕大小设置侧边栏状态
   useEffect(() => {
     const isLargeScreen = window.innerWidth >= 1024
     setSidebarOpen(isLargeScreen)
-  }, [])
-
-  // 检查是否需要显示版本更新弹窗
-  useEffect(() => {
-    const checkVersion = async () => {
-      try {
-        const versionInfo = await versionService.getVersionInfo()
-        if (versionInfo.has_new_version) {
-          setShowVersionModal(true)
-        }
-      } catch (error) {
-        console.error('检查版本失败:', error)
-      }
-    }
-    checkVersion()
   }, [])
 
   // 加载会话列表
@@ -72,12 +57,29 @@ export default function Chat() {
     }
   }, [currentSession?.id])
 
+  // 保存当前会话 ID 到 localStorage
+  useEffect(() => {
+    if (currentSession) {
+      localStorage.setItem('mochat_last_session_id', String(currentSession.id))
+    }
+  }, [currentSession?.id])
+
   const loadSessions = async () => {
     try {
       const data = await chatService.getSessions()
       setSessions(data)
-      // 如果有会话，选中第一个
+      
+      // 如果有会话，优先恢复上次打开的会话
       if (data.length > 0 && !currentSession) {
+        const lastSessionId = localStorage.getItem('mochat_last_session_id')
+        if (lastSessionId) {
+          const lastSession = data.find(s => s.id === Number(lastSessionId))
+          if (lastSession) {
+            setCurrentSession(lastSession)
+            return
+          }
+        }
+        // 如果上次的会话不存在，选中第一个
         setCurrentSession(data[0])
       }
     } catch (error) {
@@ -85,31 +87,58 @@ export default function Chat() {
     }
   }
 
+  // 是否还有更多历史消息
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  // 是否正在加载更多消息
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  // 过滤消息中的文档内容
+  const filterMessages = (data: typeof messages) => {
+    return data.map(msg => {
+      if (msg.role === 'user' && msg.content) {
+        // 移除旧格式中的文档内容，只保留文件名
+        const filtered = msg.content.replace(
+          /<!-- DOC:([^:>]+?) -->[\s\S]*?<!-- \/DOC -->/g,
+          '<!-- DOC:$1 --><!-- /DOC -->'
+        )
+        return { ...msg, content: filtered }
+      }
+      return msg
+    })
+  }
+
   const loadMessages = async (sessionId: number) => {
     setLoading(true)
+    setHasMoreMessages(false)
     try {
-      const data = await chatService.getMessages(sessionId)
-      // 过滤用户消息中的文档内容，只保留元数据
-      // 防止从后端获取的完整文档内容导致布局问题
-      // 支持两种格式：
-      // 1. 新格式（只有元数据）: <!-- DOC:filename:key --><!-- /DOC --> - 无需处理
-      // 2. 旧格式（包含内容）: <!-- DOC:filename -->内容<!-- /DOC --> - 需要过滤
-      const filteredData = data.map(msg => {
-        if (msg.role === 'user' && msg.content) {
-          // 移除旧格式中的文档内容，只保留文件名
-          const filtered = msg.content.replace(
-            /<!-- DOC:([^:>]+?) -->[\s\S]*?<!-- \/DOC -->/g,
-            '<!-- DOC:$1 --><!-- /DOC -->'
-          )
-          return { ...msg, content: filtered }
-        }
-        return msg
-      })
-      setMessages(filteredData)
+      const result = await chatService.getMessages(sessionId, 10)
+      setMessages(filterMessages(result.messages))
+      setHasMoreMessages(result.has_more)
     } catch (error) {
       console.error('加载消息失败:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // 加载更多历史消息
+  const loadMoreMessages = async () => {
+    if (!currentSession || loadingMore || !hasMoreMessages || messages.length === 0) return
+    
+    setLoadingMore(true)
+    try {
+      const oldestMessageId = messages[0].id
+      const result = await chatService.getMessages(currentSession.id, 10, oldestMessageId)
+      
+      if (result.messages.length > 0) {
+        // 将新加载的消息添加到列表前面
+        prependMessages(filterMessages(result.messages))
+        setHasMoreMessages(result.has_more)
+      }
+    } catch (error) {
+      console.error('加载更多消息失败:', error)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -198,9 +227,9 @@ export default function Chat() {
 
   return (
     <div className="h-screen flex bg-paper-gradient overflow-hidden">
-      {/* 版本更新弹窗 */}
+      {/* 版本更新弹窗 (独立模块) */}
       {showVersionModal && (
-        <VersionModal onClose={() => setShowVersionModal(false)} />
+        <VersionModal versionInfo={versionInfo} onClose={closeVersionModal} />
       )}
 
       {/* 侧边栏 */}
@@ -243,6 +272,10 @@ export default function Chat() {
           isStreaming={isStreaming}
           streamingContent={streamingContent}
           streamingThinking={streamingThinking}
+          sessionId={currentSession?.id}
+          hasMore={hasMoreMessages}
+          loadingMore={loadingMore}
+          onLoadMore={loadMoreMessages}
         />
 
         {/* 输入区域 */}

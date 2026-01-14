@@ -16,6 +16,7 @@ interface ChatState {
   removeSession: (sessionId: number) => void
   setCurrentSession: (session: ChatSession | null) => void
   setMessages: (messages: Message[]) => void
+  prependMessages: (messages: Message[]) => void  // 在列表前面添加消息
   addMessage: (message: Message) => void
   setLoading: (loading: boolean) => void
   setStreaming: (streaming: boolean) => void
@@ -48,6 +49,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setCurrentSession: (session) => set({ currentSession: session }),
   
   setMessages: (messages) => set({ messages }),
+  
+  prependMessages: (newMessages) => set((state) => ({
+    messages: [...newMessages, ...state.messages],
+  })),
   
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message],

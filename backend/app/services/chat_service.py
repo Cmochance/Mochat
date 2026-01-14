@@ -118,6 +118,39 @@ class ChatService:
         return await crud.get_session_messages(db, session_id)
     
     @staticmethod
+    async def get_session_messages_paginated(
+        db: AsyncSession,
+        session_id: int,
+        user: User,
+        limit: int = 10,
+        before_id: int = None
+    ) -> Optional[dict]:
+        """
+        分页获取会话消息（验证所有权）
+        
+        Returns:
+            {
+                "messages": [...],
+                "has_more": bool,
+                "total": int
+            }
+        """
+        session = await crud.get_session_by_id(db, session_id)
+        if not session or session.user_id != user.id:
+            return None
+        
+        messages, has_more = await crud.get_session_messages_paginated(
+            db, session_id, limit, before_id
+        )
+        total = await crud.get_session_message_count(db, session_id)
+        
+        return {
+            "messages": messages,
+            "has_more": has_more,
+            "total": total
+        }
+    
+    @staticmethod
     async def send_message_stream(
         db: AsyncSession,
         session_id: int,

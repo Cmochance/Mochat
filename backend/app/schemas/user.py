@@ -30,6 +30,7 @@ class UserResponse(UserBase):
     id: int
     role: str
     is_active: bool
+    last_seen_version: Optional[str] = None  # 用户已阅读的最新版本号
     created_at: datetime
     updated_at: datetime
     

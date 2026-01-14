@@ -14,13 +14,61 @@ from ..schemas.chat import (
     SessionUpdate,
     MessageResponse,
     MessagesPaginatedResponse,
-    ChatRequest
+    ChatRequest,
+    ModelsResponse,
+    ModelInfo
 )
 from ..services.chat_service import chat_service
+from ..services.ai_service import ai_service
+from ..db import crud
 from ..core.dependencies import get_current_active_user
 from ..db.models import User
 
 router = APIRouter()
+
+
+@router.get("/models", response_model=ModelsResponse)
+async def get_models(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取可用的AI模型列表（仅返回管理员配置的模型）"""
+    # 获取 API 提供的所有模型
+    all_models_data = await ai_service.get_models()
+    
+    # 获取数据库中允许的模型列表
+    allowed_models = await crud.get_all_allowed_models(db, active_only=True)
+    
+    if allowed_models:
+        # 如果数据库中有配置，则只返回允许的模型
+        allowed_ids = {m.model_id for m in allowed_models}
+        # 保留顺序，使用 allowed_models 的排序
+        models = []
+        for allowed in allowed_models:
+            # 查找匹配的模型
+            for m in all_models_data:
+                if m["id"] == allowed.model_id:
+                    models.append(ModelInfo(
+                        id=m["id"],
+                        name=allowed.display_name or m["name"],  # 使用自定义名称
+                        owned_by=m.get("owned_by")
+                    ))
+                    break
+            else:
+                # 如果 API 列表中没有，仍然添加（可能是自定义模型）
+                models.append(ModelInfo(
+                    id=allowed.model_id,
+                    name=allowed.display_name or allowed.model_id,
+                    owned_by=None
+                ))
+    else:
+        # 如果数据库中没有配置，返回所有模型（后向兼容）
+        models = [ModelInfo(**m) for m in all_models_data]
+    
+    return ModelsResponse(
+        models=models,
+        default_model=ai_service.default_model
+    )
 
 
 @router.get("/sessions", response_model=List[SessionResponse])
@@ -121,7 +169,7 @@ async def chat_completions(
     """
     async def generate():
         async for chunk in chat_service.send_message_stream(
-            db, request.session_id, current_user, request.content
+            db, request.session_id, current_user, request.content, request.model
         ):
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
     

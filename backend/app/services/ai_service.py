@@ -275,12 +275,52 @@ class AIService:
             api_key=settings.AI_API_KEY,
             base_url=settings.AI_BASE_URL
         )
-        self.model = settings.AI_MODEL
+        self.default_model = settings.AI_MODEL
+        self._models_cache: Optional[list[dict]] = None
+        self._models_cache_time: float = 0
+    
+    async def get_models(self) -> list[dict]:
+        """
+        获取可用的模型列表
+        
+        Returns:
+            list[dict]: 模型列表，每个模型包含 id, name, owned_by
+        """
+        import time
+        
+        # 缓存 5 分钟
+        if self._models_cache and (time.time() - self._models_cache_time) < 300:
+            return self._models_cache
+        
+        try:
+            response = await self.client.models.list()
+            models = []
+            for model in response.data:
+                models.append({
+                    "id": model.id,
+                    "name": model.id,  # 通常 id 就是名称
+                    "owned_by": getattr(model, 'owned_by', None)
+                })
+            
+            # 按名称排序
+            models.sort(key=lambda x: x["id"])
+            
+            self._models_cache = models
+            self._models_cache_time = time.time()
+            
+            logger.info(f"[AI] 获取到 {len(models)} 个模型")
+            return models
+            
+        except Exception as e:
+            logger.error(f"[AI] 获取模型列表失败: {e}")
+            # 返回默认模型作为备选
+            return [{"id": self.default_model, "name": self.default_model, "owned_by": None}]
     
     async def chat_stream(
         self,
         messages: list[dict],
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
     ) -> AsyncGenerator[dict, None]:
         """
         流式对话，返回thinking和content分开的数据流
@@ -325,10 +365,14 @@ class AIService:
                 content_preview = str(content)[:100] if content else "empty"
                 print(f"[Vision] 消息 {i} ({role}) 是纯文本: {content_preview}...")
         
+        # 确定使用的模型
+        use_model = model or self.default_model
+        logger.info(f"[AI] 使用模型: {use_model}")
+        
         try:
             # 调用AI API（流式）
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model=use_model,
                 messages=chat_messages,
                 stream=True,
                 temperature=0.7,
@@ -425,7 +469,8 @@ class AIService:
     async def chat_simple(
         self,
         messages: list[dict],
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
     ) -> tuple[str, str]:
         """
         简单对话（非流式），返回完整响应
@@ -436,7 +481,7 @@ class AIService:
         thinking = ""
         content = ""
         
-        async for chunk in self.chat_stream(messages, system_prompt):
+        async for chunk in self.chat_stream(messages, system_prompt, model):
             if chunk["type"] == "thinking":
                 thinking += chunk["data"]
             elif chunk["type"] == "content":
@@ -450,7 +495,7 @@ class AIService:
         """根据第一条消息生成会话标题"""
         try:
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model=self.default_model,
                 messages=[
                     {
                         "role": "system",

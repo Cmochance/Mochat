@@ -1,14 +1,25 @@
 import { useState, useRef, useEffect, DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle } from 'lucide-react'
+import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu } from 'lucide-react'
 import { useAuthStore } from '../../../stores/authStore'
 // 从独立模块导入
 import { useImageUpload, type ImagePreview } from '@uppic'
 import { useDocUpload } from '@upword'
 
+// 模型信息类型
+export interface ModelInfo {
+  id: string
+  name: string
+  owned_by?: string | null
+}
+
 interface InputAreaProps {
-  onSend: (content: string) => void
+  onSend: (content: string, model?: string) => void
   disabled?: boolean
+  models?: ModelInfo[]
+  currentModel?: string
+  defaultModel?: string
+  onModelChange?: (model: string) => void
 }
 
 // Word 文档预览类型
@@ -17,17 +28,47 @@ interface DocPreview {
   localUrl: string  // 本地 blob URL，用于下载
 }
 
-export default function InputArea({ onSend, disabled = false }: InputAreaProps) {
+export default function InputArea({ 
+  onSend, 
+  disabled = false,
+  models = [],
+  currentModel,
+  defaultModel,
+  onModelChange,
+}: InputAreaProps) {
   const [content, setContent] = useState('')
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null)
   const [docPreview, setDocPreview] = useState<DocPreview | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragFileType, setDragFileType] = useState<'image' | 'doc' | 'unknown'>('unknown')
   const [fileError, setFileError] = useState<string | null>(null)
+  const [showModelPicker, setShowModelPicker] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
   const dragCounterRef = useRef(0)
+  const modelPickerRef = useRef<HTMLDivElement>(null)
+
+  // 获取显示的模型名称（优先使用自定义名称）
+  const getModelDisplayName = (model: ModelInfo) => {
+    // 优先使用后端返回的 name（可能是自定义名称），否则从 id 提取
+    if (model.name && model.name !== model.id) {
+      return model.name
+    }
+    // 从 id 提取简化名称
+    const parts = model.id.split('/')
+    return parts[parts.length - 1]
+  }
+
+  // 根据 ID 获取模型对象
+  const getModelById = (modelId: string): ModelInfo | undefined => {
+    return models.find(m => m.id === modelId)
+  }
+
+  // 当前显示的模型 ID
+  const displayModelId = currentModel || defaultModel || (models[0]?.id)
+  // 当前显示的模型对象
+  const displayModelObj = displayModelId ? getModelById(displayModelId) : undefined
   
   const { user } = useAuthStore()
   
@@ -297,11 +338,25 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
         : docTag
     }
 
-    onSend(messageContent)
+    onSend(messageContent, displayModelId)
     setContent('')
     removeImage()
     removeDoc()
   }
+
+  // 点击外部关闭模型选择器
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(event.target as Node)) {
+        setShowModelPicker(false)
+      }
+    }
+    
+    if (showModelPicker) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showModelPicker])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -568,6 +623,68 @@ export default function InputArea({ onSend, disabled = false }: InputAreaProps) 
           >
             {isProcessing ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
           </motion.button>
+
+          {/* 模型选择器 */}
+          {models.length > 0 && (
+            <div className="relative" ref={modelPickerRef}>
+              <motion.button
+                onClick={() => setShowModelPicker(!showModelPicker)}
+                disabled={disabled || isProcessing}
+                className={`
+                  px-3 py-2 rounded-sm flex items-center gap-1.5
+                  ${!disabled && !isProcessing
+                    ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged border-2 border-paper-aged'
+                    : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
+                  }
+                  transition-colors duration-300 text-sm
+                `}
+                whileHover={!disabled && !isProcessing ? { scale: 1.02 } : {}}
+                whileTap={!disabled && !isProcessing ? { scale: 0.98 } : {}}
+                title="选择模型"
+              >
+                <Cpu size={14} />
+                <span className="max-w-[100px] truncate">
+                  {displayModelObj ? getModelDisplayName(displayModelObj) : '选择模型'}
+                </span>
+                <ChevronUp 
+                  size={14} 
+                  className={`transition-transform ${showModelPicker ? 'rotate-180' : ''}`}
+                />
+              </motion.button>
+
+              {/* 上拉选项 */}
+              <AnimatePresence>
+                {showModelPicker && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full mb-2 right-0 w-64 max-h-60 overflow-y-auto
+                      bg-paper-white border-2 border-paper-aged rounded-sm shadow-lg z-50"
+                  >
+                    {models.map((model) => (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          onModelChange?.(model.id)
+                          setShowModelPicker(false)
+                        }}
+                        className={`
+                          w-full px-3 py-2 text-left text-sm
+                          hover:bg-paper-cream transition-colors
+                          ${model.id === displayModelId ? 'bg-paper-cream text-ink-black font-medium' : 'text-ink-medium'}
+                          border-b border-paper-aged/50 last:border-b-0
+                        `}
+                      >
+                        <div className="truncate" title={model.id}>{getModelDisplayName(model)}</div>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         {/* 提示文字 */}

@@ -4,7 +4,7 @@
 """
 
 # 当前版本号
-CURRENT_VERSION = "v1.3"
+CURRENT_VERSION = "v1.4"
 
 # 版本历史记录
 VERSION_HISTORY = [
@@ -23,5 +23,9 @@ VERSION_HISTORY = [
     {
         "version": "v1.3",
         "description": "优化公式输出格式问题，添加上传word文档功能。"
+    },
+    {
+        "version": "v1.4",
+        "description": "优化对话定位逻辑，添加模型选择功能。"
     },
 ]

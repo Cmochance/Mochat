@@ -34,7 +34,7 @@ export default function Sidebar({
   const [isLargeScreen, setIsLargeScreen] = useState(true)
   
   // 当前版本号
-  const [version, setVersion] = useState('v1.3')
+  const [version, setVersion] = useState('v1.4')
   
   useEffect(() => {
     const checkScreenSize = () => {

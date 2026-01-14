@@ -74,3 +74,16 @@ class RestrictedKeyword(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+
+class AllowedModel(Base):
+    """允许显示的模型"""
+    __tablename__ = "allowed_models"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    model_id = Column(String(200), unique=True, nullable=False, index=True)  # 模型ID
+    display_name = Column(String(200), nullable=True)  # 自定义显示名称（可选）
+    is_active = Column(Boolean, default=True)  # 是否启用
+    sort_order = Column(Integer, default=0)  # 排序顺序
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

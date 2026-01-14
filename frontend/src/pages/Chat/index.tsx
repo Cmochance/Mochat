@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
-import InputArea from './components/InputArea'
+import InputArea, { type ModelInfo } from './components/InputArea'
 import { useVersion, VersionModal } from '@upgrade'
 import { chatService } from '../../services/chatService'
 import { useChatStore } from '../../stores/chatStore'
@@ -39,6 +39,11 @@ export default function Chat() {
   // 版本更新通知 (使用独立模块)
   const { versionInfo, showModal: showVersionModal, closeModal: closeVersionModal } = useVersion()
   
+  // 模型选择状态
+  const [models, setModels] = useState<ModelInfo[]>([])
+  const [currentModel, setCurrentModel] = useState<string>('')
+  const [defaultModel, setDefaultModel] = useState<string>('')
+  
   // 挂载时根据屏幕大小设置侧边栏状态
   useEffect(() => {
     const isLargeScreen = window.innerWidth >= 1024
@@ -49,6 +54,34 @@ export default function Chat() {
   useEffect(() => {
     loadSessions()
   }, [])
+
+  // 加载模型列表
+  useEffect(() => {
+    loadModels()
+  }, [])
+
+  const loadModels = async () => {
+    try {
+      const data = await chatService.getModels()
+      setModels(data.models)
+      setDefaultModel(data.default_model)
+      // 从 localStorage 恢复上次选择的模型，否则使用默认模型
+      const savedModel = localStorage.getItem('mochat_current_model')
+      if (savedModel && data.models.some(m => m.id === savedModel)) {
+        setCurrentModel(savedModel)
+      } else {
+        setCurrentModel(data.default_model)
+      }
+    } catch (error) {
+      console.error('加载模型列表失败:', error)
+    }
+  }
+
+  // 保存选择的模型
+  const handleModelChange = (model: string) => {
+    setCurrentModel(model)
+    localStorage.setItem('mochat_current_model', model)
+  }
 
   // 加载消息
   useEffect(() => {
@@ -165,19 +198,19 @@ export default function Chat() {
     }
   }
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, model?: string) => {
     if (!currentSession) {
       // 如果没有当前会话，先创建一个
       const session = await chatService.createSession()
       addSession(session)
       setCurrentSession(session)
-      await sendMessageToSession(session.id, content)
+      await sendMessageToSession(session.id, content, model)
     } else {
-      await sendMessageToSession(currentSession.id, content)
+      await sendMessageToSession(currentSession.id, content, model)
     }
   }
 
-  const sendMessageToSession = async (sessionId: number, content: string) => {
+  const sendMessageToSession = async (sessionId: number, content: string, model?: string) => {
     // 新版本：消息中已经只包含元数据，不需要再过滤
     // 格式: <!-- DOC:filename:key --><!-- /DOC -->
     const displayContent = content
@@ -214,7 +247,7 @@ export default function Chat() {
           console.error('AI响应错误:', chunk.data)
           clearStreaming()
         }
-      })
+      }, model)
     } catch (error) {
       console.error('发送消息失败:', error)
       clearStreaming()
@@ -282,6 +315,10 @@ export default function Chat() {
         <InputArea
           onSend={handleSendMessage}
           disabled={isStreaming}
+          models={models}
+          currentModel={currentModel}
+          defaultModel={defaultModel}
+          onModelChange={handleModelChange}
         />
       </main>
     </div>

@@ -8,7 +8,26 @@ interface MessagesPaginatedResponse {
   total: number
 }
 
+// 模型信息
+export interface ModelInfo {
+  id: string
+  name: string
+  owned_by?: string | null
+}
+
+// 模型列表响应
+interface ModelsResponse {
+  models: ModelInfo[]
+  default_model: string
+}
+
 export const chatService = {
+  // 获取可用模型列表
+  async getModels(): Promise<ModelsResponse> {
+    const response = await api.get<ModelsResponse>('/chat/models')
+    return response.data
+  },
+
   // 获取会话列表
   async getSessions(): Promise<ChatSession[]> {
     const response = await api.get<ChatSession[]>('/chat/sessions')
@@ -52,7 +71,8 @@ export const chatService = {
   async sendMessage(
     sessionId: number,
     content: string,
-    onChunk: (chunk: StreamChunk) => void
+    onChunk: (chunk: StreamChunk) => void,
+    model?: string
   ): Promise<void> {
     const token = localStorage.getItem('token')
     
@@ -65,6 +85,7 @@ export const chatService = {
       body: JSON.stringify({
         session_id: sessionId,
         content,
+        model: model || undefined,
       }),
     })
 

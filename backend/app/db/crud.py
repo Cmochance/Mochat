@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
-from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword
+from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel
 from ..core.security import get_password_hash, verify_password, encrypt_password
 
 
@@ -364,4 +364,100 @@ async def toggle_keyword_status(
 async def get_keyword_count(db: AsyncSession) -> int:
     """获取限制词总数"""
     result = await db.execute(select(func.count(RestrictedKeyword.id)))
+    return result.scalar()
+
+
+# ============ 模型管理相关 CRUD ============
+
+async def get_all_allowed_models(
+    db: AsyncSession,
+    active_only: bool = False
+) -> List[AllowedModel]:
+    """获取所有允许的模型"""
+    query = select(AllowedModel).order_by(AllowedModel.sort_order.asc(), AllowedModel.created_at.asc())
+    if active_only:
+        query = query.where(AllowedModel.is_active == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_active_model_ids(db: AsyncSession) -> List[str]:
+    """获取所有启用的模型 ID 列表"""
+    result = await db.execute(
+        select(AllowedModel.model_id)
+        .where(AllowedModel.is_active == True)
+        .order_by(AllowedModel.sort_order.asc())
+    )
+    return [row[0] for row in result.fetchall()]
+
+
+async def add_allowed_model(
+    db: AsyncSession,
+    model_id: str,
+    display_name: Optional[str] = None,
+    sort_order: int = 0
+) -> Optional[AllowedModel]:
+    """添加允许的模型"""
+    # 检查是否已存在
+    existing = await db.execute(
+        select(AllowedModel).where(AllowedModel.model_id == model_id)
+    )
+    if existing.scalar_one_or_none():
+        return None  # 已存在
+    
+    new_model = AllowedModel(
+        model_id=model_id,
+        display_name=display_name,
+        sort_order=sort_order
+    )
+    db.add(new_model)
+    await db.flush()
+    await db.refresh(new_model)
+    return new_model
+
+
+async def delete_allowed_model(db: AsyncSession, model_db_id: int) -> bool:
+    """删除允许的模型"""
+    result = await db.execute(
+        delete(AllowedModel).where(AllowedModel.id == model_db_id)
+    )
+    return result.rowcount > 0
+
+
+async def toggle_model_status(
+    db: AsyncSession,
+    model_db_id: int
+) -> Optional[AllowedModel]:
+    """切换模型启用状态"""
+    result = await db.execute(
+        select(AllowedModel).where(AllowedModel.id == model_db_id)
+    )
+    model = result.scalar_one_or_none()
+    if model:
+        model.is_active = not model.is_active
+        await db.flush()
+        await db.refresh(model)
+    return model
+
+
+async def update_model_sort_order(
+    db: AsyncSession,
+    model_db_id: int,
+    sort_order: int
+) -> Optional[AllowedModel]:
+    """更新模型排序顺序"""
+    result = await db.execute(
+        select(AllowedModel).where(AllowedModel.id == model_db_id)
+    )
+    model = result.scalar_one_or_none()
+    if model:
+        model.sort_order = sort_order
+        await db.flush()
+        await db.refresh(model)
+    return model
+
+
+async def get_allowed_model_count(db: AsyncSession) -> int:
+    """获取允许的模型总数"""
+    result = await db.execute(select(func.count(AllowedModel.id)))
     return result.scalar()

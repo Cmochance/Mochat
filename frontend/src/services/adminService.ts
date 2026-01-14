@@ -76,4 +76,51 @@ export const adminService = {
     const response = await api.post<RestrictedKeyword>(`/admin/keywords/${keywordId}/toggle`)
     return response.data
   },
+
+  // ============ 模型管理 ============
+
+  // 获取所有允许的模型
+  async getAllowedModels(): Promise<AllowedModel[]> {
+    const response = await api.get<AllowedModel[]>('/admin/models')
+    return response.data
+  },
+
+  // 添加允许的模型
+  async addAllowedModel(modelId: string, displayName?: string, sortOrder?: number): Promise<AllowedModel> {
+    const response = await api.post<AllowedModel>('/admin/models', {
+      model_id: modelId,
+      display_name: displayName,
+      sort_order: sortOrder ?? 0,
+    })
+    return response.data
+  },
+
+  // 删除允许的模型
+  async deleteAllowedModel(modelDbId: number): Promise<void> {
+    await api.delete(`/admin/models/${modelDbId}`)
+  },
+
+  // 切换模型状态
+  async toggleModelStatus(modelDbId: number): Promise<AllowedModel> {
+    const response = await api.post<AllowedModel>(`/admin/models/${modelDbId}/toggle`)
+    return response.data
+  },
+
+  // 更新模型排序
+  async updateModelSort(modelDbId: number, sortOrder: number): Promise<AllowedModel> {
+    const response = await api.put<AllowedModel>(`/admin/models/${modelDbId}/sort`, {
+      sort_order: sortOrder,
+    })
+    return response.data
+  },
+}
+
+// 允许的模型类型
+export interface AllowedModel {
+  id: number
+  model_id: string
+  display_name: string | null
+  is_active: boolean
+  sort_order: number
+  created_at: string | null
 }

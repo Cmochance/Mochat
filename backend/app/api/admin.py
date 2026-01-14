@@ -231,3 +231,145 @@ async def toggle_keyword(
         "is_active": result.is_active,
         "created_at": result.created_at.isoformat() if result.created_at else None
     }
+
+
+# ============ 模型管理 ============
+
+class ModelCreate(BaseModel):
+    model_id: str
+    display_name: str = None
+    sort_order: int = 0
+
+
+class ModelSortUpdate(BaseModel):
+    sort_order: int
+
+
+@router.get("/models")
+async def get_allowed_models(
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """获取所有配置的模型"""
+    models = await crud.get_all_allowed_models(db)
+    return [
+        {
+            "id": m.id,
+            "model_id": m.model_id,
+            "display_name": m.display_name,
+            "is_active": m.is_active,
+            "sort_order": m.sort_order,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        }
+        for m in models
+    ]
+
+
+@router.post("/models")
+async def add_model(
+    data: ModelCreate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """添加允许的模型"""
+    model_id = data.model_id.strip()
+    if not model_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="模型ID不能为空"
+        )
+    
+    result = await crud.add_allowed_model(
+        db, 
+        model_id, 
+        data.display_name.strip() if data.display_name else None,
+        data.sort_order
+    )
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该模型已存在"
+        )
+    
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "display_name": result.display_name,
+        "is_active": result.is_active,
+        "sort_order": result.sort_order,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+@router.delete("/models/{model_db_id}")
+async def delete_model(
+    model_db_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """删除允许的模型"""
+    success = await crud.delete_allowed_model(db, model_db_id)
+    await db.commit()
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型不存在"
+        )
+    
+    return {"message": "删除成功"}
+
+
+@router.post("/models/{model_db_id}/toggle")
+async def toggle_model(
+    model_db_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """切换模型启用状态"""
+    result = await crud.toggle_model_status(db, model_db_id)
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型不存在"
+        )
+    
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "display_name": result.display_name,
+        "is_active": result.is_active,
+        "sort_order": result.sort_order,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+@router.put("/models/{model_db_id}/sort")
+async def update_model_sort(
+    model_db_id: int,
+    data: ModelSortUpdate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """更新模型排序"""
+    result = await crud.update_model_sort_order(db, model_db_id, data.sort_order)
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型不存在"
+        )
+    
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "display_name": result.display_name,
+        "is_active": result.is_active,
+        "sort_order": result.sort_order,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }

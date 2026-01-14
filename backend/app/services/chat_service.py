@@ -155,10 +155,14 @@ class ChatService:
         db: AsyncSession,
         session_id: int,
         user: User,
-        content: str
+        content: str,
+        model: Optional[str] = None
     ) -> AsyncGenerator[dict, None]:
         """
         发送消息并获取AI流式响应
+        
+        Args:
+            model: 可选的模型名称，不传则使用默认模型
         
         Yields:
             dict: {"type": "thinking" | "content" | "done" | "error", "data": str}
@@ -202,7 +206,7 @@ class ChatService:
         content_full = ""
         output_restricted = False
         
-        async for chunk in ai_service.chat_stream(messages):
+        async for chunk in ai_service.chat_stream(messages, model=model):
             if chunk["type"] == "thinking":
                 thinking_full += chunk["data"]
                 yield chunk

@@ -7,17 +7,19 @@ import {
   Settings, 
   ArrowLeft,
   LogOut,
-  ShieldAlert
+  ShieldAlert,
+  Bot
 } from 'lucide-react'
 import UserManagement from './components/UserManagement'
 import SystemStats from './components/SystemStats'
 import ModelConfig from './components/ModelConfig'
 import KeywordManagement from './components/KeywordManagement'
+import ModelManagement from './components/ModelManagement'
 import { useAuthStore } from '../../stores/authStore'
 import { adminService } from '../../services/adminService'
 import type { User, SystemStats as SystemStatsType } from '../../types'
 
-type TabType = 'stats' | 'users' | 'config' | 'keywords'
+type TabType = 'stats' | 'users' | 'models' | 'config' | 'keywords'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -55,7 +57,8 @@ export default function Admin() {
   const tabs = [
     { id: 'stats' as const, label: '系统概览', icon: BarChart3 },
     { id: 'users' as const, label: '用户管理', icon: Users },
-    { id: 'config' as const, label: '模型配置', icon: Settings },
+    { id: 'models' as const, label: '模型管理', icon: Bot },
+    { id: 'config' as const, label: '系统配置', icon: Settings },
     { id: 'keywords' as const, label: '内容限制', icon: ShieldAlert },
   ]
 
@@ -135,6 +138,7 @@ export default function Admin() {
               onRefresh={loadData}
             />
           )}
+          {activeTab === 'models' && <ModelManagement />}
           {activeTab === 'config' && <ModelConfig />}
           {activeTab === 'keywords' && <KeywordManagement />}
         </motion.div>

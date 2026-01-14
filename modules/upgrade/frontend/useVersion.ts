@@ -103,5 +103,5 @@ export async function getCurrentVersion(apiBasePath = '/upgrade'): Promise<strin
   } catch (err) {
     console.error('[Upgrade] 获取当前版本失败:', err)
   }
-  return 'v1.3' // 默认版本
+  return 'v1.4' // 默认版本
 }

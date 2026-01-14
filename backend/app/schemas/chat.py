@@ -48,6 +48,20 @@ class ChatRequest(BaseModel):
     """对话请求模型"""
     session_id: int
     content: str = Field(..., min_length=1)
+    model: Optional[str] = None  # 可选模型，不传则使用默认
+
+
+class ModelInfo(BaseModel):
+    """模型信息"""
+    id: str
+    name: str
+    owned_by: Optional[str] = None
+
+
+class ModelsResponse(BaseModel):
+    """模型列表响应"""
+    models: List[ModelInfo]
+    default_model: str
 
 
 class ChatStreamChunk(BaseModel):

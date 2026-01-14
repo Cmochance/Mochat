@@ -208,22 +208,12 @@ export const chatService = {
       throw new Error('导出失败')
     }
 
-    // 获取文件名
-    const contentDisposition = response.headers.get('Content-Disposition')
-    let downloadFilename = `${filename}.docx`
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename[^;=\n]*=\s*["']?([^"';\n]*)/)
-      if (match && match[1]) {
-        downloadFilename = decodeURIComponent(match[1])
-      }
-    }
-
-    // 下载文件
+    // 下载文件 - 直接使用前端传入的文件名
     const blob = await response.blob()
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = downloadFilename
+    a.download = `${filename}.docx`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

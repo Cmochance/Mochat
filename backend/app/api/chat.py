@@ -276,14 +276,18 @@ async def export_to_docx(
         # 安全的文件名（处理中文）
         from urllib.parse import quote
         filename = f"{request.filename}.docx"
-        encoded_filename = quote(filename)
+        # ASCII 回退文件名（用于不支持 RFC 5987 的客户端）
+        ascii_filename = "export.docx"
+        # UTF-8 编码的文件名
+        encoded_filename = quote(filename, safe='')
         
         # 返回文件内容
+        # 同时提供 filename 和 filename* 以兼容不同浏览器
         return Response(
             content=docx_content,
             media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             headers={
-                'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"
+                'Content-Disposition': f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_filename}'
             }
         )
         

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, X, FileText, Copy, Check, RefreshCw } from 'lucide-react'
+import { User, X, FileText, Copy, Check, RefreshCw, FileDown } from 'lucide-react'
+import { chatService } from '../../../services/chatService'
 import ThinkingBlock from './ThinkingBlock'
 import type { Message } from '../../../types'
 import ReactMarkdown from 'react-markdown'
@@ -196,6 +197,7 @@ export default function MessageItem({
 }: MessageItemProps) {
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
   
   // 对用户消息解析文档标记
   const { displayContent, docFiles } = isUser 
@@ -210,6 +212,65 @@ export default function MessageItem({
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('复制失败:', err)
+    }
+  }
+
+  // 从内容中提取标题
+  const extractTitle = (content: string): string => {
+    const lines = content.trim().split('\n')
+    
+    // 检查第一行是否是 Markdown 标题
+    for (const line of lines) {
+      const trimmedLine = line.trim()
+      if (!trimmedLine) continue
+      
+      // 匹配 Markdown 标题 (# 开头)
+      const titleMatch = trimmedLine.match(/^#{1,6}\s+(.+)$/)
+      if (titleMatch) {
+        // 去除可能的 Markdown 格式字符
+        const title = titleMatch[1].replace(/[*_`\[\]]/g, '').trim()
+        // 限制长度
+        return title.slice(0, 20)
+      }
+      
+      // 不是标题，取第一句话的前10个字
+      // 去除 Markdown 格式
+      const cleanText = trimmedLine
+        .replace(/^[-*+]\s+/, '') // 列表项
+        .replace(/\*\*(.+?)\*\*/g, '$1') // 加粗
+        .replace(/\*(.+?)\*/g, '$1') // 斜体
+        .replace(/`(.+?)`/g, '$1') // 行内代码
+        .replace(/\[(.+?)\]\(.+?\)/g, '$1') // 链接
+        .trim()
+      
+      if (cleanText) {
+        // 取前10个字符（中文或英文）
+        return cleanText.slice(0, 10)
+      }
+    }
+    
+    // 如果都没有，返回默认值
+    return '墨语对话'
+  }
+
+  // 导出为 Word 文档
+  const handleExport = async () => {
+    if (exporting || !message.content) return
+    
+    setExporting(true)
+    try {
+      // 智能生成文件名
+      const title = extractTitle(message.content)
+      // 清理文件名中的非法字符
+      const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_')
+      const filename = safeTitle || '墨语对话'
+      
+      await chatService.exportToDocx(message.content, filename)
+    } catch (err) {
+      console.error('导出失败:', err)
+      alert('导出失败，请重试')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -294,6 +355,18 @@ export default function MessageItem({
               ) : (
                 <Copy size={14} />
               )}
+            </motion.button>
+
+            {/* 导出为 Word 按钮 */}
+            <motion.button
+              onClick={handleExport}
+              disabled={exporting}
+              className="p-1.5 text-ink-faint hover:text-ink-medium hover:bg-paper-aged/50 rounded transition-colors disabled:opacity-50"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="导出为 Word"
+            >
+              <FileDown size={14} className={exporting ? 'animate-pulse' : ''} />
             </motion.button>
 
             {/* 重新生成按钮（仅最后一条 AI 消息显示） */}

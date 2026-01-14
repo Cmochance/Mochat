@@ -190,4 +190,43 @@ export const chatService = {
       }
     }
   },
+
+  // 导出为 Word 文档
+  async exportToDocx(content: string, filename: string = 'export'): Promise<void> {
+    const token = localStorage.getItem('token')
+    
+    const response = await fetch('/api/chat/export/docx', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ content, filename }),
+    })
+
+    if (!response.ok) {
+      throw new Error('导出失败')
+    }
+
+    // 获取文件名
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let downloadFilename = `${filename}.docx`
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename[^;=\n]*=\s*["']?([^"';\n]*)/)
+      if (match && match[1]) {
+        downloadFilename = decodeURIComponent(match[1])
+      }
+    }
+
+    // 下载文件
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = downloadFilename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  },
 }

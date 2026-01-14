@@ -2,10 +2,13 @@
 对话API路由 - 处理对话相关请求，支持流式输出
 """
 import json
+import os
+import tempfile
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from ..db.database import get_db
 from ..schemas.chat import (
@@ -25,6 +28,9 @@ from ..core.dependencies import get_current_active_user
 from ..db.models import User
 
 router = APIRouter()
+
+# 自定义模板路径
+CUSTOM_REFERENCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "custom_reference.docx")
 
 
 @router.get("/models", response_model=ModelsResponse)
@@ -206,3 +212,89 @@ async def regenerate_response(
             "X-Accel-Buffering": "no"
         }
     )
+
+
+class ExportRequest(BaseModel):
+    """导出请求"""
+    content: str
+    filename: str = "export"
+
+
+@router.post("/export/docx")
+async def export_to_docx(
+    request: ExportRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    将 Markdown 内容导出为 Word 文档
+    
+    使用 pandoc 和自定义模板进行转换
+    """
+    import pypandoc
+    from fastapi.responses import Response
+    
+    md_path = None
+    docx_path = None
+    
+    try:
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            suffix='.md', 
+            delete=False, 
+            encoding='utf-8'
+        ) as md_file:
+            md_file.write(request.content)
+            md_path = md_file.name
+        
+        # 输出文件路径
+        docx_path = md_path.replace('.md', '.docx')
+        
+        # 构建 pandoc 参数
+        extra_args = ['--wrap=none']
+        
+        # 如果存在自定义模板，使用它
+        if os.path.exists(CUSTOM_REFERENCE_PATH):
+            extra_args.append(f'--reference-doc={CUSTOM_REFERENCE_PATH}')
+        
+        # 使用 pypandoc 转换
+        pypandoc.convert_file(
+            md_path,
+            'docx',
+            outputfile=docx_path,
+            extra_args=extra_args
+        )
+        
+        # 读取生成的文件内容
+        with open(docx_path, 'rb') as f:
+            docx_content = f.read()
+        
+        # 清理临时文件
+        os.unlink(md_path)
+        os.unlink(docx_path)
+        
+        # 安全的文件名（处理中文）
+        from urllib.parse import quote
+        filename = f"{request.filename}.docx"
+        encoded_filename = quote(filename)
+        
+        # 返回文件内容
+        return Response(
+            content=docx_content,
+            media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={
+                'Content-Disposition': f"attachment; filename*=UTF-8''{encoded_filename}"
+            }
+        )
+        
+    except Exception as e:
+        # 清理临时文件
+        if md_path and os.path.exists(md_path):
+            os.unlink(md_path)
+        if docx_path and os.path.exists(docx_path):
+            os.unlink(docx_path)
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"导出失败: {str(e)}"
+        )

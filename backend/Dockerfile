@@ -6,7 +6,12 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# 安装依赖
+# 安装 pandoc
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pandoc \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

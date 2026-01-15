@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea, { type ModelInfo } from './components/InputArea'
 import { useVersion, VersionModal } from '@upgrade'
+import { useImageGenerate } from '@picgenerate'
 import { chatService } from '../../services/chatService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -45,6 +46,16 @@ export default function Chat() {
   const [models, setModels] = useState<ModelInfo[]>([])
   const [currentModel, setCurrentModel] = useState<string>('')
   const [defaultModel, setDefaultModel] = useState<string>('')
+  
+  // 绘图模式状态
+  const [isDrawMode, setIsDrawMode] = useState(false)
+  
+  // 绘图 Hook
+  const { 
+    generate: generateImage, 
+    isGenerating: isDrawing, 
+    reset: resetDraw 
+  } = useImageGenerate({ apiBasePath: '/picgen' })
   
   // 挂载时根据屏幕大小设置侧边栏状态
   useEffect(() => {
@@ -263,6 +274,85 @@ export default function Chat() {
     loadSessions()
   }
 
+  // 处理绘图请求
+  const handleGenerateImage = async (prompt: string) => {
+    if (!currentSession) {
+      // 如果没有当前会话，先创建一个
+      const session = await chatService.createSession()
+      addSession(session)
+      setCurrentSession(session)
+      await generateImageInSession(session.id, prompt)
+    } else {
+      await generateImageInSession(currentSession.id, prompt)
+    }
+  }
+
+  const generateImageInSession = async (_sessionId: number, prompt: string) => {
+    // 添加用户消息
+    addMessage({
+      id: Date.now(),
+      role: 'user',
+      content: `🎨 绘图请求：${prompt}`,
+      created_at: new Date().toISOString(),
+    })
+
+    setStreaming(true)
+    clearStreaming()
+
+    try {
+      // 调用绘图模块
+      const result = await generateImage(
+        { prompt, userId: user?.id?.toString() || 'anonymous' },
+        (thinkingChunk) => {
+          // thinking 回调，实时更新
+          flushSync(() => {
+            appendStreamingThinking(thinkingChunk)
+          })
+        }
+      )
+
+      // 生成完成后，添加 AI 消息
+      const state = useChatStore.getState()
+      
+      if (result.success && result.imageUrl) {
+        // 成功：显示图片
+        addMessage({
+          id: Date.now(),
+          role: 'assistant',
+          content: `![AI生成的图像](${result.imageUrl})`,
+          thinking: state.streamingThinking || undefined,
+          created_at: new Date().toISOString(),
+        })
+      } else {
+        // 失败：显示错误
+        addMessage({
+          id: Date.now(),
+          role: 'assistant',
+          content: `❌ 图像生成失败：${result.error || '未知错误'}`,
+          thinking: state.streamingThinking || undefined,
+          created_at: new Date().toISOString(),
+        })
+      }
+      
+      endStreaming()
+      resetDraw()
+      
+    } catch (error) {
+      console.error('绘图失败:', error)
+      addMessage({
+        id: Date.now(),
+        role: 'assistant',
+        content: `❌ 图像生成失败：${error instanceof Error ? error.message : '未知错误'}`,
+        created_at: new Date().toISOString(),
+      })
+      endStreaming()
+      resetDraw()
+    }
+
+    // 刷新会话列表
+    loadSessions()
+  }
+
   // 重新生成最后一条 AI 消息
   const handleRegenerate = async () => {
     if (!currentSession || isStreaming) return
@@ -367,11 +457,14 @@ export default function Chat() {
         {/* 输入区域 */}
         <InputArea
           onSend={handleSendMessage}
-          disabled={isStreaming}
+          onGenerateImage={handleGenerateImage}
+          disabled={isStreaming || isDrawing}
           models={models}
           currentModel={currentModel}
           defaultModel={defaultModel}
           onModelChange={handleModelChange}
+          isDrawMode={isDrawMode}
+          onDrawModeChange={setIsDrawMode}
         />
       </main>
     </div>

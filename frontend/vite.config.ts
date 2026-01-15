@@ -11,6 +11,7 @@ export default defineConfig({
       '@uppic': path.resolve(__dirname, '../modules/uppic/frontend'),
       '@upword': path.resolve(__dirname, '../modules/upword/frontend'),
       '@upgrade': path.resolve(__dirname, '../modules/upgrade/frontend'),
+      '@picgenerate': path.resolve(__dirname, '../modules/picgenerate/frontend'),
     },
   },
   server: {
@@ -57,6 +58,12 @@ export default defineConfig({
         target: 'http://localhost:13902',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/upgrade/, ''),
+      },
+      // Picgenerate AI 图像生成服务代理 (Docker 端口 30903)
+      '/picgen': {
+        target: 'http://localhost:30903',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/picgen/, ''),
       },
     },
   },

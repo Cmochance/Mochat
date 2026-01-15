@@ -29,9 +29,11 @@
       "@upword": ["../modules/upword/frontend/index.ts"],
       "@upword/*": ["../modules/upword/frontend/*"],
       "@upgrade": ["../modules/upgrade/frontend/index.ts"],
-      "@upgrade/*": ["../modules/upgrade/frontend/*"]
+      "@upgrade/*": ["../modules/upgrade/frontend/*"],
+      "@picgenerate": ["../modules/picgenerate/frontend/index.ts"],
+      "@picgenerate/*": ["../modules/picgenerate/frontend/*"]
     }
   },
-  "include": ["src", "../modules/uppic/frontend", "../modules/upword/frontend", "../modules/upgrade/frontend"],
+  "include": ["src", "../modules/uppic/frontend", "../modules/upword/frontend", "../modules/upgrade/frontend", "../modules/picgenerate/frontend"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

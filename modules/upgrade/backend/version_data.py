@@ -4,7 +4,7 @@
 """
 
 # 当前版本号
-CURRENT_VERSION = "v1.5"
+CURRENT_VERSION = "v1.5.4"
 
 # 版本历史记录
 # 大版本格式: v1.x，小版本格式: v1.x.y
@@ -49,12 +49,16 @@ VERSION_HISTORY = [
         "version": "v1.5.1",
         "description": "修复对话内容过长导致的布局溢出。"
     },
-        {
+    {
         "version": "v1.5.2",
         "description": "修复输出内容过长导致长时间无反应的问题，添加流式输出。"
     },
-        {
+    {
         "version": "v1.5.3",
         "description": "修改定位逻辑，避免向上加载聊天记录时自动下滚。"
+    },
+    {
+        "version": "v1.5.4",
+        "description": "添加 AI 绘图模式，集成 picgenerate 模块，支持流式 thinking 输出。"
     },
 ]

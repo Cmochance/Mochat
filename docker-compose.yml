@@ -99,6 +99,31 @@ services:
       - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
     restart: unless-stopped
 
+  # PPT 生成服务
+  pptgen:
+    build:
+      context: ./modules/pptgen/backend
+      dockerfile: Dockerfile
+    ports:
+      - "30904:3904"
+    environment:
+      - PPTGEN_PORT=3904
+      - PPTGEN_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+      # AI 配置
+      - PPTGEN_AI_API_KEY=${PPTGEN_AI_API_KEY:-}
+      - PPTGEN_AI_API_BASE=${PPTGEN_AI_API_BASE:-}
+      - PPTGEN_AI_MODEL=${PPTGEN_AI_MODEL:-gpt-4}
+      # Cloud Run 配置
+      - PPTGEN_CLOUDRUN_URL=${PPTGEN_CLOUDRUN_URL:-}
+      - PPTGEN_CLOUDRUN_SECRET=${PPTGEN_CLOUDRUN_SECRET:-}
+      # R2 存储配置
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-}
+      - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
+    restart: unless-stopped
+
   # 前端服务
   frontend:
     build:
@@ -112,6 +137,7 @@ services:
       - upword
       - upgrade
       - picgenerate
+      - pptgen
     restart: unless-stopped
 
 volumes:

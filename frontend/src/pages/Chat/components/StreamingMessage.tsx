@@ -37,8 +37,8 @@ export default function StreamingMessage({ content, thinking }: StreamingMessage
       <div className="flex-1 max-w-[80%]">
         {/* Thinking块 */}
         {thinking && (
-          <div className="mb-3 px-3 py-2 bg-ink-black/5 border-l-2 border-ink-faint rounded-r-sm">
-            <div className="flex items-center gap-2 text-xs text-ink-faint mb-1">
+          <div className="mb-3 px-3 py-2 bg-ink-black/5 border-l-2 border-ink-faint rounded-r-sm max-h-[200px] overflow-y-auto custom-scrollbar">
+            <div className="flex items-center gap-2 text-xs text-ink-faint mb-1 sticky top-0 bg-ink-black/5 -mx-3 px-3 py-1">
               <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeDasharray="31.4" strokeDashoffset="10" />
               </svg>

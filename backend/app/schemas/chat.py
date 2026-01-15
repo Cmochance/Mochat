@@ -29,7 +29,10 @@ class SessionResponse(BaseModel):
 
 class MessageCreate(BaseModel):
     """消息创建模型"""
+    session_id: int
+    role: str = Field(..., pattern=r"^(user|assistant)$")
     content: str = Field(..., min_length=1)
+    thinking: Optional[str] = None
 
 
 class MessageResponse(BaseModel):

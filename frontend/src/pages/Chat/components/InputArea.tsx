@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette } from 'lucide-react'
+import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette, Presentation } from 'lucide-react'
 import { useAuthStore } from '../../../stores/authStore'
 // 从独立模块导入
 import { useImageUpload, type ImagePreview } from '@uppic'
@@ -16,6 +16,7 @@ export interface ModelInfo {
 interface InputAreaProps {
   onSend: (content: string, model?: string) => void
   onGenerateImage?: (prompt: string) => void  // 绘图模式发送
+  onGeneratePPT?: (prompt: string) => void    // PPT 模式发送
   disabled?: boolean
   models?: ModelInfo[]
   currentModel?: string
@@ -23,6 +24,8 @@ interface InputAreaProps {
   onModelChange?: (model: string) => void
   isDrawMode?: boolean  // 是否绘图模式
   onDrawModeChange?: (mode: boolean) => void  // 切换绘图模式
+  isPPTMode?: boolean   // 是否 PPT 模式
+  onPPTModeChange?: (mode: boolean) => void   // 切换 PPT 模式
 }
 
 // Word 文档预览类型
@@ -34,6 +37,7 @@ interface DocPreview {
 export default function InputArea({ 
   onSend, 
   onGenerateImage,
+  onGeneratePPT,
   disabled = false,
   models = [],
   currentModel,
@@ -41,6 +45,8 @@ export default function InputArea({
   onModelChange,
   isDrawMode = false,
   onDrawModeChange,
+  isPPTMode = false,
+  onPPTModeChange,
 }: InputAreaProps) {
   const [content, setContent] = useState('')
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null)
@@ -300,6 +306,13 @@ export default function InputArea({
       return
     }
 
+    // PPT 模式：直接调用 PPT 生成接口
+    if (isPPTMode && content.trim()) {
+      onGeneratePPT?.(content.trim())
+      setContent('')
+      return
+    }
+
     let imageUrl: string | undefined
     let docInfo: { key: string; url: string; filename: string } | undefined
 
@@ -555,17 +568,17 @@ export default function InputArea({
           {/* 图片上传按钮 */}
           <motion.button
             onClick={triggerImageInput}
-            disabled={disabled || isProcessing || isDrawMode}
+            disabled={disabled || isProcessing || isDrawMode || isPPTMode}
             className={`
               p-3 rounded-sm
-              ${!disabled && !isProcessing && !isDrawMode
+              ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
                 ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
               }
               transition-colors duration-300
             `}
-            whileHover={!disabled && !isProcessing && !isDrawMode ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing && !isDrawMode ? { scale: 0.95 } : {}}
+            whileHover={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 1.05 } : {}}
+            whileTap={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 0.95 } : {}}
             title="上传图片"
           >
             <ImagePlus size={20} />
@@ -574,17 +587,17 @@ export default function InputArea({
           {/* Word 文档上传按钮 */}
           <motion.button
             onClick={triggerDocInput}
-            disabled={disabled || isProcessing || isDrawMode}
+            disabled={disabled || isProcessing || isDrawMode || isPPTMode}
             className={`
               p-3 rounded-sm
-              ${!disabled && !isProcessing && !isDrawMode
+              ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
                 ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
               }
               transition-colors duration-300
             `}
-            whileHover={!disabled && !isProcessing && !isDrawMode ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing && !isDrawMode ? { scale: 0.95 } : {}}
+            whileHover={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 1.05 } : {}}
+            whileTap={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 0.95 } : {}}
             title="上传 Word 文档"
           >
             <FileText size={20} />
@@ -592,23 +605,50 @@ export default function InputArea({
 
           {/* 绘图模式按钮 */}
           <motion.button
-            onClick={() => onDrawModeChange?.(!isDrawMode)}
-            disabled={disabled || isProcessing}
+            onClick={() => {
+              onDrawModeChange?.(!isDrawMode)
+              if (!isDrawMode) onPPTModeChange?.(false) // 互斥
+            }}
+            disabled={disabled || isProcessing || isPPTMode}
             className={`
               p-3 rounded-sm
               ${isDrawMode
                 ? 'bg-cyan-ink text-paper-white border-2 border-cyan-ink'
-                : !disabled && !isProcessing
+                : !disabled && !isProcessing && !isPPTMode
                   ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                   : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
               }
               transition-colors duration-300
             `}
-            whileHover={!disabled && !isProcessing ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing ? { scale: 0.95 } : {}}
+            whileHover={!disabled && !isProcessing && !isPPTMode ? { scale: 1.05 } : {}}
+            whileTap={!disabled && !isProcessing && !isPPTMode ? { scale: 0.95 } : {}}
             title={isDrawMode ? '退出绘图模式' : '绘图模式'}
           >
             <Palette size={20} />
+          </motion.button>
+
+          {/* PPT 模式按钮 */}
+          <motion.button
+            onClick={() => {
+              onPPTModeChange?.(!isPPTMode)
+              if (!isPPTMode) onDrawModeChange?.(false) // 互斥
+            }}
+            disabled={disabled || isProcessing || isDrawMode}
+            className={`
+              p-3 rounded-sm
+              ${isPPTMode
+                ? 'bg-vermilion text-paper-white border-2 border-vermilion'
+                : !disabled && !isProcessing && !isDrawMode
+                  ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
+                  : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
+              }
+              transition-colors duration-300
+            `}
+            whileHover={!disabled && !isProcessing && !isDrawMode ? { scale: 1.05 } : {}}
+            whileTap={!disabled && !isProcessing && !isDrawMode ? { scale: 0.95 } : {}}
+            title={isPPTMode ? '退出 PPT 模式' : 'PPT 生成模式'}
+          >
+            <Presentation size={20} />
           </motion.button>
 
           {/* 输入框 */}
@@ -620,14 +660,16 @@ export default function InputArea({
               onKeyDown={handleKeyDown}
               placeholder={isDrawMode 
                 ? "🎨 绘图模式：描述你想要的图像，AI 将为你生成..." 
-                : "请输入消息，按 Enter 发送，Shift + Enter 换行，支持拖拽上传..."
+                : isPPTMode
+                  ? "📊 PPT 模式：描述你想要的 PPT 主题和内容，AI 将为你生成..."
+                  : "请输入消息，按 Enter 发送，Shift + Enter 换行，支持拖拽上传..."
               }
               disabled={disabled || isProcessing}
               rows={1}
               className={`
                 w-full px-4 py-3 pr-12
                 bg-paper-white border-2
-                ${isDrawMode ? 'border-cyan-ink/50' : 'border-paper-aged'}
+                ${isDrawMode ? 'border-cyan-ink/50' : isPPTMode ? 'border-vermilion/50' : 'border-paper-aged'}
                 rounded-sm resize-none
                 text-ink-black placeholder-ink-faint
                 focus:outline-none focus:border-ink-medium
@@ -653,19 +695,23 @@ export default function InputArea({
               ${canSend
                 ? isDrawMode
                   ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/80'
-                  : 'bg-ink-black text-paper-white hover:bg-ink-dark'
+                  : isPPTMode
+                    ? 'bg-vermilion text-paper-white hover:bg-vermilion/80'
+                    : 'bg-ink-black text-paper-white hover:bg-ink-dark'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed'
               }
               transition-colors duration-300
             `}
             whileHover={canSend ? { scale: 1.05 } : {}}
             whileTap={canSend ? { scale: 0.95 } : {}}
-            title={isDrawMode ? '生成图像' : '发送消息'}
+            title={isDrawMode ? '生成图像' : isPPTMode ? '生成 PPT' : '发送消息'}
           >
             {isProcessing ? (
               <Loader2 size={20} className="animate-spin" />
             ) : isDrawMode ? (
               <Palette size={20} />
+            ) : isPPTMode ? (
+              <Presentation size={20} />
             ) : (
               <Send size={20} />
             )}
@@ -738,7 +784,9 @@ export default function InputArea({
         <p className="text-xs text-ink-faint mt-2 text-center">
           {isDrawMode 
             ? '🎨 绘图模式已开启 · 输入描述后 AI 将生成图像'
-            : '墨语AI可能会产生错误信息，请核实重要内容 · 支持拖拽上传图片或Word文档'
+            : isPPTMode
+              ? '📊 PPT 模式已开启 · 输入主题后 AI 将生成演示文稿'
+              : '墨语AI可能会产生错误信息，请核实重要内容 · 支持拖拽上传图片或Word文档'
           }
         </p>
       </div>

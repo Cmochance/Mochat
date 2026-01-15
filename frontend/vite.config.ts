@@ -12,6 +12,7 @@ export default defineConfig({
       '@upword': path.resolve(__dirname, '../modules/upword/frontend'),
       '@upgrade': path.resolve(__dirname, '../modules/upgrade/frontend'),
       '@picgenerate': path.resolve(__dirname, '../modules/picgenerate/frontend'),
+      '@pptgen': path.resolve(__dirname, '../modules/pptgen/frontend'),
     },
   },
   server: {
@@ -64,6 +65,12 @@ export default defineConfig({
         target: 'http://localhost:30903',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/picgen/, ''),
+      },
+      // PPT 生成服务代理 (Docker 端口 30904)
+      '/pptgen': {
+        target: 'http://localhost:30904',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/pptgen/, ''),
       },
     },
   },

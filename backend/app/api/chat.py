@@ -19,7 +19,8 @@ from ..schemas.chat import (
     MessagesPaginatedResponse,
     ChatRequest,
     ModelsResponse,
-    ModelInfo
+    ModelInfo,
+    MessageCreate
 )
 from ..services.chat_service import chat_service
 from ..services.ai_service import ai_service
@@ -157,6 +158,34 @@ async def get_messages(
             detail="会话不存在"
         )
     return result
+
+
+@router.post("/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+async def save_message(
+    request: MessageCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    直接保存消息到数据库（不经过AI生成流程）
+    用于保存绘图、PPT等非AI对话生成的消息
+    """
+    # 验证会话是否存在且属于当前用户
+    session = await chat_service.get_session(db, request.session_id, current_user)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="会话不存在或无权访问"
+        )
+    
+    message = await crud.create_message(
+        db,
+        request.session_id,
+        request.role,
+        request.content,
+        request.thinking
+    )
+    return message
 
 
 @router.post("/completions")

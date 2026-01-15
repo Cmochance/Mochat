@@ -100,6 +100,31 @@ body::after {
   background: var(--ink-medium);
 }
 
+/* 自定义滚动条 - 更细的版本，用于 thinking 块等小区域 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--ink-faint);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-medium);
+}
+
+/* Firefox 兼容 */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-faint) transparent;
+}
+
 /* ============ 组件样式 ============ */
 
 /* 水墨按钮 */

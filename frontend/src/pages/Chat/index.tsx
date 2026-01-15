@@ -6,6 +6,7 @@ import MessageList from './components/MessageList'
 import InputArea, { type ModelInfo } from './components/InputArea'
 import { useVersion, VersionModal } from '@upgrade'
 import { useImageGenerate } from '@picgenerate'
+import { usePPTGenerate } from '@pptgen'
 import { chatService } from '../../services/chatService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -50,12 +51,22 @@ export default function Chat() {
   // 绘图模式状态
   const [isDrawMode, setIsDrawMode] = useState(false)
   
+  // PPT 模式状态
+  const [isPPTMode, setIsPPTMode] = useState(false)
+  
   // 绘图 Hook
   const { 
     generate: generateImage, 
     isGenerating: isDrawing, 
     reset: resetDraw 
   } = useImageGenerate({ apiBasePath: '/picgen' })
+  
+  // PPT 生成 Hook
+  const {
+    generatePPT,
+    isGenerating: isGeneratingPPT,
+    reset: resetPPT
+  } = usePPTGenerate({ apiBase: '/pptgen', userId: user?.id?.toString() })
   
   // 挂载时根据屏幕大小设置侧边栏状态
   useEffect(() => {
@@ -353,6 +364,102 @@ export default function Chat() {
     loadSessions()
   }
 
+  // 处理 PPT 生成请求
+  const handleGeneratePPT = async (prompt: string) => {
+    if (!currentSession) {
+      const session = await chatService.createSession()
+      addSession(session)
+      setCurrentSession(session)
+      await generatePPTInSession(session.id, prompt)
+    } else {
+      await generatePPTInSession(currentSession.id, prompt)
+    }
+  }
+
+  const generatePPTInSession = async (sessionId: number, prompt: string) => {
+    const userContent = `📊 PPT 生成请求：${prompt}`
+    
+    // 添加用户消息
+    addMessage({
+      id: Date.now(),
+      role: 'user',
+      content: userContent,
+      created_at: new Date().toISOString(),
+    })
+
+    setStreaming(true)
+    clearStreaming()
+
+    try {
+      const result = await generatePPT(
+        { prompt },
+        (thinkingChunk) => {
+          flushSync(() => {
+            appendStreamingThinking(thinkingChunk)
+          })
+        }
+      )
+
+      const state = useChatStore.getState()
+      const thinking = state.streamingThinking || undefined
+      
+      let assistantContent: string
+      
+      if (result.success && result.pptUrl) {
+        assistantContent = `📊 PPT 生成成功！\n\n**${result.title || '演示文稿'}**\n\n[📥 点击下载 PPT](${result.pptUrl})`
+        addMessage({
+          id: Date.now(),
+          role: 'assistant',
+          content: assistantContent,
+          thinking,
+          created_at: new Date().toISOString(),
+        })
+      } else {
+        assistantContent = `❌ PPT 生成失败：${result.error || '未知错误'}`
+        addMessage({
+          id: Date.now(),
+          role: 'assistant',
+          content: assistantContent,
+          thinking,
+          created_at: new Date().toISOString(),
+        })
+      }
+      
+      // 保存消息到数据库
+      try {
+        await chatService.saveMessage(sessionId, 'user', userContent)
+        await chatService.saveMessage(sessionId, 'assistant', assistantContent, thinking)
+      } catch (saveError) {
+        console.error('保存 PPT 消息失败:', saveError)
+      }
+      
+      endStreaming()
+      resetPPT()
+      
+    } catch (error) {
+      console.error('PPT 生成失败:', error)
+      const assistantContent = `❌ PPT 生成失败：${error instanceof Error ? error.message : '未知错误'}`
+      addMessage({
+        id: Date.now(),
+        role: 'assistant',
+        content: assistantContent,
+        created_at: new Date().toISOString(),
+      })
+      
+      try {
+        await chatService.saveMessage(sessionId, 'user', userContent)
+        await chatService.saveMessage(sessionId, 'assistant', assistantContent)
+      } catch (saveError) {
+        console.error('保存 PPT 消息失败:', saveError)
+      }
+      
+      endStreaming()
+      resetPPT()
+    }
+
+    loadSessions()
+  }
+
   // 重新生成最后一条 AI 消息
   const handleRegenerate = async () => {
     if (!currentSession || isStreaming) return
@@ -458,13 +565,16 @@ export default function Chat() {
         <InputArea
           onSend={handleSendMessage}
           onGenerateImage={handleGenerateImage}
-          disabled={isStreaming || isDrawing}
+          onGeneratePPT={handleGeneratePPT}
+          disabled={isStreaming || isDrawing || isGeneratingPPT}
           models={models}
           currentModel={currentModel}
           defaultModel={defaultModel}
           onModelChange={handleModelChange}
           isDrawMode={isDrawMode}
           onDrawModeChange={setIsDrawMode}
+          isPPTMode={isPPTMode}
+          onPPTModeChange={setIsPPTMode}
         />
       </main>
     </div>

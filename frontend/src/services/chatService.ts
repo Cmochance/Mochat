@@ -218,6 +218,21 @@ export const chatService = {
     }
   },
 
+  // 保存消息到数据库（用于绘图、PPT等非AI对话生成的消息）
+  async saveMessage(
+    sessionId: number,
+    role: 'user' | 'assistant',
+    content: string,
+    thinking?: string
+  ): Promise<void> {
+    await api.post('/chat/messages', {
+      session_id: sessionId,
+      role,
+      content,
+      thinking,
+    })
+  },
+
   // 导出为 Word 文档
   async exportToDocx(content: string, filename: string = 'export'): Promise<void> {
     const token = localStorage.getItem('token')

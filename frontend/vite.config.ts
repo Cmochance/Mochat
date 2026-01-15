@@ -19,13 +19,23 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:9527',
         changeOrigin: true,
-        // SSE 流式传输支持
+        ws: true,
+        // SSE 流式传输优化
         configure: (proxy) => {
-          proxy.on('proxyRes', (proxyRes) => {
-            // 检测 SSE 响应，禁用缓冲
+          // 禁用 http-proxy 的 proxyRes 缓冲
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            // 检测 SSE 响应
             if (proxyRes.headers['content-type']?.includes('text/event-stream')) {
-              proxyRes.headers['cache-control'] = 'no-cache'
-              proxyRes.headers['connection'] = 'keep-alive'
+              // 设置响应头禁用各层缓冲
+              res.setHeader('Cache-Control', 'no-cache')
+              res.setHeader('Connection', 'keep-alive')
+              res.setHeader('X-Accel-Buffering', 'no')
+              
+              // 关键：将 socket 的 timeout 设为 0，禁用 Nagle 算法延迟
+              if (res.socket) {
+                res.socket.setNoDelay(true)
+                res.socket.setTimeout(0)
+              }
             }
           })
         },

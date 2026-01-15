@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     AI_API_KEY: str = ""
     AI_BASE_URL: str = "https://api.openai.com/v1"
     AI_MODEL: str = "gpt-4"
+    AI_MAX_TOKENS: int = 4096
+    AI_TEMPERATURE: float = 0.7
     
     # CORS配置
     CORS_ORIGINS: str = "http://localhost:3721,http://localhost:3000"

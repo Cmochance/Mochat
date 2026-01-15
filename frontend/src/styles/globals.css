@@ -30,6 +30,7 @@
 /* ========== 布局锁定 - 防止任何元素撑破视口 ========== */
 html {
   height: 100%;
+  height: 100dvh; /* 移动端动态视口高度，优先使用 */
   margin: 0;
   padding: 0;
   overflow: hidden !important; /* 完全禁止滚动 */
@@ -37,6 +38,8 @@ html {
 
 body {
   height: 100%;
+  height: 100dvh; /* 移动端动态视口高度 */
+  max-height: 100dvh; /* 双重约束 */
   margin: 0;
   padding: 0;
   overflow: hidden !important; /* 完全禁止滚动 */
@@ -47,7 +50,9 @@ body {
 }
 
 #root {
-  height: 100%; /* 固定高度，不使用 min-height */
+  height: 100%;
+  height: 100dvh; /* 移动端动态视口高度 */
+  max-height: 100dvh; /* 强制不超出视口 */
   width: 100%;
   display: flex;
   flex-direction: column;

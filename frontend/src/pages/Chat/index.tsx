@@ -303,7 +303,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="h-screen flex bg-paper-gradient overflow-hidden">
+    <div className="h-screen max-h-screen flex bg-paper-gradient overflow-hidden">
       {/* 版本更新弹窗 (独立模块) */}
       {showVersionModal && (
         <VersionModal versionInfo={versionInfo} onClose={closeVersionModal} />
@@ -322,7 +322,7 @@ export default function Chat() {
       />
 
       {/* 主内容区 - 严格高度约束 */}
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 h-full overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 max-h-full overflow-hidden">
         {/* 头部 */}
         <motion.header
           className="h-16 border-b border-paper-aged bg-paper-white/80 backdrop-blur-sm flex items-center px-6 flex-shrink-0"

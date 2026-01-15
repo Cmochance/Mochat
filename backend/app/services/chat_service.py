@@ -10,10 +10,7 @@ from ..db import crud
 from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
 from .content_filter import content_filter, RESTRICTED_MESSAGE
-
-# 默认配置值
-DEFAULT_MAX_TOKENS = 4096
-DEFAULT_TEMPERATURE = 0.7
+from ..core.config import settings
 
 # Upword 服务地址（Docker 内部网络）
 UPWORD_SERVICE_URL = "http://upword:3901"
@@ -205,23 +202,9 @@ class ChatService:
                 msg_content = await ChatService.expand_doc_content(msg_content)
             messages.append({"role": msg.role, "content": msg_content})
         
-        # 从数据库获取配置
-        max_tokens = DEFAULT_MAX_TOKENS
-        temperature = DEFAULT_TEMPERATURE
-        
-        try:
-            max_tokens_str = await crud.get_config(db, "max_tokens")
-            if max_tokens_str:
-                max_tokens = int(max_tokens_str)
-        except (ValueError, TypeError):
-            pass
-        
-        try:
-            temperature_str = await crud.get_config(db, "temperature")
-            if temperature_str:
-                temperature = float(temperature_str)
-        except (ValueError, TypeError):
-            pass
+        # 使用环境变量配置（避免数据库查询延迟）
+        max_tokens = settings.AI_MAX_TOKENS
+        temperature = settings.AI_TEMPERATURE
         
         # 调用AI服务获取流式响应
         thinking_full = ""
@@ -236,17 +219,18 @@ class ChatService:
         ):
             if chunk["type"] == "thinking":
                 thinking_full += chunk["data"]
-                yield chunk
+                yield chunk  # 立即推送，不阻塞
             elif chunk["type"] == "content":
                 content_full += chunk["data"]
-                # 实时检查输出内容
-                output_passed, _ = await content_filter.check_content(db, content_full)
-                if not output_passed:
-                    output_restricted = True
-                    break
-                yield chunk
+                yield chunk  # 立即推送，不做任何阻塞检查
             else:
                 yield chunk
+        
+        # 流结束后再检查内容（不影响流式输出）
+        if content_full:
+            output_passed, _ = await content_filter.check_content(db, content_full)
+            if not output_passed:
+                output_restricted = True
         
         # 如果输出被限制
         if output_restricted:
@@ -315,23 +299,9 @@ class ChatService:
             yield {"type": "error", "data": "没有用户消息"}
             return
         
-        # 从数据库获取配置
-        max_tokens = DEFAULT_MAX_TOKENS
-        temperature = DEFAULT_TEMPERATURE
-        
-        try:
-            max_tokens_str = await crud.get_config(db, "max_tokens")
-            if max_tokens_str:
-                max_tokens = int(max_tokens_str)
-        except (ValueError, TypeError):
-            pass
-        
-        try:
-            temperature_str = await crud.get_config(db, "temperature")
-            if temperature_str:
-                temperature = float(temperature_str)
-        except (ValueError, TypeError):
-            pass
+        # 使用环境变量配置
+        max_tokens = settings.AI_MAX_TOKENS
+        temperature = settings.AI_TEMPERATURE
         
         # 调用AI服务
         thinking_full = ""

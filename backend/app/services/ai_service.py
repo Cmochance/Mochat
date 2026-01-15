@@ -393,6 +393,7 @@ class AIService:
             in_thinking = False
             tag_buffer = ""  # 用于缓冲可能不完整的标签
             
+            chunk_index = 0
             async for chunk in response:
                 if not chunk.choices:
                     continue
@@ -400,6 +401,10 @@ class AIService:
                 delta = chunk.choices[0].delta
                 if not delta.content:
                     continue
+                
+                # 调试日志：确认收到流式数据
+                chunk_index += 1
+                print(f"[Stream] Chunk #{chunk_index}: {len(delta.content)} chars")
                 
                 # 合并之前缓冲的可能不完整的标签
                 text = tag_buffer + delta.content

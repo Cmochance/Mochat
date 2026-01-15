@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Save, RotateCcw, Bot, Key, Globe, Cpu, 
+  Save, RotateCcw, Bot, Key, Globe, 
   Plus, Trash2, ToggleLeft, ToggleRight, RefreshCw, GripVertical,
   ChevronDown, ChevronUp
 } from 'lucide-react'
@@ -22,8 +22,6 @@ export default function ModelConfig() {
     ai_api_key: '',
     ai_base_url: '',
     ai_model: '',
-    max_tokens: '4096',
-    temperature: '0.7',
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -54,8 +52,6 @@ export default function ModelConfig() {
         ai_api_key: configs.ai_api_key || '',
         ai_base_url: configs.ai_base_url || '',
         ai_model: configs.ai_model || '',
-        max_tokens: configs.max_tokens || '4096',
-        temperature: configs.temperature || '0.7',
       }))
     } catch (error) {
       console.error('加载配置失败:', error)
@@ -88,8 +84,6 @@ export default function ModelConfig() {
         { key: 'ai_api_key', value: config.ai_api_key },
         { key: 'ai_base_url', value: config.ai_base_url },
         { key: 'ai_model', value: config.ai_model },
-        { key: 'max_tokens', value: config.max_tokens },
-        { key: 'temperature', value: config.temperature },
       ]
 
       for (const { key, value } of configsToSave) {
@@ -113,8 +107,6 @@ export default function ModelConfig() {
       ai_api_key: '',
       ai_base_url: 'https://api.openai.com/v1',
       ai_model: 'gpt-4',
-      max_tokens: '4096',
-      temperature: '0.7',
     })
   }
 
@@ -240,37 +232,6 @@ export default function ModelConfig() {
           <p className="text-xs text-ink-light">
             用户未选择时使用的默认模型
           </p>
-        </div>
-
-        {/* 参数配置 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-ink-black">
-              <Cpu size={16} />
-              最大令牌数
-            </label>
-            <Input
-              type="number"
-              placeholder="4096"
-              value={config.max_tokens}
-              onChange={(e) => setConfig({ ...config, max_tokens: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-ink-black">
-              温度 (Temperature)
-            </label>
-            <Input
-              type="number"
-              step="0.1"
-              min="0"
-              max="2"
-              placeholder="0.7"
-              value={config.temperature}
-              onChange={(e) => setConfig({ ...config, temperature: e.target.value })}
-            />
-          </div>
         </div>
 
         {/* 操作按钮 */}
@@ -481,6 +442,7 @@ export default function ModelConfig() {
           <li>模型列表：添加的模型将显示在用户的模型选择列表中</li>
           <li>如果未配置任何模型，将显示 API 提供的所有模型</li>
           <li>禁用的模型不会显示在用户的选择列表中</li>
+          <li>最大令牌数和温度参数请在 .env 文件中配置</li>
         </ul>
       </motion.div>
     </div>

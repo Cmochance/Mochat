@@ -149,7 +149,7 @@ export default function MessageList({
   }
 
   return (
-    <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-6 min-h-0">
+    <div ref={containerRef} className="h-0 flex-grow overflow-y-auto px-4 py-6">
       <div className="max-w-4xl mx-auto space-y-6">
         {/* 加载更多历史消息 */}
         {hasMore && (

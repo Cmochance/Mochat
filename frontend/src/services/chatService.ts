@@ -98,10 +98,20 @@ export const chatService = {
 
     const decoder = new TextDecoder()
     let buffer = ''
+    let chunkCount = 0
+
+    console.log('[Stream] 开始接收流式数据...')
 
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        console.log(`[Stream] 流式传输完成，共收到 ${chunkCount} 个数据块`)
+        break
+      }
+
+      // 调试日志：确认收到数据
+      chunkCount++
+      console.log(`[Stream] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
 
       // 使用 stream: true 处理多字节字符
       buffer += decoder.decode(value, { stream: true })
@@ -156,10 +166,20 @@ export const chatService = {
 
     const decoder = new TextDecoder()
     let buffer = ''
+    let chunkCount = 0
+
+    console.log('[Stream/Regenerate] 开始接收流式数据...')
 
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        console.log(`[Stream/Regenerate] 流式传输完成，共收到 ${chunkCount} 个数据块`)
+        break
+      }
+
+      // 调试日志
+      chunkCount++
+      console.log(`[Stream/Regenerate] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
 
       // 使用 stream: true 处理多字节字符
       buffer += decoder.decode(value, { stream: true })

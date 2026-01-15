@@ -10,7 +10,7 @@ COPY modules/ ./modules/
 WORKDIR /build/frontend
 
 # 安装依赖
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # 创建符号链接让 ../modules 能访问 node_modules
 RUN ln -s /build/frontend/node_modules /build/node_modules

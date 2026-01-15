@@ -91,7 +91,7 @@ export default function SystemStats({ stats, loading }: SystemStatsProps) {
           </div>
           <div className="p-4 bg-paper-cream rounded-sm">
             <p className="text-sm text-ink-light">版本</p>
-            <p className="text-lg font-medium text-ink-black">v1.4</p>
+            <p className="text-lg font-medium text-ink-black">v1.5</p>
           </div>
           <div className="p-4 bg-paper-cream rounded-sm">
             <p className="text-sm text-ink-light">前端框架</p>

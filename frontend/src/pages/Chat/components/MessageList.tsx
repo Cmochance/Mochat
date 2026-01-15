@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import MessageItem from './MessageItem'
 import StreamingMessage from './StreamingMessage'
@@ -18,8 +18,10 @@ interface MessageListProps {
   onRegenerate?: () => void  // 重新生成最后一条AI消息
 }
 
-// 获取滚动位置存储的 key
+// 获取滚动位置存储的 key（localStorage - 持久保存）
 const getScrollKey = (sessionId: number) => `mochat_scroll_${sessionId}`
+// 获取"已访问过"标记的 key（sessionStorage - 标签页关闭后清除）
+const getVisitedKey = (sessionId: number) => `mochat_visited_${sessionId}`
 
 export default function MessageList({
   messages,
@@ -36,10 +38,8 @@ export default function MessageList({
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
-  const [isInitialLoad, setIsInitialLoad] = useState(true)
-  const prevMessagesLengthRef = useRef(0)
-  const prevSessionIdRef = useRef<number | undefined>(undefined)
   const prevScrollHeightRef = useRef(0)
+  const hasInitializedRef = useRef(false)  // 防止重复初始化
 
   // 保存滚动位置
   const saveScrollPosition = useCallback(() => {
@@ -49,53 +49,40 @@ export default function MessageList({
     }
   }, [sessionId])
 
-  // 恢复滚动位置（直接定位，无动画）
-  const restoreScrollPosition = useCallback(() => {
-    if (containerRef.current && sessionId) {
-      const savedPosition = localStorage.getItem(getScrollKey(sessionId))
-      if (savedPosition) {
-        containerRef.current.scrollTop = Number(savedPosition)
-      } else {
-        // 没有保存的位置，滚动到底部
-        containerRef.current.scrollTop = containerRef.current.scrollHeight
-      }
-    }
-  }, [sessionId])
-
-  // 会话切换时，重置初始加载状态
+  // 恢复滚动位置或滚动到底部（仅在首次打开标签页时滚动到底部）
   useEffect(() => {
-    if (sessionId !== prevSessionIdRef.current) {
-      setIsInitialLoad(true)
-      prevSessionIdRef.current = sessionId
-    }
-  }, [sessionId])
-
-  // 消息加载完成后恢复滚动位置
-  useEffect(() => {
-    if (!isLoading && messages.length > 0 && isInitialLoad && containerRef.current) {
-      // 使用 requestAnimationFrame 确保 DOM 已更新
+    if (!isLoading && messages.length > 0 && sessionId && containerRef.current && !hasInitializedRef.current) {
+      hasInitializedRef.current = true
+      
       requestAnimationFrame(() => {
-        restoreScrollPosition()
-        setIsInitialLoad(false)
-        prevMessagesLengthRef.current = messages.length
+        const container = containerRef.current
+        if (!container) return
+        
+        const visitedKey = getVisitedKey(sessionId)
+        const scrollKey = getScrollKey(sessionId)
+        const hasVisited = sessionStorage.getItem(visitedKey)
+        const savedPosition = localStorage.getItem(scrollKey)
+        
+        if (!hasVisited) {
+          // 首次打开此标签页：滚动到底部
+          container.scrollTop = container.scrollHeight
+          // 标记为已访问
+          sessionStorage.setItem(visitedKey, 'true')
+        } else if (savedPosition) {
+          // 已访问过且有保存的位置：恢复到保存的位置
+          container.scrollTop = Number(savedPosition)
+        }
+        // 其他情况：保持默认位置（通常是顶部，但由于消息已渲染，会保持当前位置）
       })
     }
-  }, [isLoading, messages.length, isInitialLoad, restoreScrollPosition])
+  }, [isLoading, messages.length, sessionId])
 
-  // 新消息到达时滚动到底部（仅限非初始加载）
+  // 会话切换时，重置初始化标记
   useEffect(() => {
-    if (!isInitialLoad && messages.length > prevMessagesLengthRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-      prevMessagesLengthRef.current = messages.length
-    }
-  }, [messages.length, isInitialLoad])
+    hasInitializedRef.current = false
+  }, [sessionId])
 
-  // 流式输出时滚动到底部
-  useEffect(() => {
-    if (isStreaming && streamingContent) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [isStreaming, streamingContent])
+  // 注意：新消息、流式输出、加载历史消息都不自动滚动，保持当前位置
 
   // 监听滚动事件保存位置 & 检测滚动到顶部加载更多
   useEffect(() => {

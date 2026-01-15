@@ -18,7 +18,7 @@ class Settings:
     ).split(",")
     
     # 当前版本号
-    CURRENT_VERSION: str = os.getenv("CURRENT_VERSION", "v1.4")
+    CURRENT_VERSION: str = os.getenv("CURRENT_VERSION", "v1.5")
 
 
 settings = Settings()

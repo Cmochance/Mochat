@@ -19,6 +19,6 @@
  * ```
  */
 
-export { useVersion, getCurrentVersion } from './useVersion'
+export { useVersion, getCurrentVersion, getVersionInfo } from './useVersion'
 export { VersionModal } from './VersionModal'
 export type { VersionInfo, VersionHistoryItem, UpgradeConfig } from './types'

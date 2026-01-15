@@ -103,5 +103,22 @@ export async function getCurrentVersion(apiBasePath = '/upgrade'): Promise<strin
   } catch (err) {
     console.error('[Upgrade] 获取当前版本失败:', err)
   }
-  return 'v1.4' // 默认版本
+  return 'v1.5' // 默认版本
+}
+
+// 获取完整版本信息（用于手动触发弹窗）
+export async function getVersionInfo(apiBasePath = '/upgrade'): Promise<VersionInfo> {
+  const token = localStorage.getItem('token')
+  
+  const response = await fetch(`${apiBasePath}/api/version`, {
+    headers: token ? {
+      'Authorization': `Bearer ${token}`,
+    } : {},
+  })
+
+  if (!response.ok) {
+    throw new Error('获取版本信息失败')
+  }
+
+  return await response.json()
 }

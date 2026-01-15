@@ -173,19 +173,24 @@ async def chat_completions(
     data: {"type": "content", "data": "..."}
     data: {"type": "done", "data": "..."}
     """
+    import asyncio
+    
     async def generate():
         async for chunk in chat_service.send_message_stream(
             db, request.session_id, current_user, request.content, request.model
         ):
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            # 强制事件循环立即处理，确保数据被发送
+            await asyncio.sleep(0)
     
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
         }
     )
 
@@ -197,19 +202,24 @@ async def regenerate_response(
     db: AsyncSession = Depends(get_db)
 ):
     """重新生成最后一条AI响应（SSE流式输出）"""
+    import asyncio
+    
     async def generate():
         async for chunk in chat_service.regenerate_response(
             db, session_id, current_user
         ):
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            # 强制事件循环立即处理，确保数据被发送
+            await asyncio.sleep(0)
     
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
         }
     )
 

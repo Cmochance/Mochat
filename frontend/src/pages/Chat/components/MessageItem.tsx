@@ -279,7 +279,8 @@ export default function MessageItem({
       className={`flex gap-4 ${isUser ? 'flex-row-reverse' : ''}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      // 流式消息不延迟，普通消息保留延迟动画
+      transition={{ delay: isStreaming ? 0 : Math.min(index * 0.05, 0.3) }}
     >
       {/* 头像 */}
       <div
@@ -325,17 +326,26 @@ export default function MessageItem({
         {(displayContent || !isUser || isStreaming) && (
           <div
             className={`
-              p-4 rounded-sm max-h-[400px] overflow-y-auto
+              p-4 rounded-sm max-h-[400px] overflow-y-auto custom-scrollbar
               ${isUser
                 ? 'bg-ink-black text-paper-white'
                 : 'bg-paper-white border border-paper-aged text-ink-black'
               }
             `}
           >
-            <MarkdownContent 
-              content={displayContent || (isStreaming ? '▌' : '')} 
-              isUser={isUser}
-            />
+            {isStreaming && !isUser ? (
+              // 流式输出时：简单文本渲染，避免 ReactMarkdown 性能问题
+              <div className="whitespace-pre-wrap break-words">
+                {displayContent}
+                <span className="inline-block w-2 h-4 bg-ink-medium animate-pulse ml-0.5 align-middle" />
+              </div>
+            ) : (
+              // 完成后：完整 Markdown 渲染
+              <MarkdownContent 
+                content={displayContent || ''} 
+                isUser={isUser}
+              />
+            )}
           </div>
         )}
 

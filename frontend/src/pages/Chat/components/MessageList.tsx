@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import MessageItem from './MessageItem'
+import StreamingMessage from './StreamingMessage'
 import Loading from '../../../components/common/Loading'
 import type { Message } from '../../../types'
 
@@ -202,18 +203,11 @@ export default function MessageList({
           })}
         </AnimatePresence>
 
-        {/* 流式响应中的消息 */}
+        {/* 流式响应中的消息 - 使用专门的流式组件，直接操作 DOM */}
         {isStreaming && (streamingContent || streamingThinking) && (
-          <MessageItem
-            message={{
-              id: -1,
-              role: 'assistant',
-              content: streamingContent,
-              thinking: streamingThinking,
-              created_at: new Date().toISOString(),
-            }}
-            index={messages.length}
-            isStreaming
+          <StreamingMessage
+            content={streamingContent}
+            thinking={streamingThinking}
           />
         )}
 

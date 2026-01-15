@@ -124,12 +124,16 @@ export const chatService = {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6)) as StreamChunk
+            // 立即调用回调，让 React 处理更新
             onChunk(data)
           } catch {
             // 忽略解析错误
           }
         }
       }
+      
+      // 给浏览器一个渲染的机会
+      await new Promise(resolve => setTimeout(resolve, 0))
     }
 
     // 处理剩余的 buffer
@@ -198,6 +202,9 @@ export const chatService = {
           }
         }
       }
+      
+      // 给浏览器一个渲染的机会
+      await new Promise(resolve => setTimeout(resolve, 0))
     }
 
     // 处理剩余的 buffer

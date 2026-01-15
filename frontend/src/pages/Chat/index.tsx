@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { flushSync } from 'react-dom'
 import { motion } from 'framer-motion'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
@@ -29,6 +30,7 @@ export default function Chat() {
     appendStreamingContent,
     appendStreamingThinking,
     clearStreaming,
+    endStreaming,
     addSession,
     removeSession,
   } = useChatStore()
@@ -228,29 +230,32 @@ export default function Chat() {
 
     try {
       await chatService.sendMessage(sessionId, content, (chunk: StreamChunk) => {
-        if (chunk.type === 'thinking') {
-          appendStreamingThinking(chunk.data)
-        } else if (chunk.type === 'content') {
-          appendStreamingContent(chunk.data)
-        } else if (chunk.type === 'done') {
-          // 完成时，将流式内容转为正式消息
-          const state = useChatStore.getState()
-          addMessage({
-            id: Date.now(),
-            role: 'assistant',
-            content: state.streamingContent,
-            thinking: state.streamingThinking || undefined,
-            created_at: new Date().toISOString(),
-          })
-          clearStreaming()
-        } else if (chunk.type === 'error') {
-          console.error('AI响应错误:', chunk.data)
-          clearStreaming()
-        }
+        // 使用 flushSync 强制同步渲染，解决 React 18 批处理导致的流式输出延迟
+        flushSync(() => {
+          if (chunk.type === 'thinking') {
+            appendStreamingThinking(chunk.data)
+          } else if (chunk.type === 'content') {
+            appendStreamingContent(chunk.data)
+          } else if (chunk.type === 'done') {
+            // 完成时，将流式内容转为正式消息
+            const state = useChatStore.getState()
+            addMessage({
+              id: Date.now(),
+              role: 'assistant',
+              content: state.streamingContent,
+              thinking: state.streamingThinking || undefined,
+              created_at: new Date().toISOString(),
+            })
+            endStreaming()  // 使用 endStreaming 完全结束流式状态
+          } else if (chunk.type === 'error') {
+            console.error('AI响应错误:', chunk.data)
+            endStreaming()  // 使用 endStreaming 完全结束流式状态
+          }
+        })
       }, model)
     } catch (error) {
       console.error('发送消息失败:', error)
-      clearStreaming()
+      endStreaming()  // 使用 endStreaming 完全结束流式状态
     }
 
     // 注意：不在这里调用 setStreaming(false)，因为 clearStreaming() 已经处理了
@@ -277,28 +282,31 @@ export default function Chat() {
 
     try {
       await chatService.regenerateResponse(currentSession.id, (chunk: StreamChunk) => {
-        if (chunk.type === 'thinking') {
-          appendStreamingThinking(chunk.data)
-        } else if (chunk.type === 'content') {
-          appendStreamingContent(chunk.data)
-        } else if (chunk.type === 'done') {
-          const state = useChatStore.getState()
-          addMessage({
-            id: Date.now(),
-            role: 'assistant',
-            content: state.streamingContent,
-            thinking: state.streamingThinking || undefined,
-            created_at: new Date().toISOString(),
-          })
-          clearStreaming()
-        } else if (chunk.type === 'error') {
-          console.error('重新生成失败:', chunk.data)
-          clearStreaming()
-        }
+        // 使用 flushSync 强制同步渲染
+        flushSync(() => {
+          if (chunk.type === 'thinking') {
+            appendStreamingThinking(chunk.data)
+          } else if (chunk.type === 'content') {
+            appendStreamingContent(chunk.data)
+          } else if (chunk.type === 'done') {
+            const state = useChatStore.getState()
+            addMessage({
+              id: Date.now(),
+              role: 'assistant',
+              content: state.streamingContent,
+              thinking: state.streamingThinking || undefined,
+              created_at: new Date().toISOString(),
+            })
+            endStreaming()  // 使用 endStreaming 完全结束流式状态
+          } else if (chunk.type === 'error') {
+            console.error('重新生成失败:', chunk.data)
+            endStreaming()  // 使用 endStreaming 完全结束流式状态
+          }
+        })
       })
     } catch (error) {
       console.error('重新生成失败:', error)
-      clearStreaming()
+      endStreaming()  // 使用 endStreaming 完全结束流式状态
     }
   }
 

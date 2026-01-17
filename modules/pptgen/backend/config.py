@@ -38,7 +38,7 @@ class Settings:
     
     # Cloud Run PPT 生成服务配置
     CLOUDRUN_URL: str = os.getenv("PPTGEN_CLOUDRUN_URL", "")
-    CLOUDRUN_SECRET: str = os.getenv("PPTGEN_CLOUDRUN_SECRET", "")
+    CLOUDRUN_SECRET: str = os.getenv("PPTGEN_CLOUDRUN_SECRET", "") or os.getenv("AUTH_TOKEN", "")
     
     # Cloudflare R2 配置
     R2_ACCOUNT_ID: str = os.getenv("R2_ACCOUNT_ID", "")

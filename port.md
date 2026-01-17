@@ -21,6 +21,7 @@
 | **upword** | 3901 | 13901 | `UPWORD_PORT` | 文档上传解析服务 |
 | **upgrade** | 3902 | 13902 | `UPGRADE_PORT` | 版本更新通知服务 |
 | **picgenerate** | 3903 | 30903 | `PICGEN_PORT` | AI 图像生成服务 |
+| **pptgen** | 3904 | 30904 | `PPTGEN_PORT` | AI PPT 生成服务 |
 
 ---
 
@@ -36,6 +37,7 @@
 | 文档上传 | http://localhost:13901 |
 | 版本服务 | http://localhost:13902 |
 | 图像生成 | http://localhost:30903 |
+| PPT生成 | http://localhost:30904 |
 
 ### 生产环境
 
@@ -45,6 +47,7 @@
 - `/upword/*` → upword:3901
 - `/upgrade/*` → upgrade:3902
 - `/picgen/*` → picgenerate:3903
+- `/pptgen/*` → pptgen:3904
 
 ---
 
@@ -67,3 +70,4 @@ lsof -i :端口号
 | 日期 | 变更 |
 |------|------|
 | 2026-01-15 | 初始创建，添加 picgenerate 服务 (30903) |
+| 2026-01-16 | 添加 pptgen 服务 (30904) |

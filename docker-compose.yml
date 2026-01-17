@@ -31,7 +31,7 @@ services:
       context: ./modules/upword/backend
       dockerfile: Dockerfile
     ports:
-      - "13901:3901"
+      - "33901:3901"
     environment:
       - UPWORD_PORT=3901
       - UPWORD_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
@@ -48,7 +48,7 @@ services:
       context: ./modules/uppic/backend
       dockerfile: Dockerfile
     ports:
-      - "13900:3900"
+      - "33900:3900"
     environment:
       - UPPIC_PORT=3900
       - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
@@ -65,7 +65,7 @@ services:
       context: ./modules/upgrade/backend
       dockerfile: Dockerfile
     ports:
-      - "13902:3902"
+      - "33902:3902"
     environment:
       - UPGRADE_PORT=3902
       - UPGRADE_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
@@ -115,7 +115,7 @@ services:
       - PPTGEN_AI_MODEL=${PPTGEN_AI_MODEL:-gpt-4}
       # Cloud Run 配置
       - PPTGEN_CLOUDRUN_URL=${PPTGEN_CLOUDRUN_URL:-}
-      - PPTGEN_CLOUDRUN_SECRET=${PPTGEN_CLOUDRUN_SECRET:-}
+      - PPTGEN_CLOUDRUN_SECRET=${PPTGEN_CLOUDRUN_SECRET:-${AUTH_TOKEN:-}}
       # R2 存储配置
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}

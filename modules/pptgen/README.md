@@ -5,7 +5,7 @@
 ## 架构
 
 ```
-用户 -> 后端(AI生成JSON) -> Cloud Run(PPT生成) -> R2 -> 前端
+用户 -> 后端(AI生成JSON) -> Cloud Run(PPT生成+上传R2) -> 返回R2链接 -> 前端
 ```
 
 ## 目录结构
@@ -17,15 +17,11 @@ modules/pptgen/
 │   ├── main.py       # 主入口
 │   ├── ai_generator.py      # AI JSON 生成
 │   ├── cloudrun_client.py   # Cloud Run 客户端
-│   ├── storage.py    # R2 存储
+│   ├── storage.py    # R2 存储（备用）
 │   ├── Dockerfile
 │   └── requirements.txt
-├── cloudrun/         # Cloud Run 服务 (Node.js)
-│   ├── src/
-│   │   └── index.ts  # PPT 生成服务
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── Dockerfile
+├── cloudrun/         # Cloud Run 服务 (Python)
+│   └── main.py       # PPT 生成 + R2 上传服务
 ├── frontend/         # 前端组件
 │   ├── types.ts      # 类型定义
 │   ├── usePPTGenerate.ts  # React Hook
@@ -61,21 +57,29 @@ R2_PUBLIC_DOMAIN=xxx
 
 ### 1. 部署 Cloud Run 服务
 
+Cloud Run 服务使用 Python + python-pptx，负责生成 PPT 并上传到 R2。
+
 ```bash
-cd modules/pptgen/cloudrun
-
-# 安装依赖
-npm install
-
-# 构建
-npm run build
-
-# 部署到 Cloud Run
-gcloud run deploy pptgen-service \
-  --source . \
-  --region asia-east1 \
+# 部署到 Cloud Run (使用 functions-framework)
+gcloud functions deploy pptgen \
+  --gen2 \
+  --runtime=python311 \
+  --region=asia-east1 \
+  --source=. \
+  --entry-point=pptgen \
+  --trigger-http \
   --allow-unauthenticated \
-  --set-env-vars PPTGEN_CLOUDRUN_SECRET=your-secret
+  --set-env-vars AUTH_TOKEN=xxx,R2_ACCOUNT_ID=xxx,R2_ACCESS_KEY_ID=xxx,R2_SECRET_ACCESS_KEY=xxx,R2_BUCKET_NAME=xxx,R2_PUBLIC_DOMAIN=xxx
+```
+
+Cloud Run 环境变量：
+```env
+AUTH_TOKEN=your-secret              # 鉴权密钥
+R2_ACCOUNT_ID=xxx                   # R2 账户 ID
+R2_ACCESS_KEY_ID=xxx                # R2 访问密钥
+R2_SECRET_ACCESS_KEY=xxx            # R2 密钥
+R2_BUCKET_NAME=xxx                  # R2 存储桶名称
+R2_PUBLIC_DOMAIN=https://xxx.com    # R2 公开访问域名
 ```
 
 ### 2. 部署后端服务

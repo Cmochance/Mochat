@@ -4,9 +4,8 @@ PPT 生成微服务
 执行流程：
 1. 接收用户的 prompt
 2. 调用 AI 生成 PPT 的 JSON 结构（流式输出 thinking）
-3. 调用 Cloud Run 服务将 JSON 转换为 PPTX
-4. 上传 PPTX 到 R2
-5. 返回下载链接
+3. 调用 Cloud Run 服务将 JSON 转换为 PPTX 并上传到 R2
+4. 返回下载链接
 
 全过程以 thinking 形式流式输出给主项目
 """
@@ -15,16 +14,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, AsyncGenerator
-import uuid
 import json
 import asyncio
-import re
-from datetime import datetime
 
 from config import settings
 from ai_generator import get_ai_generator, AIGeneratorError
 from cloudrun_client import get_cloudrun_client, CloudRunError
-from storage import storage_service
 
 app = FastAPI(
     title="PPT 生成服务",
@@ -71,18 +66,6 @@ async def root():
 async def health():
     """健康检查"""
     return {"status": "healthy"}
-
-
-def sanitize_filename(title: str) -> str:
-    """将标题转换为安全的文件名"""
-    # 移除或替换不安全的字符
-    safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
-    # 限制长度
-    safe_title = safe_title[:50]
-    # 如果为空，使用默认名称
-    if not safe_title.strip():
-        safe_title = "presentation"
-    return safe_title.strip()
 
 
 def make_sse(data_type: str, data: str) -> str:
@@ -162,7 +145,7 @@ async def generate_stream(request: GenerateRequest) -> AsyncGenerator[str, None]
         yield make_sse('thinking', f'{NL}✅ 验证通过！PPT 标题: {ppt_title}，共 {slide_count} 页{NL}')
         await asyncio.sleep(0)
         
-        # ========== 阶段 4: 调用 Cloud Run 生成 PPTX ==========
+        # ========== 阶段 4: 调用 Cloud Run 生成 PPTX 并上传 R2 ==========
         yield make_sse('thinking', f'{NL}🔧 正在生成 PPT 文件...')
         await asyncio.sleep(0)
         
@@ -170,27 +153,18 @@ async def generate_stream(request: GenerateRequest) -> AsyncGenerator[str, None]
         await asyncio.sleep(0)
         
         cloudrun_client = get_cloudrun_client()
-        pptx_data = await cloudrun_client.generate_pptx(ppt_data)
+        result = await cloudrun_client.generate_pptx(ppt_data, request.user_id)
         
-        file_size_kb = len(pptx_data) / 1024
-        yield make_sse('thinking', f'{NL}✅ PPT 文件生成成功！文件大小: {file_size_kb:.1f} KB')
+        yield make_sse('thinking', f'{NL}✅ PPT 文件生成成功！')
         await asyncio.sleep(0)
         
-        # ========== 阶段 5: 上传到 R2 ==========
-        yield make_sse('thinking', f'{NL}{NL}☁️ 正在上传到云存储...')
+        yield make_sse('thinking', f'{NL}☁️ 文件已上传到云存储')
         await asyncio.sleep(0)
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        safe_title = sanitize_filename(ppt_title)
-        key = f"ppt/{request.user_id}/{timestamp}_{unique_id}_{safe_title}.pptx"
+        ppt_url = result.url
+        ppt_title = result.title
         
-        ppt_url = storage_service.upload_pptx(key, pptx_data)
-        
-        yield make_sse('thinking', f'{NL}✅ 上传完成！')
-        await asyncio.sleep(0)
-        
-        # ========== 阶段 6: 返回结果 ==========
+        # ========== 阶段 5: 返回结果 ==========
         yield make_sse('thinking', f'{NL}{NL}🎉 PPT 生成完成！')
         await asyncio.sleep(0)
         
@@ -268,24 +242,15 @@ async def generate_ppt(request: GenerateRequest):
             clean_json = clean_json[:-3]
         
         ppt_data = json.loads(clean_json.strip())
-        ppt_title = ppt_data.get("title", "演示文稿")
         
-        # 2. 调用 Cloud Run 生成 PPTX
+        # 2. 调用 Cloud Run 生成 PPTX 并上传 R2
         cloudrun_client = get_cloudrun_client()
-        pptx_data = await cloudrun_client.generate_pptx(ppt_data)
-        
-        # 3. 上传到 R2
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        unique_id = str(uuid.uuid4())[:8]
-        safe_title = sanitize_filename(ppt_title)
-        key = f"ppt/{request.user_id}/{timestamp}_{unique_id}_{safe_title}.pptx"
-        
-        ppt_url = storage_service.upload_pptx(key, pptx_data)
+        result = await cloudrun_client.generate_pptx(ppt_data, request.user_id)
         
         return GenerateResponse(
             success=True,
-            pptUrl=ppt_url,
-            title=ppt_title
+            pptUrl=result.url,
+            title=result.title
         )
         
     except (AIGeneratorError, CloudRunError) as e:

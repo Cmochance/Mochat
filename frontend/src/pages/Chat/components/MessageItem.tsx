@@ -169,6 +169,49 @@ function MarkdownContent({
           },
           // 链接渲染
           a({ href, children }) {
+            // 检查是否是 pptx 文件下载链接
+            const isPptxDownload = href && (href.includes('.pptx') || href.includes('ppt/'))
+            
+            if (isPptxDownload) {
+              // 使用 JS 下载，避免 Windows Zone.Identifier 标记导致 Office 无法打开
+              const handleDownload = async (e: React.MouseEvent) => {
+                e.preventDefault()
+                try {
+                  const response = await fetch(href)
+                  const blob = await response.blob()
+                  const url = window.URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  // 从 URL 中提取文件名
+                  const urlParams = new URLSearchParams(href.split('?')[1] || '')
+                  const disposition = urlParams.get('response-content-disposition') || ''
+                  const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+                  const filename = filenameMatch 
+                    ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''))
+                    : 'presentation.pptx'
+                  a.download = filename
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                } catch (error) {
+                  console.error('Download failed:', error)
+                  // 降级为普通链接下载
+                  window.open(href, '_blank')
+                }
+              }
+              
+              return (
+                <a 
+                  href={href}
+                  onClick={handleDownload}
+                  className={isUser ? 'text-cyan-300 underline cursor-pointer' : 'text-cyan-ink underline cursor-pointer'}
+                >
+                  {children}
+                </a>
+              )
+            }
+            
             return (
               <a 
                 href={href} 

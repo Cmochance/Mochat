@@ -1,0 +1,4 @@
+functions-framework==3.*
+python-pptx==1.0.2
+boto3>=1.35.0
+lxml>=5.0.0

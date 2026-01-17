@@ -44,19 +44,19 @@ export default defineConfig({
       },
       // Uppic 独立图片上传服务代理 (Docker 端口 13900)
       '/uppic': {
-        target: 'http://localhost:13900',
+        target: 'http://localhost:33900',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/uppic/, ''),
       },
       // Upword 独立文档上传解析服务代理 (Docker 端口 13901)
       '/upword': {
-        target: 'http://localhost:13901',
+        target: 'http://localhost:33901',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/upword/, ''),
       },
       // Upgrade 独立版本更新服务代理 (Docker 端口 13902)
       '/upgrade': {
-        target: 'http://localhost:13902',
+        target: 'http://localhost:33902',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/upgrade/, ''),
       },

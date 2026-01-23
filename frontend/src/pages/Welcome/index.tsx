@@ -16,16 +16,19 @@ export default function Welcome() {
       icon: <MessageCircle className="w-8 h-8" />,
       title: t('welcome.features.smartDialogue.title'),
       description: t('welcome.features.smartDialogue.description'),
+      link: 'https://chenmo.mochance.xyz',
     },
     {
       icon: <Sparkles className="w-8 h-8" />,
       title: t('welcome.features.visibleThinking.title'),
       description: t('welcome.features.visibleThinking.description'),
+      link: 'https://mochan-ai-letters-front.vercel.app',
     },
     {
       icon: <Zap className="w-8 h-8" />,
       title: t('welcome.features.streamingOutput.title'),
       description: t('welcome.features.streamingOutput.description'),
+      link: 'https://sci-data.mochance.xyz',
     },
     {
       icon: <Shield className="w-8 h-8" />,
@@ -155,26 +158,48 @@ export default function Welcome() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.6 }}
         >
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              className="ink-card p-6 text-center"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
-              whileHover={{ y: -5 }}
-            >
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-paper-cream flex items-center justify-center text-ink-black">
-                {feature.icon}
-              </div>
-              <h3 className="text-xl font-title text-ink-black mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-ink-light text-sm">
-                {feature.description}
-              </p>
-            </motion.div>
-          ))}
+          {features.map((feature, index) => {
+            const cardContent = (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-paper-cream flex items-center justify-center text-ink-black">
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-title text-ink-black mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-ink-light text-sm">
+                  {feature.description}
+                </p>
+              </>
+            )
+
+            return feature.link ? (
+              <motion.a
+                key={feature.title}
+                href={feature.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ink-card p-6 text-center block cursor-pointer"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
+                whileHover={{ y: -5 }}
+              >
+                {cardContent}
+              </motion.a>
+            ) : (
+              <motion.div
+                key={feature.title}
+                className="ink-card p-6 text-center"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 + index * 0.1 }}
+                whileHover={{ y: -5 }}
+              >
+                {cardContent}
+              </motion.div>
+            )
+          })}
         </motion.section>
 
         {/* 装饰性水墨元素 */}

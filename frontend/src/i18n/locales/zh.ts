@@ -40,20 +40,20 @@ export default {
     // 特性
     features: {
       smartDialogue: {
-        title: '智能对话',
-        description: '与AI进行自然流畅的对话，获取知识与灵感',
+        title: '墨城',
+        description: '联系我们，了解墨城平台其他应用的信息',
       },
       visibleThinking: {
-        title: '思维可见',
-        description: '独特的思考过程展示，了解AI的推理逻辑',
+        title: '墨书',
+        description: '小说加工厂，您的规划师与文学助手',
       },
       streamingOutput: {
-        title: '流式输出',
-        description: '实时流式响应，让对话如行云流水般顺畅',
+        title: '墨图',
+        description: '科研助手，实验与测试数据图像处理与深度分析',
       },
       secureReliable: {
-        title: '安全可靠',
-        description: '数据加密存储，保护您的隐私与安全',
+        title: '墨文',
+        description: '科研专家，输入您的数据，一键生成高质量论文',
       },
     },
     // 装饰文字

@@ -40,20 +40,20 @@ export default {
     // Features
     features: {
       smartDialogue: {
-        title: 'Smart Dialogue',
-        description: 'Engage in natural conversations with AI to gain knowledge and inspiration',
+        title: 'Mochan Blog',
+        description: 'Contact us to learn more about the other applications of the Mochat platform',
       },
       visibleThinking: {
-        title: 'Visible Thinking',
-        description: 'Unique display of thinking process to understand AI\'s reasoning',
+        title: 'Mochan Novelist',
+        description: 'Novel factory, your planner and literary assistant',
       },
       streamingOutput: {
-        title: 'Streaming Output',
-        description: 'Real-time streaming response for smooth conversations',
+        title: 'Mochan Sci-Grapher',
+        description: 'Scientific assistant, image processing and deep analysis of experimental and test data',
       },
       secureReliable: {
-        title: 'Secure & Reliable',
-        description: 'Encrypted data storage to protect your privacy and security',
+        title: 'Mochan Sci-Writer',
+        description: 'Scientific expert, input your data, one-click generate high-quality论文',
       },
     },
     // Decorative characters

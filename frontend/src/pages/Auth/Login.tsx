@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { User, Lock, ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
+import LanguageSwitcher from '../../components/common/LanguageSwitcher'
 import { authService } from '../../services/authService'
 import { useAuthStore } from '../../stores/authStore'
 
 export default function Login() {
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
+  const { t } = useTranslation()
   
   const [formData, setFormData] = useState({
     username: '',
@@ -28,7 +31,7 @@ export default function Login() {
       setAuth(response.access_token, response.user)
       navigate('/chat')
     } catch (err: any) {
-      setError(err.response?.data?.detail || '登录失败，请检查用户名和密码')
+      setError(err.response?.data?.detail || t('login.loginFailed'))
     } finally {
       setLoading(false)
     }
@@ -70,7 +73,7 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            墨语
+            {t('welcome.brand')}
           </motion.h1>
           <motion.p
             className="text-xl text-paper-cream/80"
@@ -78,7 +81,7 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            水墨之间，智慧流淌
+            {t('login.decorativeText')}
           </motion.p>
         </div>
       </motion.div>
@@ -100,7 +103,7 @@ export default function Login() {
             transition={{ delay: 0.3 }}
           >
             <ArrowLeft size={20} />
-            返回首页
+            {t('common.backToHome')}
           </motion.button>
 
           {/* 标题 */}
@@ -110,8 +113,8 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <h2 className="text-4xl font-title text-ink-black mb-2">登录</h2>
-            <p className="text-ink-light">欢迎回来，继续您的对话之旅</p>
+            <h2 className="text-4xl font-title text-ink-black mb-2">{t('login.title')}</h2>
+            <p className="text-ink-light">{t('login.subtitle')}</p>
           </motion.div>
 
           {/* 错误提示 */}
@@ -134,8 +137,8 @@ export default function Login() {
             transition={{ delay: 0.5 }}
           >
             <Input
-              label="用户名"
-              placeholder="请输入用户名"
+              label={t('login.username')}
+              placeholder={t('login.usernamePlaceholder')}
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
               icon={<User size={18} />}
@@ -143,9 +146,9 @@ export default function Login() {
             />
 
             <Input
-              label="密码"
+              label={t('login.password')}
               type="password"
-              placeholder="请输入密码"
+              placeholder={t('login.passwordPlaceholder')}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               icon={<Lock size={18} />}
@@ -158,7 +161,7 @@ export default function Login() {
               loading={loading}
               size="lg"
             >
-              登录
+              {t('common.login')}
             </Button>
           </motion.form>
 
@@ -173,7 +176,7 @@ export default function Login() {
               to="/auth/forgot-password"
               className="text-sm text-ink-light hover:text-ink-dark transition-colors"
             >
-              忘记密码？
+              {t('login.forgotPassword')}
             </Link>
           </motion.div>
 
@@ -184,16 +187,19 @@ export default function Login() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7 }}
           >
-            还没有账号？
+            {t('login.noAccount')}
             <Link
               to="/auth/register"
               className="text-vermilion hover:text-vermilion-light ml-2 transition-colors"
             >
-              立即注册
+              {t('login.registerNow')}
             </Link>
           </motion.p>
         </div>
       </motion.div>
+
+      {/* 语言切换按钮 */}
+      <LanguageSwitcher />
     </div>
   )
 }

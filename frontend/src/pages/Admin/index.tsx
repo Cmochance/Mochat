@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { 
   Users, 
   BarChart3, 
@@ -13,6 +14,7 @@ import UserManagement from './components/UserManagement'
 import SystemStats from './components/SystemStats'
 import ModelConfig from './components/ModelConfig'
 import KeywordManagement from './components/KeywordManagement'
+import LanguageSwitcher from '../../components/common/LanguageSwitcher'
 import { useAuthStore } from '../../stores/authStore'
 import { adminService } from '../../services/adminService'
 import type { User, SystemStats as SystemStatsType } from '../../types'
@@ -22,6 +24,7 @@ type TabType = 'stats' | 'users' | 'config' | 'keywords'
 export default function Admin() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabType>('stats')
   const [stats, setStats] = useState<SystemStatsType | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -53,10 +56,10 @@ export default function Admin() {
   }
 
   const tabs = [
-    { id: 'stats' as const, label: '系统概览', icon: BarChart3 },
-    { id: 'users' as const, label: '用户管理', icon: Users },
-    { id: 'config' as const, label: '系统配置', icon: Settings },
-    { id: 'keywords' as const, label: '内容限制', icon: ShieldAlert },
+    { id: 'stats' as const, label: t('admin.tabs.stats'), icon: BarChart3 },
+    { id: 'users' as const, label: t('admin.tabs.users'), icon: Users },
+    { id: 'config' as const, label: t('admin.tabs.config'), icon: Settings },
+    { id: 'keywords' as const, label: t('admin.tabs.keywords'), icon: ShieldAlert },
   ]
 
   return (
@@ -74,22 +77,22 @@ export default function Admin() {
               onClick={() => navigate('/chat')}
             >
               <ArrowLeft size={20} />
-              返回对话
+              {t('common.backToChat')}
             </button>
             <div className="h-6 w-px bg-ink-medium" />
-            <h1 className="text-xl font-title">后台管理</h1>
+            <h1 className="text-xl font-title">{t('admin.title')}</h1>
           </div>
 
           <div className="flex items-center gap-4">
             <span className="text-paper-cream text-sm">
-              管理员：{user?.username}
+              {t('admin.adminLabel')}{user?.username}
             </span>
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-vermilion/20 hover:bg-vermilion/30 rounded-sm text-vermilion-light transition-colors"
               onClick={handleLogout}
             >
               <LogOut size={16} />
-              登出
+              {t('common.logout')}
             </button>
           </div>
         </div>
@@ -141,6 +144,9 @@ export default function Admin() {
           </motion.div>
         </div>
       </main>
+
+      {/* 语言切换按钮 */}
+      <LanguageSwitcher />
     </div>
   )
 }

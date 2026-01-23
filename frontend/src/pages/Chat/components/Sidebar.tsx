@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, MessageSquare, Trash2, LogOut, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../../stores/authStore'
 import { getCurrentVersion, VersionModal, getVersionInfo, type VersionInfo } from '@upgrade'
 import type { ChatSession } from '../../../types'
@@ -60,6 +61,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const { logout, user } = useAuthStore()
+  const { t } = useTranslation()
   
   // 检测是否为大屏幕 - 大屏幕不需要遮罩层
   const [isLargeScreen, setIsLargeScreen] = useState(true)
@@ -141,7 +143,7 @@ export default function Sidebar({
             onClick={onToggle}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            title="展开侧边栏"
+            title={t('chat.expandSidebar')}
           >
             <InkToggleIcon isOpen={false} />
           </motion.button>
@@ -152,7 +154,7 @@ export default function Sidebar({
             onClick={onNewSession}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            title="新建对话"
+            title={t('chat.newConversation')}
           >
             <Plus size={20} />
           </motion.button>
@@ -168,7 +170,7 @@ export default function Sidebar({
                 onClick={() => navigate('/admin')}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                title="管理后台"
+                title={t('chat.adminPanel')}
               >
                 <Settings size={18} className="text-paper-cream/70" />
               </motion.button>
@@ -178,7 +180,7 @@ export default function Sidebar({
               onClick={handleLogout}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              title={`${username} - 点击登出`}
+              title={`${username} - ${t('chat.clickToLogout')}`}
             >
               <span className="text-paper-white font-body">
                 {username.charAt(0).toUpperCase()}
@@ -203,11 +205,11 @@ export default function Sidebar({
                 <span className="text-ink-black font-title text-xl">墨</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-title leading-tight whitespace-nowrap">墨语</span>
+                <span className="text-xl font-title leading-tight whitespace-nowrap">{t('welcome.brand')}</span>
                 <button
                   onClick={handleVersionClick}
                   className="text-xs text-paper-cream/60 hover:text-cyan-ink transition-colors text-left"
-                  title="查看版本历史"
+                  title={t('chat.viewVersionHistory')}
                 >
                   {version}
                 </button>
@@ -219,7 +221,7 @@ export default function Sidebar({
               onClick={onToggle}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              title="收起侧边栏"
+              title={t('chat.collapseSidebar')}
             >
               <InkToggleIcon isOpen={true} />
             </motion.button>
@@ -234,7 +236,7 @@ export default function Sidebar({
               whileTap={{ scale: 0.98 }}
             >
               <Plus size={20} />
-              新建对话
+              {t('chat.newConversation')}
             </motion.button>
           </div>
 
@@ -275,7 +277,7 @@ export default function Sidebar({
 
             {sessions.length === 0 && (
               <div className="text-center py-8 text-paper-cream/50 text-sm whitespace-nowrap">
-                暂无对话记录
+                {t('chat.noConversations')}
               </div>
             )}
           </div>
@@ -291,7 +293,7 @@ export default function Sidebar({
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{username}</p>
                 <p className="text-xs text-paper-cream/60 whitespace-nowrap">
-                  {user?.role === 'admin' ? '管理员' : '用户'}
+                  {user?.role === 'admin' ? t('common.admin') : t('common.user')}
                 </p>
               </div>
             </div>
@@ -305,7 +307,7 @@ export default function Sidebar({
                   whileTap={{ scale: 0.98 }}
                 >
                   <Settings size={16} />
-                  管理
+                  {t('chat.manage')}
                 </motion.button>
               )}
               <motion.button
@@ -315,7 +317,7 @@ export default function Sidebar({
                 whileTap={{ scale: 0.98 }}
               >
                 <LogOut size={16} />
-                登出
+                {t('common.logout')}
               </motion.button>
             </div>
           </div>

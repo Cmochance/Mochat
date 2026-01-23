@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea, { type ModelInfo } from './components/InputArea'
+import LanguageSwitcher from '../../components/common/LanguageSwitcher'
 import { useVersion, VersionModal } from '@upgrade'
 import { useImageGenerate } from '@picgenerate'
 import { usePPTGenerate } from '@pptgen'
@@ -14,6 +16,7 @@ import type { StreamChunk } from '../../types'
 
 export default function Chat() {
   const { user } = useAuthStore()
+  const { t } = useTranslation()
   const {
     sessions,
     currentSession,
@@ -515,16 +518,16 @@ export default function Chat() {
       )}
 
       {/* 侧边栏 */}
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        sessions={sessions}
-        currentSession={currentSession}
-        onSelectSession={setCurrentSession}
-        onNewSession={handleNewSession}
-        onDeleteSession={handleDeleteSession}
-        username={user?.username || '用户'}
-      />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          sessions={sessions}
+          currentSession={currentSession}
+          onSelectSession={setCurrentSession}
+          onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
+          username={user?.username || t('common.user')}
+        />
 
       {/* 主内容区 - 严格高度约束 */}
       <main className="flex-1 flex flex-col min-w-0 min-h-0 max-h-full overflow-hidden">
@@ -543,7 +546,7 @@ export default function Chat() {
             </svg>
           </button>
           <h1 className="text-xl font-title text-ink-black truncate">
-            {currentSession?.title || '新对话'}
+            {currentSession?.title || t('chat.newChat')}
           </h1>
         </motion.header>
 
@@ -577,6 +580,9 @@ export default function Chat() {
           onPPTModeChange={setIsPPTMode}
         />
       </main>
+
+      {/* 语言切换按钮 */}
+      <LanguageSwitcher />
     </div>
   )
 }

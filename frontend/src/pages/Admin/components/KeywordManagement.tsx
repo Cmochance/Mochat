@@ -9,12 +9,14 @@ import {
   Shield,
   Search
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { adminService } from '../../../services/adminService'
 import type { RestrictedKeyword } from '../../../types'
 import Button from '../../../components/common/Button'
 import Input from '../../../components/common/Input'
 
 export default function KeywordManagement() {
+  const { t } = useTranslation()
   const [keywords, setKeywords] = useState<RestrictedKeyword[]>([])
   const [loading, setLoading] = useState(true)
   const [newKeyword, setNewKeyword] = useState('')
@@ -33,7 +35,7 @@ export default function KeywordManagement() {
       setKeywords(data)
     } catch (err) {
       console.error('加载限制词失败:', err)
-      setError('加载限制词失败')
+      setError(t('admin.keywords.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -49,14 +51,14 @@ export default function KeywordManagement() {
       setKeywords([keyword, ...keywords])
       setNewKeyword('')
     } catch (err: any) {
-      setError(err.response?.data?.detail || '添加失败')
+      setError(err.response?.data?.detail || t('admin.keywords.addFailed'))
     } finally {
       setAdding(false)
     }
   }
 
   const handleDeleteKeyword = async (id: number) => {
-    if (!confirm('确定要删除这个限制词吗？')) return
+    if (!confirm(t('admin.keywords.confirmDeleteKeyword'))) return
     
     try {
       await adminService.deleteKeyword(id)
@@ -103,7 +105,7 @@ export default function KeywordManagement() {
               <Shield className="text-vermilion" size={20} />
             </div>
             <div>
-              <p className="text-sm text-ink-light">总限制词</p>
+              <p className="text-sm text-ink-light">{t('admin.keywords.totalKeywords')}</p>
               <p className="text-2xl font-title text-ink-black">{keywords.length}</p>
             </div>
           </div>
@@ -120,7 +122,7 @@ export default function KeywordManagement() {
               <ToggleRight className="text-green-600" size={20} />
             </div>
             <div>
-              <p className="text-sm text-ink-light">已启用</p>
+              <p className="text-sm text-ink-light">{t('admin.keywords.enabledKeywords')}</p>
               <p className="text-2xl font-title text-ink-black">{activeCount}</p>
             </div>
           </div>
@@ -137,7 +139,7 @@ export default function KeywordManagement() {
               <ToggleLeft className="text-gray-400" size={20} />
             </div>
             <div>
-              <p className="text-sm text-ink-light">已禁用</p>
+              <p className="text-sm text-ink-light">{t('admin.keywords.disabledKeywords')}</p>
               <p className="text-2xl font-title text-ink-black">{keywords.length - activeCount}</p>
             </div>
           </div>
@@ -153,13 +155,13 @@ export default function KeywordManagement() {
       >
         <h3 className="text-lg font-title mb-4 flex items-center gap-2">
           <Plus size={20} className="text-vermilion" />
-          添加限制词
+          {t('admin.keywords.addKeyword')}
         </h3>
         
         <div className="flex gap-3">
           <div className="flex-1">
             <Input
-              placeholder="输入要限制的关键词..."
+              placeholder={t('admin.keywords.keywordPlaceholder')}
               value={newKeyword}
               onChange={(e) => setNewKeyword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddKeyword()}
@@ -170,7 +172,7 @@ export default function KeywordManagement() {
             loading={adding}
             disabled={!newKeyword.trim()}
           >
-            添加
+            {t('common.add')}
           </Button>
         </div>
 
@@ -186,7 +188,7 @@ export default function KeywordManagement() {
         )}
 
         <p className="mt-3 text-sm text-ink-light">
-          提示：当用户输入或 AI 回复中包含限制词时，将显示 "受地区限制，部分内容无法显示。"
+          {t('admin.keywords.keywordHint')}
         </p>
       </motion.div>
 
@@ -195,7 +197,7 @@ export default function KeywordManagement() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-light" size={18} />
         <input
           type="text"
-          placeholder="搜索限制词..."
+          placeholder={t('admin.keywords.searchPlaceholder')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-10 pr-4 py-2 border border-ink-light/30 rounded-sm focus:border-vermilion focus:outline-none"
@@ -210,12 +212,12 @@ export default function KeywordManagement() {
         transition={{ delay: 0.4 }}
       >
         <div className="border-b border-ink-light/30 px-4 py-3 bg-paper-cream/50">
-          <h3 className="font-title">限制词列表</h3>
+          <h3 className="font-title">{t('admin.keywords.keywordList')}</h3>
         </div>
 
         {filteredKeywords.length === 0 ? (
           <div className="p-8 text-center text-ink-light">
-            {searchTerm ? '没有找到匹配的限制词' : '暂无限制词，点击上方添加'}
+            {searchTerm ? t('admin.keywords.noMatchingKeywords') : t('admin.keywords.noKeywordsYet')}
           </div>
         ) : (
           <div className="divide-y divide-ink-light/20">
@@ -237,7 +239,7 @@ export default function KeywordManagement() {
                         : 'bg-gray-100 text-gray-500'
                       }
                     `}>
-                      {keyword.is_active ? '启用' : '禁用'}
+                      {keyword.is_active ? t('common.enabled') : t('common.disabled')}
                     </span>
                     <span className="font-mono text-ink-black">{keyword.keyword}</span>
                   </div>
@@ -256,7 +258,7 @@ export default function KeywordManagement() {
                           : 'text-gray-400 hover:bg-gray-50'
                         }
                       `}
-                      title={keyword.is_active ? '禁用' : '启用'}
+                      title={keyword.is_active ? t('common.disable') : t('common.enable')}
                     >
                       {keyword.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                     </button>
@@ -264,7 +266,7 @@ export default function KeywordManagement() {
                     <button
                       onClick={() => handleDeleteKeyword(keyword.id)}
                       className="p-1.5 text-vermilion hover:bg-vermilion/10 rounded-sm transition-colors"
-                      title="删除"
+                      title={t('common.delete')}
                     >
                       <Trash2 size={18} />
                     </button>

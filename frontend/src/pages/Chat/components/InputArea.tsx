@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette, Presentation } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../../stores/authStore'
 // 从独立模块导入
 import { useImageUpload, type ImagePreview } from '@uppic'
@@ -48,6 +49,7 @@ export default function InputArea({
   isPPTMode = false,
   onPPTModeChange,
 }: InputAreaProps) {
+  const { t } = useTranslation()
   const [content, setContent] = useState('')
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null)
   const [docPreview, setDocPreview] = useState<DocPreview | null>(null)
@@ -203,7 +205,7 @@ export default function InputArea({
     } else if (isWordDocument(file)) {
       processDocFile(file)
     } else {
-      setFileError('未知格式文件，请上传图片或Word文档')
+      setFileError(t('input.unknownFormat'))
       // 3秒后自动清除错误
       setTimeout(() => setFileError(null), 3000)
     }
@@ -405,11 +407,11 @@ export default function InputArea({
   const getDragHint = () => {
     switch (dragFileType) {
       case 'image':
-        return { icon: ImagePlus, text: '释放以上传图片', isError: false }
+        return { icon: ImagePlus, text: t('input.dropImage'), isError: false }
       case 'doc':
-        return { icon: FileText, text: '释放以上传文档', isError: false }
+        return { icon: FileText, text: t('input.dropDoc'), isError: false }
       default:
-        return { icon: AlertCircle, text: '未知格式文件，请上传图片或Word文档', isError: true }
+        return { icon: AlertCircle, text: t('input.unknownFormat'), isError: true }
     }
   }
 
@@ -466,7 +468,7 @@ export default function InputArea({
               <div className="relative inline-block">
                 <img
                   src={imagePreview.previewUrl}
-                  alt="预览"
+                  alt={t('input.preview')}
                   className="max-h-32 rounded-sm border-2 border-paper-aged shadow-sm"
                 />
                 <motion.button
@@ -504,7 +506,7 @@ export default function InputArea({
                 <button
                   onClick={openDoc}
                   className="text-sm text-cyan-ink hover:text-ink-black hover:underline flex items-center gap-1 transition-colors"
-                  title="点击下载文档"
+                  title={t('input.clickToDownload')}
                 >
                   <span className="max-w-[200px] truncate">{docPreview.file.name}</span>
                   <ExternalLink size={12} />
@@ -513,7 +515,7 @@ export default function InputArea({
                 {/* 处理状态 */}
                 {isProcessingDoc && (
                   <span className="text-xs text-ink-faint ml-2">
-                    {docProgress === 'uploading' ? '上传中...' : '解析中...'}
+                    {docProgress === 'uploading' ? t('input.uploading') : t('input.parsing')}
                   </span>
                 )}
 
@@ -579,7 +581,7 @@ export default function InputArea({
             `}
             whileHover={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 1.05 } : {}}
             whileTap={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 0.95 } : {}}
-            title="上传图片"
+            title={t('input.uploadImage')}
           >
             <ImagePlus size={20} />
           </motion.button>
@@ -598,7 +600,7 @@ export default function InputArea({
             `}
             whileHover={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 1.05 } : {}}
             whileTap={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 0.95 } : {}}
-            title="上传 Word 文档"
+            title={t('input.uploadDoc')}
           >
             <FileText size={20} />
           </motion.button>
@@ -622,7 +624,7 @@ export default function InputArea({
             `}
             whileHover={!disabled && !isProcessing && !isPPTMode ? { scale: 1.05 } : {}}
             whileTap={!disabled && !isProcessing && !isPPTMode ? { scale: 0.95 } : {}}
-            title={isDrawMode ? '退出绘图模式' : '绘图模式'}
+            title={isDrawMode ? t('input.exitDrawMode') : t('input.drawMode')}
           >
             <Palette size={20} />
           </motion.button>
@@ -646,7 +648,7 @@ export default function InputArea({
             `}
             whileHover={!disabled && !isProcessing && !isDrawMode ? { scale: 1.05 } : {}}
             whileTap={!disabled && !isProcessing && !isDrawMode ? { scale: 0.95 } : {}}
-            title={isPPTMode ? '退出 PPT 模式' : 'PPT 生成模式'}
+            title={isPPTMode ? t('input.exitPptMode') : t('input.pptMode')}
           >
             <Presentation size={20} />
           </motion.button>
@@ -659,10 +661,10 @@ export default function InputArea({
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={isDrawMode 
-                ? "🎨 绘图模式：描述你想要的图像，AI 将为你生成..." 
+                ? t('input.drawModePlaceholder')
                 : isPPTMode
-                  ? "📊 PPT 模式：描述你想要的 PPT 主题和内容，AI 将为你生成..."
-                  : "请输入消息，按 Enter 发送，Shift + Enter 换行，支持拖拽上传..."
+                  ? t('input.pptModePlaceholder')
+                  : t('input.placeholder')
               }
               disabled={disabled || isProcessing}
               rows={1}
@@ -704,7 +706,7 @@ export default function InputArea({
             `}
             whileHover={canSend ? { scale: 1.05 } : {}}
             whileTap={canSend ? { scale: 0.95 } : {}}
-            title={isDrawMode ? '生成图像' : isPPTMode ? '生成 PPT' : '发送消息'}
+            title={isDrawMode ? t('input.generateImage') : isPPTMode ? t('input.generatePpt') : t('input.sendMessage')}
           >
             {isProcessing ? (
               <Loader2 size={20} className="animate-spin" />
@@ -733,11 +735,11 @@ export default function InputArea({
                 `}
                 whileHover={!disabled && !isProcessing ? { scale: 1.02 } : {}}
                 whileTap={!disabled && !isProcessing ? { scale: 0.98 } : {}}
-                title="选择模型"
+                title={t('input.selectModel')}
               >
                 <Cpu size={14} />
                 <span className="max-w-[100px] truncate">
-                  {displayModelObj ? getModelDisplayName(displayModelObj) : '选择模型'}
+                  {displayModelObj ? getModelDisplayName(displayModelObj) : t('input.selectModel')}
                 </span>
                 <ChevronUp 
                   size={14} 
@@ -783,10 +785,10 @@ export default function InputArea({
         {/* 提示文字 */}
         <p className="text-xs text-ink-faint mt-2 text-center">
           {isDrawMode 
-            ? '🎨 绘图模式已开启 · 输入描述后 AI 将生成图像'
+            ? t('input.drawModeHint')
             : isPPTMode
-              ? '📊 PPT 模式已开启 · 输入主题后 AI 将生成演示文稿'
-              : '墨语AI可能会产生错误信息，请核实重要内容 · 支持拖拽上传图片或Word文档'
+              ? t('input.pptModeHint')
+              : t('input.disclaimer')
           }
         </p>
       </div>

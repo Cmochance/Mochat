@@ -5,6 +5,7 @@ import {
   Plus, Trash2, ToggleLeft, ToggleRight, RefreshCw, GripVertical,
   ChevronDown, ChevronUp
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import Button from '../../../components/common/Button'
 import Input from '../../../components/common/Input'
 import { adminService, type AllowedModel } from '../../../services/adminService'
@@ -17,6 +18,8 @@ interface AvailableModel {
 }
 
 export default function ModelConfig() {
+  const { t } = useTranslation()
+  
   // 系统配置状态
   const [config, setConfig] = useState({
     ai_api_key: '',
@@ -96,7 +99,7 @@ export default function ModelConfig() {
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error('保存配置失败:', error)
-      alert('保存失败，请重试')
+      alert(t('admin.config.saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -126,14 +129,14 @@ export default function ModelConfig() {
       setShowAddForm(false)
     } catch (error) {
       console.error('添加模型失败:', error)
-      alert('添加失败，模型可能已存在')
+      alert(t('admin.config.addFailed'))
     } finally {
       setAdding(false)
     }
   }
 
   const handleDeleteModel = async (id: number) => {
-    if (!confirm('确定要删除这个模型吗？')) return
+    if (!confirm(t('admin.config.confirmDeleteModel'))) return
     
     try {
       await adminService.deleteAllowedModel(id)
@@ -171,9 +174,11 @@ export default function ModelConfig() {
     )
   }
 
+  const configNotes = t('admin.config.notes', { returnObjects: true }) as string[]
+
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-title text-ink-black">系统配置</h2>
+      <h2 className="text-2xl font-title text-ink-black">{t('admin.config.title')}</h2>
 
       {/* API 配置区域 */}
       <motion.div
@@ -182,23 +187,23 @@ export default function ModelConfig() {
         animate={{ opacity: 1, y: 0 }}
       >
         <h3 className="text-lg font-medium text-ink-black border-b border-paper-aged pb-2">
-          API 配置
+          {t('admin.config.apiConfig')}
         </h3>
 
         {/* API密钥 */}
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-medium text-ink-black">
             <Key size={16} />
-            API 密钥
+            {t('admin.config.apiKey')}
           </label>
           <Input
             type="password"
-            placeholder="输入您的 API 密钥"
+            placeholder={t('admin.config.apiKeyPlaceholder')}
             value={config.ai_api_key}
             onChange={(e) => setConfig({ ...config, ai_api_key: e.target.value })}
           />
           <p className="text-xs text-ink-light">
-            您的 API 密钥将被安全存储，不会泄露给他人
+            {t('admin.config.apiKeyHint')}
           </p>
         </div>
 
@@ -206,7 +211,7 @@ export default function ModelConfig() {
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-medium text-ink-black">
             <Globe size={16} />
-            API 地址
+            {t('admin.config.apiUrl')}
           </label>
           <Input
             placeholder="https://api.openai.com/v1"
@@ -214,7 +219,7 @@ export default function ModelConfig() {
             onChange={(e) => setConfig({ ...config, ai_base_url: e.target.value })}
           />
           <p className="text-xs text-ink-light">
-            支持 OpenAI 兼容的 API 地址
+            {t('admin.config.apiUrlHint')}
           </p>
         </div>
 
@@ -222,15 +227,15 @@ export default function ModelConfig() {
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm font-medium text-ink-black">
             <Bot size={16} />
-            默认模型
+            {t('admin.config.defaultModel')}
           </label>
           <Input
-            placeholder="gpt-4 或其他模型ID"
+            placeholder={t('admin.config.defaultModelPlaceholder')}
             value={config.ai_model}
             onChange={(e) => setConfig({ ...config, ai_model: e.target.value })}
           />
           <p className="text-xs text-ink-light">
-            用户未选择时使用的默认模型
+            {t('admin.config.defaultModelHint')}
           </p>
         </div>
 
@@ -238,11 +243,11 @@ export default function ModelConfig() {
         <div className="flex gap-3 pt-4 border-t border-paper-aged">
           <Button onClick={handleSave} loading={saving}>
             <Save size={18} />
-            {saved ? '已保存' : '保存配置'}
+            {saved ? t('common.saved') : t('admin.config.saveConfig')}
           </Button>
           <Button variant="ghost" onClick={handleReset}>
             <RotateCcw size={18} />
-            重置默认
+            {t('admin.config.resetDefault')}
           </Button>
         </div>
       </motion.div>
@@ -261,9 +266,9 @@ export default function ModelConfig() {
         >
           <h3 className="text-lg font-medium text-ink-black flex items-center gap-2">
             <Bot size={20} />
-            模型列表管理
+            {t('admin.config.modelManagement')}
             <span className="text-sm text-ink-light font-normal">
-              ({allowedModels.length} 个已配置)
+              ({allowedModels.length} {t('admin.config.modelsConfigured')})
             </span>
           </h3>
           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -276,7 +281,7 @@ export default function ModelConfig() {
             </Button>
             <Button onClick={() => setShowAddForm(!showAddForm)}>
               <Plus size={16} />
-              添加
+              {t('common.add')}
             </Button>
             {showModelList ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
           </div>
@@ -299,12 +304,12 @@ export default function ModelConfig() {
                     exit={{ opacity: 0, height: 0 }}
                     className="p-4 bg-paper-cream border-y border-paper-aged overflow-hidden"
                   >
-                    <h4 className="text-sm font-medium text-ink-black mb-3">添加新模型</h4>
+                    <h4 className="text-sm font-medium text-ink-black mb-3">{t('admin.config.addNewModel')}</h4>
                     
                     {/* 从可用模型中选择 */}
                     {unaddedModels.length > 0 && (
                       <div className="mb-3">
-                        <label className="block text-xs text-ink-medium mb-2">从可用模型中选择：</label>
+                        <label className="block text-xs text-ink-medium mb-2">{t('admin.config.selectFromAvailable')}</label>
                         <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-2 bg-paper-white rounded">
                           {unaddedModels.map(model => (
                             <button
@@ -327,17 +332,17 @@ export default function ModelConfig() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-xs text-ink-medium mb-1">模型 ID：</label>
+                        <label className="block text-xs text-ink-medium mb-1">{t('admin.config.modelId')}</label>
                         <Input
-                          placeholder="例如：gpt-4"
+                          placeholder={t('admin.config.modelIdPlaceholder')}
                           value={newModelId}
                           onChange={(e) => setNewModelId(e.target.value)}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-ink-medium mb-1">显示名称（可选）：</label>
+                        <label className="block text-xs text-ink-medium mb-1">{t('admin.config.displayName')}</label>
                         <Input
-                          placeholder="自定义显示名称"
+                          placeholder={t('admin.config.displayNamePlaceholder')}
                           value={newDisplayName}
                           onChange={(e) => setNewDisplayName(e.target.value)}
                         />
@@ -346,14 +351,14 @@ export default function ModelConfig() {
 
                     <div className="flex gap-2">
                       <Button onClick={handleAddModel} loading={adding} disabled={!newModelId.trim()}>
-                        确认添加
+                        {t('admin.config.confirmAdd')}
                       </Button>
                       <Button variant="ghost" onClick={() => {
                         setShowAddForm(false)
                         setNewModelId('')
                         setNewDisplayName('')
                       }}>
-                        取消
+                        {t('common.cancel')}
                       </Button>
                     </div>
                   </motion.div>
@@ -362,12 +367,12 @@ export default function ModelConfig() {
 
               {/* 模型列表 */}
               {modelsLoading ? (
-                <div className="p-6 text-center text-ink-light">加载中...</div>
+                <div className="p-6 text-center text-ink-light">{t('common.loading')}</div>
               ) : allowedModels.length === 0 ? (
                 <div className="p-6 text-center">
                   <Bot size={40} className="mx-auto mb-3 text-ink-faint" />
-                  <p className="text-ink-light text-sm mb-1">暂未配置任何模型</p>
-                  <p className="text-xs text-ink-faint">未配置时将显示所有可用模型</p>
+                  <p className="text-ink-light text-sm mb-1">{t('admin.config.noModelsConfigured')}</p>
+                  <p className="text-xs text-ink-faint">{t('admin.config.noModelsHint')}</p>
                 </div>
               ) : (
                 <div className="divide-y divide-paper-aged">
@@ -390,7 +395,7 @@ export default function ModelConfig() {
                           </span>
                           {!model.is_active && (
                             <span className="text-xs px-1.5 py-0.5 bg-paper-aged text-ink-light rounded">
-                              禁用
+                              {t('common.disabled')}
                             </span>
                           )}
                         </div>
@@ -407,7 +412,7 @@ export default function ModelConfig() {
                               ? 'text-jade hover:bg-jade/10'
                               : 'text-ink-faint hover:bg-paper-aged'
                           }`}
-                          title={model.is_active ? '点击禁用' : '点击启用'}
+                          title={model.is_active ? t('admin.config.clickToDisable') : t('admin.config.clickToEnable')}
                         >
                           {model.is_active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                         </button>
@@ -415,7 +420,7 @@ export default function ModelConfig() {
                         <button
                           onClick={() => handleDeleteModel(model.id)}
                           className="p-1.5 text-ink-faint hover:text-vermilion hover:bg-vermilion/10 rounded transition-colors"
-                          title="删除"
+                          title={t('common.delete')}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -436,13 +441,11 @@ export default function ModelConfig() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <h4 className="font-medium text-ink-black mb-2">💡 配置说明</h4>
+        <h4 className="font-medium text-ink-black mb-2">{t('admin.config.configNotes')}</h4>
         <ul className="text-sm text-ink-medium space-y-1 list-disc list-inside">
-          <li>API 密钥和地址：配置后需要重启后端服务才能生效</li>
-          <li>模型列表：添加的模型将显示在用户的模型选择列表中</li>
-          <li>如果未配置任何模型，将显示 API 提供的所有模型</li>
-          <li>禁用的模型不会显示在用户的选择列表中</li>
-          <li>最大令牌数和温度参数请在 .env 文件中配置</li>
+          {configNotes.map((note, index) => (
+            <li key={index}>{note}</li>
+          ))}
         </ul>
       </motion.div>
     </div>

@@ -24,6 +24,7 @@ from ..schemas.chat import (
 )
 from ..services.chat_service import chat_service
 from ..services.ai_service import ai_service
+from ..services.usage_service import usage_service
 from ..db import crud
 from ..core.dependencies import get_current_active_user
 from ..db.models import User
@@ -204,6 +205,14 @@ async def chat_completions(
     """
     import asyncio
     
+    # 检查对话限额
+    can_send, error_msg = await usage_service.check_chat_limit(db, current_user)
+    if not can_send:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=error_msg
+        )
+    
     async def generate():
         async for chunk in chat_service.send_message_stream(
             db, request.session_id, current_user, request.content, request.model
@@ -211,6 +220,10 @@ async def chat_completions(
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
             # 强制事件循环立即处理，确保数据被发送
             await asyncio.sleep(0)
+        
+        # 对话成功完成后增加计数
+        await usage_service.increment_chat_count(db, current_user)
+        await db.commit()
     
     return StreamingResponse(
         generate(),

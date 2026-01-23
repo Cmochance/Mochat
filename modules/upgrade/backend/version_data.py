@@ -4,7 +4,7 @@
 """
 
 # 当前版本号
-CURRENT_VERSION = "v1.5.4"
+CURRENT_VERSION = "v1.5.6"
 
 # 版本历史记录
 # 大版本格式: v1.x，小版本格式: v1.x.y
@@ -60,5 +60,13 @@ VERSION_HISTORY = [
     {
         "version": "v1.5.4",
         "description": "添加 AI 绘图模式，集成 picgenerate 模块，支持流式 thinking 输出。"
+    },
+    {
+        "version": "v1.5.5",
+        "description": "添加 PPT 生成模式，集成 pptgen 模块(暂时无法正常使用)，添加中英文切换。"
+    },
+    {
+        "version": "v1.5.6",
+        "description": "因模型调用额度有限，添加用户等级划分。<br>免费用户每日可免费对话50次，生成2次图片；<br>高级用户每日可免费对话200次，生成5次图片；<br>超级用户每日可免费对话500次，生成10次图片。"
     },
 ]

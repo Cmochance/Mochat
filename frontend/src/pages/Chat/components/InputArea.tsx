@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette, Presentation } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../../stores/authStore'
+import { userService } from '../../../services/userService'
 // 从独立模块导入
 import { useImageUpload, type ImagePreview } from '@uppic'
 import { useDocUpload } from '@upword'
@@ -301,10 +302,24 @@ export default function InputArea({
   const handleSubmit = async () => {
     if ((!content.trim() && !imagePreview && !docPreview) || disabled || isProcessing) return
 
-    // 绘图模式：直接调用绘图接口
+    // 绘图模式：检查限额后调用绘图接口
     if (isDrawMode && content.trim()) {
-      onGenerateImage?.(content.trim())
-      setContent('')
+      try {
+        // 检查生图限额
+        const { allowed, message } = await userService.checkImageLimit()
+        if (!allowed) {
+          setFileError(message || t('chat.usage.imageExhausted'))
+          setTimeout(() => setFileError(null), 5000)
+          return
+        }
+        onGenerateImage?.(content.trim())
+        setContent('')
+      } catch (error) {
+        console.error('检查生图限额失败:', error)
+        // 出错时仍然允许发送，让后端做最终检查
+        onGenerateImage?.(content.trim())
+        setContent('')
+      }
       return
     }
 

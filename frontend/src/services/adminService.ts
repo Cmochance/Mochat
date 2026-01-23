@@ -1,5 +1,5 @@
 import api from './api'
-import type { User, SystemStats, RestrictedKeyword } from '../types'
+import type { User, SystemStats, RestrictedKeyword, UsageStats, TierInfo } from '../types'
 
 export const adminService = {
   // 获取系统统计
@@ -109,6 +109,28 @@ export const adminService = {
     const response = await api.put<AllowedModel>(`/admin/models/${modelDbId}/sort`, {
       sort_order: sortOrder,
     })
+    return response.data
+  },
+
+  // ============ 用户等级管理 ============
+
+  // 更新用户等级
+  async updateUserTier(userId: number, tier: string): Promise<User> {
+    const response = await api.put<User>(`/admin/users/${userId}/tier`, { tier })
+    return response.data
+  },
+
+  // 获取等级配置信息
+  async getTierInfo(): Promise<{ tiers: TierInfo[] }> {
+    const response = await api.get<{ tiers: TierInfo[] }>('/admin/tiers')
+    return response.data
+  },
+
+  // ============ 使用量统计 ============
+
+  // 获取所有用户使用量统计
+  async getUsageStats(): Promise<UsageStats[]> {
+    const response = await api.get<UsageStats[]>('/admin/usage/stats')
     return response.data
   },
 }

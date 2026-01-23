@@ -9,7 +9,8 @@ import {
   Shield,
   User as UserIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { adminService } from '../../../services/adminService'
@@ -17,6 +18,13 @@ import Loading from '../../../components/common/Loading'
 import Modal from '../../../components/common/Modal'
 import Button from '../../../components/common/Button'
 import type { User } from '../../../types'
+
+// 等级选项
+const TIER_OPTIONS = [
+  { id: 'free', name_zh: '普通用户', name_en: 'Free User' },
+  { id: 'pro', name_zh: '高级用户', name_en: 'Pro User' },
+  { id: 'plus', name_zh: '超级用户', name_en: 'Plus User' },
+]
 
 interface UserManagementProps {
   users: User[]
@@ -77,6 +85,27 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
     }
   }
 
+  const handleTierChange = async (userId: number, newTier: string) => {
+    try {
+      await adminService.updateUserTier(userId, newTier)
+      onRefresh()
+    } catch (error) {
+      console.error('更新用户等级失败:', error)
+    }
+  }
+
+  // 获取等级样式
+  const getTierStyle = (tier?: string) => {
+    switch (tier) {
+      case 'plus':
+        return 'bg-amber-100 text-amber-700'
+      case 'pro':
+        return 'bg-cyan-100 text-cyan-700'
+      default:
+        return 'bg-gray-100 text-gray-600'
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -121,6 +150,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.email')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.passwordHash')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.role')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.tier')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.status')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.registeredAt')}</th>
                 <th className="px-6 py-3 text-right text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.actions')}</th>
@@ -170,6 +200,35 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                       <span className={`px-2 py-1 text-xs rounded-sm ${user.role === 'admin' ? 'bg-vermilion/10 text-vermilion' : 'bg-cyan-ink/10 text-cyan-ink'}`}>
                         {user.role === 'admin' ? t('common.admin') : t('common.user')}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.role === 'admin' ? (
+                        <span className="px-2 py-1 text-xs rounded-sm bg-vermilion/10 text-vermilion">
+                          {i18n.language === 'zh' ? '管理员' : 'Admin'}
+                        </span>
+                      ) : (
+                        <div className="relative inline-block">
+                          <select
+                            value={user.tier || 'free'}
+                            onChange={(e) => handleTierChange(user.id, e.target.value)}
+                            className={`
+                              appearance-none px-2 py-1 pr-6 text-xs rounded-sm cursor-pointer
+                              border-0 focus:outline-none focus:ring-2 focus:ring-ink-medium
+                              ${getTierStyle(user.tier)}
+                            `}
+                          >
+                            {TIER_OPTIONS.map((tier) => (
+                              <option key={tier.id} value={tier.id}>
+                                {i18n.language === 'zh' ? tier.name_zh : tier.name_en}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown 
+                            size={12} 
+                            className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-current opacity-60" 
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-sm ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>

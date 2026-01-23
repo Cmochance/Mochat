@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_db
 from ..db import crud
-from ..schemas.user import UserResponse, UserUpdate, UserAdminResponse
+from ..schemas.user import UserResponse, UserUpdate, UserAdminResponse, TierUpdateRequest
 from ..services.admin_service import admin_service
 from ..services.content_filter import content_filter
+from ..services.usage_service import usage_service, TIER_LIMITS
 from ..core.dependencies import get_admin_user
 from ..db.models import User
 
@@ -378,3 +379,71 @@ async def update_model_sort(
         "sort_order": result.sort_order,
         "created_at": result.created_at.isoformat() if result.created_at else None
     }
+
+
+# ============ 用户等级管理 ============
+
+@router.put("/users/{user_id}/tier", response_model=UserResponse)
+async def update_user_tier(
+    user_id: int,
+    data: TierUpdateRequest,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """更新用户等级"""
+    # 检查等级是否有效
+    if data.tier not in ["free", "pro", "plus"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无效的用户等级，必须是 free、pro 或 plus"
+        )
+    
+    # 不能修改管理员的等级
+    target_user = await crud.get_user_by_id(db, user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+    
+    if target_user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无法修改管理员的等级"
+        )
+    
+    user = await crud.update_user(db, user_id, tier=data.tier)
+    await db.commit()
+    
+    return user
+
+
+@router.get("/tiers")
+async def get_tier_info(
+    current_user: User = Depends(get_admin_user)
+) -> Dict[str, Any]:
+    """获取所有等级配置信息"""
+    return {
+        "tiers": [
+            {
+                "id": tier_id,
+                "name_zh": info["name_zh"],
+                "name_en": info["name_en"],
+                "chat_limit": info["chat_limit"],
+                "image_limit": info["image_limit"]
+            }
+            for tier_id, info in TIER_LIMITS.items()
+            if tier_id != "admin"  # 不返回管理员等级
+        ]
+    }
+
+
+# ============ 使用量统计 ============
+
+@router.get("/usage/stats")
+async def get_usage_stats(
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """获取所有用户的使用量统计"""
+    return await usage_service.get_all_usage_stats(db)

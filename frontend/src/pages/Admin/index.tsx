@@ -8,18 +8,20 @@ import {
   Settings, 
   ArrowLeft,
   LogOut,
-  ShieldAlert
+  ShieldAlert,
+  Activity
 } from 'lucide-react'
 import UserManagement from './components/UserManagement'
 import SystemStats from './components/SystemStats'
 import ModelConfig from './components/ModelConfig'
 import KeywordManagement from './components/KeywordManagement'
+import UsageStats from './components/UsageStats'
 import LanguageSwitcher from '../../components/common/LanguageSwitcher'
 import { useAuthStore } from '../../stores/authStore'
 import { adminService } from '../../services/adminService'
 import type { User, SystemStats as SystemStatsType } from '../../types'
 
-type TabType = 'stats' | 'users' | 'config' | 'keywords'
+type TabType = 'stats' | 'users' | 'config' | 'keywords' | 'usage'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -58,6 +60,7 @@ export default function Admin() {
   const tabs = [
     { id: 'stats' as const, label: t('admin.tabs.stats'), icon: BarChart3 },
     { id: 'users' as const, label: t('admin.tabs.users'), icon: Users },
+    { id: 'usage' as const, label: t('admin.tabs.usage'), icon: Activity },
     { id: 'config' as const, label: t('admin.tabs.config'), icon: Settings },
     { id: 'keywords' as const, label: t('admin.tabs.keywords'), icon: ShieldAlert },
   ]
@@ -139,6 +142,7 @@ export default function Admin() {
                 onRefresh={loadData}
               />
             )}
+            {activeTab === 'usage' && <UsageStats />}
             {activeTab === 'config' && <ModelConfig />}
             {activeTab === 'keywords' && <KeywordManagement />}
           </motion.div>

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, MessageSquare, Trash2, LogOut, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../../stores/authStore'
+import { userService } from '../../../services/userService'
 import { getCurrentVersion, VersionModal, getVersionInfo, type VersionInfo } from '@upgrade'
 import type { ChatSession } from '../../../types'
 
@@ -60,8 +61,8 @@ export default function Sidebar({
   username,
 }: SidebarProps) {
   const navigate = useNavigate()
-  const { logout, user } = useAuthStore()
-  const { t } = useTranslation()
+  const { logout, user, usage, setUsage } = useAuthStore()
+  const { t, i18n } = useTranslation()
   
   // 检测是否为大屏幕 - 大屏幕不需要遮罩层
   const [isLargeScreen, setIsLargeScreen] = useState(true)
@@ -72,6 +73,24 @@ export default function Sidebar({
   // 版本弹窗状态
   const [showVersionModal, setShowVersionModal] = useState(false)
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
+
+  // 获取用户使用量信息
+  const fetchUsage = useCallback(async () => {
+    try {
+      const usageData = await userService.getUsage()
+      setUsage(usageData)
+    } catch (error) {
+      console.error('获取使用量信息失败:', error)
+    }
+  }, [setUsage])
+
+  // 初始化时获取使用量
+  useEffect(() => {
+    fetchUsage()
+    // 每 30 秒刷新一次使用量
+    const interval = setInterval(fetchUsage, 30000)
+    return () => clearInterval(interval)
+  }, [fetchUsage])
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -284,7 +303,7 @@ export default function Sidebar({
 
           {/* 底部用户区 */}
           <div className="p-4 border-t border-ink-medium shrink-0">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-cyan-ink flex items-center justify-center shrink-0">
                 <span className="text-paper-white font-body">
                   {username.charAt(0).toUpperCase()}
@@ -292,11 +311,62 @@ export default function Sidebar({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{username}</p>
-                <p className="text-xs text-paper-cream/60 whitespace-nowrap">
-                  {user?.role === 'admin' ? t('common.admin') : t('common.user')}
-                </p>
+                {/* 用户等级标签 */}
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`
+                    text-xs px-1.5 py-0.5 rounded-sm
+                    ${usage?.tier === 'admin' || user?.role === 'admin' 
+                      ? 'bg-vermilion/30 text-vermilion-light' 
+                      : usage?.tier === 'plus' 
+                        ? 'bg-amber-500/30 text-amber-300'
+                        : usage?.tier === 'pro'
+                          ? 'bg-cyan-ink/30 text-cyan-300'
+                          : 'bg-paper-white/10 text-paper-cream/70'
+                    }
+                  `}>
+                    {user?.role === 'admin' 
+                      ? t('chat.tier.admin')
+                      : i18n.language === 'zh' 
+                        ? (usage?.tier_name_zh || t('chat.tier.free'))
+                        : (usage?.tier_name_en || t('chat.tier.free'))
+                    }
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* 使用量显示 - 非管理员显示 */}
+            {usage && !usage.is_unlimited && (
+              <div className="mb-3 p-2 bg-paper-white/5 rounded-sm">
+                <div className="flex justify-between text-xs text-paper-cream/70 mb-1">
+                  <span>{t('chat.usage.chat')}</span>
+                  <span>{t('chat.usage.remaining')}: {usage.chat_remaining}/{usage.chat_limit}</span>
+                </div>
+                <div className="w-full h-1.5 bg-ink-medium rounded-full overflow-hidden mb-2">
+                  <div 
+                    className="h-full bg-cyan-ink rounded-full transition-all"
+                    style={{ width: `${Math.max(0, (usage.chat_remaining / usage.chat_limit) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-paper-cream/70 mb-1">
+                  <span>{t('chat.usage.image')}</span>
+                  <span>{t('chat.usage.remaining')}: {usage.image_remaining}/{usage.image_limit}</span>
+                </div>
+                <div className="w-full h-1.5 bg-ink-medium rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-amber-500 rounded-full transition-all"
+                    style={{ width: `${Math.max(0, (usage.image_remaining / usage.image_limit) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* 管理员显示无限制标签 */}
+            {usage?.is_unlimited && (
+              <div className="mb-3 p-2 bg-vermilion/10 rounded-sm text-center">
+                <span className="text-xs text-vermilion-light">{t('chat.usage.unlimited')}</span>
+              </div>
+            )}
 
             <div className="flex gap-2">
               {user?.role === 'admin' && (

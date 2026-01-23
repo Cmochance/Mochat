@@ -143,6 +143,22 @@ export default {
     adminPanel: '管理后台',
     clickToLogout: '点击登出',
     manage: '管理',
+    // 用户等级
+    tier: {
+      free: '普通用户',
+      pro: '高级用户',
+      plus: '超级用户',
+      admin: '管理员',
+    },
+    usage: {
+      chat: '对话',
+      image: '生图',
+      unlimited: '无限制',
+      remaining: '剩余',
+      quotaExhausted: '今日额度已用完',
+      chatExhausted: '今日对话次数已用完，请明天再试或升级账户',
+      imageExhausted: '今日生图次数已用完，请明天再试或升级账户',
+    },
   },
 
   // 输入区域
@@ -181,6 +197,7 @@ export default {
       users: '用户管理',
       config: '系统配置',
       keywords: '内容限制',
+      usage: '使用量统计',
     },
     // 系统统计
     stats: {
@@ -205,6 +222,7 @@ export default {
         email: '邮箱',
         passwordHash: '密码哈希',
         role: '角色',
+        tier: '等级',
         status: '状态',
         registeredAt: '注册时间',
         actions: '操作',
@@ -214,6 +232,21 @@ export default {
       confirmDeleteMessage: '确定要删除用户 {{username}} 吗？此操作不可撤销。',
       loadingUsers: '加载用户列表...',
       none: '无',
+      tierUpdated: '用户等级已更新',
+      tierUpdateFailed: '更新等级失败',
+    },
+    // 使用量统计
+    usage: {
+      title: '使用量统计',
+      loadingUsage: '加载使用量数据...',
+      tableHeaders: {
+        user: '用户',
+        tier: '等级',
+        chatUsage: '今日对话',
+        imageUsage: '今日生图',
+      },
+      unlimited: '无限制',
+      noData: '暂无使用量数据',
     },
     // 模型配置
     config: {

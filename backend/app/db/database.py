@@ -66,6 +66,14 @@ async def migrate_db(conn):
                     "ALTER TABLE users ADD COLUMN last_seen_version VARCHAR(20)"
                 ))
                 print("[Migration] Column 'last_seen_version' added successfully.")
+            
+            # 添加 tier 列（如果不存在）- 用户等级
+            if 'tier' not in columns:
+                print("[Migration] Adding 'tier' column to users table...")
+                connection.execute(text(
+                    "ALTER TABLE users ADD COLUMN tier VARCHAR(20) DEFAULT 'free'"
+                ))
+                print("[Migration] Column 'tier' added successfully.")
     
     await conn.run_sync(check_and_migrate)
 

@@ -22,6 +22,7 @@ class UserUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=2, max_length=50)
     email: Optional[EmailStr] = None
     role: Optional[str] = None
+    tier: Optional[str] = None  # 用户等级
     is_active: Optional[bool] = None
 
 
@@ -29,6 +30,7 @@ class UserResponse(UserBase):
     """用户响应模型"""
     id: int
     role: str
+    tier: Optional[str] = "free"  # 用户等级
     is_active: bool
     last_seen_version: Optional[str] = None  # 用户已阅读的最新版本号
     created_at: datetime
@@ -52,7 +54,28 @@ class UserProfile(BaseModel):
     username: str
     email: str
     role: str
+    tier: Optional[str] = "free"  # 用户等级
     created_at: datetime
     
     class Config:
         from_attributes = True
+
+
+class UserUsageResponse(BaseModel):
+    """用户使用量响应模型"""
+    tier: str
+    tier_name_zh: str
+    tier_name_en: str
+    chat_limit: int
+    chat_used: int
+    chat_remaining: int
+    image_limit: int
+    image_used: int
+    image_remaining: int
+    is_unlimited: bool
+    reset_date: Optional[str] = None
+
+
+class TierUpdateRequest(BaseModel):
+    """等级更新请求"""
+    tier: str = Field(..., pattern="^(free|pro|plus)$")

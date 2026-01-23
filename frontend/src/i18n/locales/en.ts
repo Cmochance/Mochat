@@ -143,6 +143,22 @@ export default {
     adminPanel: 'Admin Panel',
     clickToLogout: 'Click to logout',
     manage: 'Admin',
+    // User tiers
+    tier: {
+      free: 'Free User',
+      pro: 'Pro User',
+      plus: 'Plus User',
+      admin: 'Admin',
+    },
+    usage: {
+      chat: 'Chat',
+      image: 'Image',
+      unlimited: 'Unlimited',
+      remaining: 'Remaining',
+      quotaExhausted: 'Daily quota exhausted',
+      chatExhausted: 'Daily chat quota exhausted, please try again tomorrow or upgrade your account',
+      imageExhausted: 'Daily image quota exhausted, please try again tomorrow or upgrade your account',
+    },
   },
 
   // Input area
@@ -181,6 +197,7 @@ export default {
       users: 'Users',
       config: 'Settings',
       keywords: 'Content Filter',
+      usage: 'Usage Stats',
     },
     // System stats
     stats: {
@@ -205,6 +222,7 @@ export default {
         email: 'Email',
         passwordHash: 'Password Hash',
         role: 'Role',
+        tier: 'Tier',
         status: 'Status',
         registeredAt: 'Registered',
         actions: 'Actions',
@@ -214,6 +232,21 @@ export default {
       confirmDeleteMessage: 'Are you sure you want to delete user {{username}}? This action cannot be undone.',
       loadingUsers: 'Loading users...',
       none: 'None',
+      tierUpdated: 'User tier updated',
+      tierUpdateFailed: 'Failed to update tier',
+    },
+    // Usage statistics
+    usage: {
+      title: 'Usage Statistics',
+      loadingUsage: 'Loading usage data...',
+      tableHeaders: {
+        user: 'User',
+        tier: 'Tier',
+        chatUsage: 'Today Chat',
+        imageUsage: 'Today Image',
+      },
+      unlimited: 'Unlimited',
+      noData: 'No usage data',
     },
     // Model config
     config: {

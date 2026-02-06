@@ -2,10 +2,13 @@
 对话API路由 - 处理对话相关请求，支持流式输出
 """
 import json
+import os
+import tempfile
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from ..db.database import get_db
 from ..schemas.chat import (
@@ -13,13 +16,67 @@ from ..schemas.chat import (
     SessionResponse, 
     SessionUpdate,
     MessageResponse,
-    ChatRequest
+    MessagesPaginatedResponse,
+    ChatRequest,
+    ModelsResponse,
+    ModelInfo,
+    MessageCreate
 )
 from ..services.chat_service import chat_service
+from ..services.ai_service import ai_service
+from ..services.usage_service import usage_service
+from ..db import crud
 from ..core.dependencies import get_current_active_user
 from ..db.models import User
 
 router = APIRouter()
+
+# 自定义模板路径
+CUSTOM_REFERENCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "custom_reference.docx")
+
+
+@router.get("/models", response_model=ModelsResponse)
+async def get_models(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """获取可用的AI模型列表（仅返回管理员配置的模型）"""
+    # 获取 API 提供的所有模型
+    all_models_data = await ai_service.get_models()
+    
+    # 获取数据库中允许的模型列表
+    allowed_models = await crud.get_all_allowed_models(db, active_only=True)
+    
+    if allowed_models:
+        # 如果数据库中有配置，则只返回允许的模型
+        allowed_ids = {m.model_id for m in allowed_models}
+        # 保留顺序，使用 allowed_models 的排序
+        models = []
+        for allowed in allowed_models:
+            # 查找匹配的模型
+            for m in all_models_data:
+                if m["id"] == allowed.model_id:
+                    models.append(ModelInfo(
+                        id=m["id"],
+                        name=allowed.display_name or m["name"],  # 使用自定义名称
+                        owned_by=m.get("owned_by")
+                    ))
+                    break
+            else:
+                # 如果 API 列表中没有，仍然添加（可能是自定义模型）
+                models.append(ModelInfo(
+                    id=allowed.model_id,
+                    name=allowed.display_name or allowed.model_id,
+                    owned_by=None
+                ))
+    else:
+        # 如果数据库中没有配置，返回所有模型（后向兼容）
+        models = [ModelInfo(**m) for m in all_models_data]
+    
+    return ModelsResponse(
+        models=models,
+        default_model=ai_service.default_model
+    )
 
 
 @router.get("/sessions", response_model=List[SessionResponse])
@@ -77,20 +134,59 @@ async def delete_session(
     return {"message": "删除成功"}
 
 
-@router.get("/sessions/{session_id}/messages", response_model=List[MessageResponse])
+@router.get("/sessions/{session_id}/messages", response_model=MessagesPaginatedResponse)
 async def get_messages(
     session_id: int,
+    limit: int = 10,
+    before_id: int = None,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取会话的消息历史"""
-    messages = await chat_service.get_session_messages(db, session_id, current_user)
-    if messages is None:
+    """
+    获取会话的消息历史（支持分页）
+    
+    Args:
+        session_id: 会话 ID
+        limit: 获取数量（默认 10）
+        before_id: 获取此 ID 之前的消息（用于加载更早的消息）
+    """
+    result = await chat_service.get_session_messages_paginated(
+        db, session_id, current_user, limit, before_id
+    )
+    if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="会话不存在"
         )
-    return messages
+    return result
+
+
+@router.post("/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+async def save_message(
+    request: MessageCreate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    直接保存消息到数据库（不经过AI生成流程）
+    用于保存绘图、PPT等非AI对话生成的消息
+    """
+    # 验证会话是否存在且属于当前用户
+    session = await chat_service.get_session(db, request.session_id, current_user)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="会话不存在或无权访问"
+        )
+    
+    message = await crud.create_message(
+        db,
+        request.session_id,
+        request.role,
+        request.content,
+        request.thinking
+    )
+    return message
 
 
 @router.post("/completions")
@@ -107,19 +203,36 @@ async def chat_completions(
     data: {"type": "content", "data": "..."}
     data: {"type": "done", "data": "..."}
     """
+    import asyncio
+    
+    # 检查对话限额
+    can_send, error_msg = await usage_service.check_chat_limit(db, current_user)
+    if not can_send:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=error_msg
+        )
+    
     async def generate():
         async for chunk in chat_service.send_message_stream(
-            db, request.session_id, current_user, request.content
+            db, request.session_id, current_user, request.content, request.model
         ):
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            # 强制事件循环立即处理，确保数据被发送
+            await asyncio.sleep(0)
+        
+        # 对话成功完成后增加计数
+        await usage_service.increment_chat_count(db, current_user)
+        await db.commit()
     
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
         }
     )
 
@@ -131,18 +244,113 @@ async def regenerate_response(
     db: AsyncSession = Depends(get_db)
 ):
     """重新生成最后一条AI响应（SSE流式输出）"""
+    import asyncio
+    
     async def generate():
         async for chunk in chat_service.regenerate_response(
             db, session_id, current_user
         ):
             yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+            # 强制事件循环立即处理，确保数据被发送
+            await asyncio.sleep(0)
     
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
         }
     )
+
+
+class ExportRequest(BaseModel):
+    """导出请求"""
+    content: str
+    filename: str = "export"
+
+
+@router.post("/export/docx")
+async def export_to_docx(
+    request: ExportRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    将 Markdown 内容导出为 Word 文档
+    
+    使用 pandoc 和自定义模板进行转换
+    """
+    import pypandoc
+    from fastapi.responses import Response
+    
+    md_path = None
+    docx_path = None
+    
+    try:
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            suffix='.md', 
+            delete=False, 
+            encoding='utf-8'
+        ) as md_file:
+            md_file.write(request.content)
+            md_path = md_file.name
+        
+        # 输出文件路径
+        docx_path = md_path.replace('.md', '.docx')
+        
+        # 构建 pandoc 参数
+        extra_args = ['--wrap=none']
+        
+        # 如果存在自定义模板，使用它
+        if os.path.exists(CUSTOM_REFERENCE_PATH):
+            extra_args.append(f'--reference-doc={CUSTOM_REFERENCE_PATH}')
+        
+        # 使用 pypandoc 转换
+        pypandoc.convert_file(
+            md_path,
+            'docx',
+            outputfile=docx_path,
+            extra_args=extra_args
+        )
+        
+        # 读取生成的文件内容
+        with open(docx_path, 'rb') as f:
+            docx_content = f.read()
+        
+        # 清理临时文件
+        os.unlink(md_path)
+        os.unlink(docx_path)
+        
+        # 安全的文件名（处理中文）
+        from urllib.parse import quote
+        filename = f"{request.filename}.docx"
+        # ASCII 回退文件名（用于不支持 RFC 5987 的客户端）
+        ascii_filename = "export.docx"
+        # UTF-8 编码的文件名
+        encoded_filename = quote(filename, safe='')
+        
+        # 返回文件内容
+        # 同时提供 filename 和 filename* 以兼容不同浏览器
+        return Response(
+            content=docx_content,
+            media_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={
+                'Content-Disposition': f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_filename}'
+            }
+        )
+        
+    except Exception as e:
+        # 清理临时文件
+        if md_path and os.path.exists(md_path):
+            os.unlink(md_path)
+        if docx_path and os.path.exists(docx_path):
+            os.unlink(docx_path)
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"导出失败: {str(e)}"
+        )

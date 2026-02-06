@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Mail, Lock, ArrowLeft, Send, Shield, CheckCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
+import LanguageSwitcher from '../../components/common/LanguageSwitcher'
 import { authService } from '../../services/authService'
 
 export default function ForgotPassword() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   
   const [formData, setFormData] = useState({
     email: '',
@@ -33,7 +36,7 @@ export default function ForgotPassword() {
   // 验证密码格式
   const validatePassword = (password: string): { valid: boolean; message: string } => {
     if (!/^[a-zA-Z0-9]+$/.test(password)) {
-      return { valid: false, message: '失败，密码不支持特殊符号！' }
+      return { valid: false, message: t('register.errors.passwordNoSpecialChars') }
     }
     
     const hasLower = /[a-z]/.test(password)
@@ -42,7 +45,7 @@ export default function ForgotPassword() {
     const typeCount = [hasLower, hasUpper, hasDigit].filter(Boolean).length
     
     if (typeCount < 2) {
-      return { valid: false, message: '密码必须至少包含数字、小写字母、大写字母中的两种' }
+      return { valid: false, message: t('register.errors.passwordRequireTwoTypes') }
     }
     
     return { valid: true, message: '' }
@@ -56,12 +59,12 @@ export default function ForgotPassword() {
   // 发送验证码
   const handleSendCode = useCallback(async () => {
     if (!formData.email) {
-      setError('请先输入邮箱地址')
+      setError(t('register.errors.enterEmail'))
       return
     }
     
     if (!isValidEmail(formData.email)) {
-      setError('请输入有效的邮箱地址')
+      setError(t('register.errors.invalidEmail'))
       return
     }
 
@@ -73,11 +76,11 @@ export default function ForgotPassword() {
       setCodeSent(true)
       setCountdown(response.cooldown || 60)
     } catch (err: any) {
-      setError(err.response?.data?.detail || '发送验证码失败，请稍后重试')
+      setError(err.response?.data?.detail || t('register.errors.sendCodeFailed'))
     } finally {
       setSendingCode(false)
     }
-  }, [formData.email])
+  }, [formData.email, t])
 
   // 提交重置
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,22 +89,22 @@ export default function ForgotPassword() {
 
     // 验证必填项
     if (!formData.code) {
-      setError('请输入验证码')
+      setError(t('register.errors.enterCode'))
       return
     }
 
     if (formData.code.length !== 6 || !/^\d{6}$/.test(formData.code)) {
-      setError('请输入6位数字验证码')
+      setError(t('register.errors.invalidCode'))
       return
     }
 
     if (formData.newPassword !== formData.confirmPassword) {
-      setError('两次输入的密码不一致')
+      setError(t('register.errors.passwordMismatch'))
       return
     }
 
     if (formData.newPassword.length < 6) {
-      setError('密码长度至少6位')
+      setError(t('register.errors.passwordTooShort'))
       return
     }
 
@@ -121,7 +124,7 @@ export default function ForgotPassword() {
       })
       setSuccess(true)
     } catch (err: any) {
-      setError(err.response?.data?.detail || '重置密码失败，请稍后重试')
+      setError(err.response?.data?.detail || t('forgotPassword.resetFailed'))
     } finally {
       setLoading(false)
     }
@@ -145,17 +148,20 @@ export default function ForgotPassword() {
             <CheckCircle className="w-10 h-10 text-cyan-ink" />
           </motion.div>
           
-          <h2 className="text-3xl font-title text-ink-black mb-4">密码重置成功</h2>
-          <p className="text-ink-light mb-8">您的密码已成功重置，请使用新密码登录</p>
+          <h2 className="text-3xl font-title text-ink-black mb-4">{t('forgotPassword.resetSuccess')}</h2>
+          <p className="text-ink-light mb-8">{t('forgotPassword.resetSuccessMessage')}</p>
           
           <Button
             onClick={() => navigate('/auth/login')}
             fullWidth
             size="lg"
           >
-            返回登录
+            {t('common.backToLogin')}
           </Button>
         </motion.div>
+
+        {/* 语言切换按钮 */}
+        <LanguageSwitcher />
       </div>
     )
   }
@@ -176,7 +182,7 @@ export default function ForgotPassword() {
           transition={{ delay: 0.3 }}
         >
           <ArrowLeft size={20} />
-          返回登录
+          {t('common.backToLogin')}
         </motion.button>
 
         {/* 标题 */}
@@ -186,8 +192,8 @@ export default function ForgotPassword() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <h2 className="text-4xl font-title text-ink-black mb-2">忘记密码</h2>
-          <p className="text-ink-light">通过邮箱验证码重置您的密码</p>
+          <h2 className="text-4xl font-title text-ink-black mb-2">{t('forgotPassword.title')}</h2>
+          <p className="text-ink-light">{t('forgotPassword.subtitle')}</p>
         </motion.div>
 
         {/* 错误提示 */}
@@ -211,7 +217,7 @@ export default function ForgotPassword() {
         >
           {/* 邮箱 + 发送验证码 */}
           <div>
-            <label className="block text-sm font-medium text-ink-dark mb-2">邮箱</label>
+            <label className="block text-sm font-medium text-ink-dark mb-2">{t('register.email')}</label>
             <div className="flex gap-3">
               <div className="flex-1">
                 <div className="relative">
@@ -220,7 +226,7 @@ export default function ForgotPassword() {
                   </span>
                   <input
                     type="email"
-                    placeholder="请输入注册时使用的邮箱"
+                    placeholder={t('forgotPassword.emailPlaceholder')}
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
@@ -244,26 +250,26 @@ export default function ForgotPassword() {
                 `}
               >
                 <Send size={16} />
-                {sendingCode ? '发送中...' : countdown > 0 ? `${countdown}秒` : '发送验证码'}
+                {sendingCode ? t('register.sending') : countdown > 0 ? `${countdown}s` : t('register.sendCode')}
               </button>
             </div>
             {codeSent && countdown > 0 && (
               <p className="text-xs text-cyan-ink mt-2">
-                验证码已发送至您的邮箱，请查收（5分钟内有效）
+                {t('register.codeSent')}
               </p>
             )}
           </div>
 
           {/* 验证码输入 */}
           <div>
-            <label className="block text-sm font-medium text-ink-dark mb-2">验证码</label>
+            <label className="block text-sm font-medium text-ink-dark mb-2">{t('register.verificationCode')}</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-light">
                 <Shield size={18} />
               </span>
               <input
                 type="text"
-                placeholder="请输入6位数字验证码"
+                placeholder={t('register.codePlaceholder')}
                 value={formData.code}
                 onChange={(e) => {
                   const value = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -280,9 +286,9 @@ export default function ForgotPassword() {
 
           <div>
             <Input
-              label="新密码"
+              label={t('forgotPassword.newPassword')}
               type="password"
-              placeholder="请输入新密码（至少6位）"
+              placeholder={t('forgotPassword.newPasswordPlaceholder')}
               value={formData.newPassword}
               onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
               icon={<Lock size={18} />}
@@ -290,14 +296,14 @@ export default function ForgotPassword() {
               minLength={6}
             />
             <p className="text-xs text-ink-light mt-1">
-              仅支持数字/小写字母/大写字母，且至少包含其中两种
+              {t('register.passwordHint')}
             </p>
           </div>
 
           <Input
-            label="确认新密码"
+            label={t('forgotPassword.confirmNewPassword')}
             type="password"
-            placeholder="请再次输入新密码"
+            placeholder={t('forgotPassword.confirmNewPasswordPlaceholder')}
             value={formData.confirmPassword}
             onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
             icon={<Lock size={18} />}
@@ -310,7 +316,7 @@ export default function ForgotPassword() {
             loading={loading}
             size="lg"
           >
-            重置密码
+            {t('forgotPassword.resetPassword')}
           </Button>
         </motion.form>
 
@@ -322,25 +328,28 @@ export default function ForgotPassword() {
           transition={{ delay: 0.7 }}
         >
           <p className="text-ink-light">
-            想起密码了？
+            {t('forgotPassword.rememberPassword')}
             <Link
               to="/auth/login"
               className="text-vermilion hover:text-vermilion-light ml-2 transition-colors"
             >
-              返回登录
+              {t('common.backToLogin')}
             </Link>
           </p>
           <p className="text-ink-light">
-            还没有账号？
+            {t('login.noAccount')}
             <Link
               to="/auth/register"
               className="text-vermilion hover:text-vermilion-light ml-2 transition-colors"
             >
-              立即注册
+              {t('login.registerNow')}
             </Link>
           </p>
         </motion.div>
       </motion.div>
+
+      {/* 语言切换按钮 */}
+      <LanguageSwitcher />
     </div>
   )
 }

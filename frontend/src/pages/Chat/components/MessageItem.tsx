@@ -1,16 +1,57 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, X } from 'lucide-react'
+import { User, X, FileText, Copy, Check, RefreshCw, FileDown } from 'lucide-react'
+import { chatService } from '../../../services/chatService'
 import ThinkingBlock from './ThinkingBlock'
 import type { Message } from '../../../types'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+
+// 解析文档标记，提取文件名和可见内容
+// 支持两种格式：
+// 1. 新格式（只有元数据）: <!-- DOC:filename:key --><!-- /DOC -->
+// 2. 旧格式（包含内容）: <!-- DOC:filename -->内容<!-- /DOC -->
+function parseDocContent(content: string): { 
+  displayContent: string
+  docFiles: string[] 
+} {
+  const docFiles: string[] = []
+  
+  // 匹配新格式: <!-- DOC:filename:key --><!-- /DOC -->
+  const newPattern = /<!-- DOC:([^:]+?):[^>]+? --><!-- \/DOC -->/g
+  let match
+  while ((match = newPattern.exec(content)) !== null) {
+    docFiles.push(match[1])
+  }
+  
+  // 匹配旧格式: <!-- DOC:filename -->...<!-- /DOC -->
+  const oldPattern = /<!-- DOC:([^:>]+?) -->[\s\S]*?<!-- \/DOC -->/g
+  while ((match = oldPattern.exec(content)) !== null) {
+    // 避免重复添加
+    if (!docFiles.includes(match[1])) {
+      docFiles.push(match[1])
+    }
+  }
+  
+  // 移除所有文档标记，只保留用户的文字消息
+  let displayContent = content
+    .replace(/<!-- DOC:[^>]+? --><!-- \/DOC -->/g, '')  // 新格式
+    .replace(/<!-- DOC:[^>]+? -->[\s\S]*?<!-- \/DOC -->/g, '')  // 旧格式
+    .trim()
+  
+  return { displayContent, docFiles }
+}
 
 interface MessageItemProps {
   message: Message
   index: number
   isStreaming?: boolean
+  isLastAiMessage?: boolean
+  onRegenerate?: () => void
 }
 
 // 图片消息组件（带 Lightbox）
@@ -88,6 +129,8 @@ function MarkdownContent({
   return (
     <div className={isUser ? '' : 'markdown-content'}>
       <ReactMarkdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           // 代码块渲染
           code({ className, children, ...props }) {
@@ -126,6 +169,49 @@ function MarkdownContent({
           },
           // 链接渲染
           a({ href, children }) {
+            // 检查是否是 pptx 文件下载链接
+            const isPptxDownload = href && (href.includes('.pptx') || href.includes('ppt/'))
+            
+            if (isPptxDownload) {
+              // 使用 JS 下载，避免 Windows Zone.Identifier 标记导致 Office 无法打开
+              const handleDownload = async (e: React.MouseEvent) => {
+                e.preventDefault()
+                try {
+                  const response = await fetch(href)
+                  const blob = await response.blob()
+                  const url = window.URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  // 从 URL 中提取文件名
+                  const urlParams = new URLSearchParams(href.split('?')[1] || '')
+                  const disposition = urlParams.get('response-content-disposition') || ''
+                  const filenameMatch = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+                  const filename = filenameMatch 
+                    ? decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''))
+                    : 'presentation.pptx'
+                  a.download = filename
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                } catch (error) {
+                  console.error('Download failed:', error)
+                  // 降级为普通链接下载
+                  window.open(href, '_blank')
+                }
+              }
+              
+              return (
+                <a 
+                  href={href}
+                  onClick={handleDownload}
+                  className={isUser ? 'text-cyan-300 underline cursor-pointer' : 'text-cyan-ink underline cursor-pointer'}
+                >
+                  {children}
+                </a>
+              )
+            }
+            
             return (
               <a 
                 href={href} 
@@ -145,15 +231,99 @@ function MarkdownContent({
   )
 }
 
-export default function MessageItem({ message, index, isStreaming = false }: MessageItemProps) {
+export default function MessageItem({ 
+  message, 
+  index, 
+  isStreaming = false,
+  isLastAiMessage = false,
+  onRegenerate
+}: MessageItemProps) {
   const isUser = message.role === 'user'
+  const [copied, setCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  
+  // 对用户消息解析文档标记
+  const { displayContent, docFiles } = isUser 
+    ? parseDocContent(message.content || '')
+    : { displayContent: message.content || '', docFiles: [] }
+
+  // 复制消息内容
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content || '')
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('复制失败:', err)
+    }
+  }
+
+  // 从内容中提取标题
+  const extractTitle = (content: string): string => {
+    const lines = content.trim().split('\n')
+    
+    // 检查第一行是否是 Markdown 标题
+    for (const line of lines) {
+      const trimmedLine = line.trim()
+      if (!trimmedLine) continue
+      
+      // 匹配 Markdown 标题 (# 开头)
+      const titleMatch = trimmedLine.match(/^#{1,6}\s+(.+)$/)
+      if (titleMatch) {
+        // 去除可能的 Markdown 格式字符
+        const title = titleMatch[1].replace(/[*_`\[\]]/g, '').trim()
+        // 限制长度
+        return title.slice(0, 20)
+      }
+      
+      // 不是标题，取第一句话的前10个字
+      // 去除 Markdown 格式
+      const cleanText = trimmedLine
+        .replace(/^[-*+]\s+/, '') // 列表项
+        .replace(/\*\*(.+?)\*\*/g, '$1') // 加粗
+        .replace(/\*(.+?)\*/g, '$1') // 斜体
+        .replace(/`(.+?)`/g, '$1') // 行内代码
+        .replace(/\[(.+?)\]\(.+?\)/g, '$1') // 链接
+        .trim()
+      
+      if (cleanText) {
+        // 取前10个字符（中文或英文）
+        return cleanText.slice(0, 10)
+      }
+    }
+    
+    // 如果都没有，返回默认值
+    return '墨语对话'
+  }
+
+  // 导出为 Word 文档
+  const handleExport = async () => {
+    if (exporting || !message.content) return
+    
+    setExporting(true)
+    try {
+      // 智能生成文件名
+      const title = extractTitle(message.content)
+      // 清理文件名中的非法字符
+      const safeTitle = title.replace(/[<>:"/\\|?*]/g, '_')
+      const filename = safeTitle || '墨语对话'
+      
+      await chatService.exportToDocx(message.content, filename)
+    } catch (err) {
+      console.error('导出失败:', err)
+      alert('导出失败，请重试')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <motion.div
       className={`flex gap-4 ${isUser ? 'flex-row-reverse' : ''}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      // 流式消息不延迟，普通消息保留延迟动画
+      transition={{ delay: isStreaming ? 0 : Math.min(index * 0.05, 0.3) }}
     >
       {/* 头像 */}
       <div
@@ -180,24 +350,95 @@ export default function MessageItem({ message, index, isStreaming = false }: Mes
           />
         )}
 
+        {/* 文档标签（用户消息上方） */}
+        {isUser && docFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 justify-end">
+            {docFiles.map((fileName, i) => (
+              <div 
+                key={i}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-ink-black/80 text-paper-white text-sm rounded-sm"
+              >
+                <FileText size={14} />
+                <span className="max-w-[200px] truncate">{fileName}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* 消息气泡 */}
-        <div
-          className={`
-            p-4 rounded-sm
-            ${isUser
-              ? 'bg-ink-black text-paper-white'
-              : 'bg-paper-white border border-paper-aged text-ink-black'
-            }
-          `}
-        >
-          <MarkdownContent 
-            content={message.content || (isStreaming ? '▌' : '')} 
-            isUser={isUser}
-          />
-        </div>
+        {(displayContent || !isUser || isStreaming) && (
+          <div
+            className={`
+              p-4 rounded-sm max-h-[400px] overflow-y-auto custom-scrollbar
+              ${isUser
+                ? 'bg-ink-black text-paper-white'
+                : 'bg-paper-white border border-paper-aged text-ink-black'
+              }
+            `}
+          >
+            {isStreaming && !isUser ? (
+              // 流式输出时：简单文本渲染，避免 ReactMarkdown 性能问题
+              <div className="whitespace-pre-wrap break-words">
+                {displayContent}
+                <span className="inline-block w-2 h-4 bg-ink-medium animate-pulse ml-0.5 align-middle" />
+              </div>
+            ) : (
+              // 完成后：完整 Markdown 渲染
+              <MarkdownContent 
+                content={displayContent || ''} 
+                isUser={isUser}
+              />
+            )}
+          </div>
+        )}
+
+        {/* AI 消息操作按钮 */}
+        {!isUser && !isStreaming && message.content && (
+          <div className="flex items-center gap-1 mt-1.5">
+            {/* 复制按钮 */}
+            <motion.button
+              onClick={handleCopy}
+              className="p-1.5 text-ink-faint hover:text-ink-medium hover:bg-paper-aged/50 rounded transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="复制内容"
+            >
+              {copied ? (
+                <Check size={14} className="text-jade" />
+              ) : (
+                <Copy size={14} />
+              )}
+            </motion.button>
+
+            {/* 导出为 Word 按钮 */}
+            <motion.button
+              onClick={handleExport}
+              disabled={exporting}
+              className="p-1.5 text-ink-faint hover:text-ink-medium hover:bg-paper-aged/50 rounded transition-colors disabled:opacity-50"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="导出为 Word"
+            >
+              <FileDown size={14} className={exporting ? 'animate-pulse' : ''} />
+            </motion.button>
+
+            {/* 重新生成按钮（仅最后一条 AI 消息显示） */}
+            {isLastAiMessage && onRegenerate && (
+              <motion.button
+                onClick={onRegenerate}
+                className="p-1.5 text-ink-faint hover:text-ink-medium hover:bg-paper-aged/50 rounded transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="重新生成"
+              >
+                <RefreshCw size={14} />
+              </motion.button>
+            )}
+          </div>
+        )}
 
         {/* 时间戳 */}
-        <p className={`text-xs text-ink-faint mt-2 ${isUser ? 'text-right' : ''}`}>
+        <p className={`text-xs text-ink-faint mt-1 ${isUser ? 'text-right' : ''}`}>
           {new Date(message.created_at).toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',

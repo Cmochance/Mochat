@@ -13,3 +13,4 @@ openai==1.12.0
 httpx==0.26.0
 python-dotenv==1.0.0
 resend==0.7.0
+pypandoc==1.13

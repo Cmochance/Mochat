@@ -25,16 +25,98 @@ services:
       - mochat_data:/data
     restart: unless-stopped
 
+  # Upword 文档上传解析服务
+  upword:
+    build:
+      context: ./modules/upword/backend
+      dockerfile: Dockerfile
+    ports:
+      - "33901:3901"
+    environment:
+      - UPWORD_PORT=3901
+      - UPWORD_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-}
+      - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
+    restart: unless-stopped
+
   # Uppic 图片上传服务
   uppic:
     build:
       context: ./modules/uppic/backend
       dockerfile: Dockerfile
     ports:
-      - "13900:3900"
+      - "33900:3900"
     environment:
       - UPPIC_PORT=3900
-      - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:8721
+      - UPPIC_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-}
+      - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
+    restart: unless-stopped
+
+  # Upgrade 版本更新通知服务
+  upgrade:
+    build:
+      context: ./modules/upgrade/backend
+      dockerfile: Dockerfile
+    ports:
+      - "33902:3902"
+    environment:
+      - UPGRADE_PORT=3902
+      - UPGRADE_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Picgenerate AI 图像生成服务
+  picgenerate:
+    build:
+      context: ./modules/picgenerate/backend
+      dockerfile: Dockerfile
+    ports:
+      - "30903:3903"
+    environment:
+      - PICGEN_PORT=3903
+      - PICGEN_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+      # 翻译/优化 AI 配置
+      - PICGEN_TRANSLATOR_API_KEY=${PICGEN_TRANSLATOR_API_KEY:-}
+      - PICGEN_TRANSLATOR_API_BASE=${PICGEN_TRANSLATOR_API_BASE:-}
+      - PICGEN_TRANSLATOR_MODEL=${PICGEN_TRANSLATOR_MODEL:-gpt-4o-mini}
+      # 图像生成 AI 配置
+      - PICGEN_IMAGE_API_KEY=${PICGEN_IMAGE_API_KEY:-}
+      - PICGEN_IMAGE_API_BASE=${PICGEN_IMAGE_API_BASE:-}
+      - PICGEN_IMAGE_MODEL=${PICGEN_IMAGE_MODEL:-gemini-3-image}
+      # R2 存储配置
+      - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME:-}
+      - R2_PUBLIC_DOMAIN=${R2_PUBLIC_DOMAIN:-}
+    restart: unless-stopped
+
+  # PPT 生成服务
+  pptgen:
+    build:
+      context: ./modules/pptgen/backend
+      dockerfile: Dockerfile
+    ports:
+      - "30904:3904"
+    environment:
+      - PPTGEN_PORT=3904
+      - PPTGEN_CORS_ORIGINS=http://localhost:3721,http://localhost:38721
+      # AI 配置
+      - PPTGEN_AI_API_KEY=${PPTGEN_AI_API_KEY:-}
+      - PPTGEN_AI_API_BASE=${PPTGEN_AI_API_BASE:-}
+      - PPTGEN_AI_MODEL=${PPTGEN_AI_MODEL:-gpt-4}
+      # Cloud Run 配置
+      - PPTGEN_CLOUDRUN_URL=${PPTGEN_CLOUDRUN_URL:-}
+      - PPTGEN_CLOUDRUN_SECRET=${PPTGEN_CLOUDRUN_SECRET:-${AUTH_TOKEN:-}}
+      # R2 存储配置
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID:-}
       - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID:-}
       - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY:-}
@@ -48,10 +130,14 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - "8721:3721"
+      - "38721:3721"
     depends_on:
       - backend
       - uppic
+      - upword
+      - upgrade
+      - picgenerate
+      - pptgen
     restart: unless-stopped
 
 volumes:

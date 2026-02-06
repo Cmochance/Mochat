@@ -3,15 +3,35 @@
 """
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_db
-from ..schemas.user import UserResponse, UserUpdate, UserAdminResponse
+from ..db import crud
+from ..schemas.user import UserResponse, UserUpdate, UserAdminResponse, TierUpdateRequest
 from ..services.admin_service import admin_service
+from ..services.content_filter import content_filter
+from ..services.usage_service import usage_service, TIER_LIMITS
 from ..core.dependencies import get_admin_user
 from ..db.models import User
 
 router = APIRouter()
+
+
+# ============ Schemas ============
+
+class KeywordCreate(BaseModel):
+    keyword: str
+
+
+class KeywordResponse(BaseModel):
+    id: int
+    keyword: str
+    is_active: bool
+    created_at: str
+    
+    class Config:
+        from_attributes = True
 
 
 @router.get("/stats")
@@ -99,13 +119,331 @@ async def get_configs(
     return await admin_service.get_all_configs(db)
 
 
+class ConfigUpdate(BaseModel):
+    value: str
+
+
 @router.put("/config/{key}")
 async def set_config(
     key: str,
-    value: str,
+    data: ConfigUpdate,
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db)
 ):
     """设置系统配置"""
-    await admin_service.set_config(db, key, value)
+    await admin_service.set_config(db, key, data.value)
+    await db.commit()
     return {"message": "配置更新成功"}
+
+
+# ============ 限制词管理 ============
+
+@router.get("/keywords")
+async def get_keywords(
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """获取所有限制词"""
+    keywords = await crud.get_all_keywords(db)
+    return [
+        {
+            "id": k.id,
+            "keyword": k.keyword,
+            "is_active": k.is_active,
+            "created_at": k.created_at.isoformat() if k.created_at else None
+        }
+        for k in keywords
+    ]
+
+
+@router.post("/keywords")
+async def add_keyword(
+    data: KeywordCreate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """添加限制词"""
+    keyword = data.keyword.strip()
+    if not keyword:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="关键词不能为空"
+        )
+    
+    result = await crud.add_keyword(db, keyword, current_user.id)
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="关键词已存在"
+        )
+    
+    # 使缓存失效
+    content_filter.invalidate_cache()
+    
+    return {
+        "id": result.id,
+        "keyword": result.keyword,
+        "is_active": result.is_active,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+@router.delete("/keywords/{keyword_id}")
+async def delete_keyword(
+    keyword_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """删除限制词"""
+    success = await crud.delete_keyword(db, keyword_id)
+    await db.commit()
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="关键词不存在"
+        )
+    
+    # 使缓存失效
+    content_filter.invalidate_cache()
+    
+    return {"message": "删除成功"}
+
+
+@router.post("/keywords/{keyword_id}/toggle")
+async def toggle_keyword(
+    keyword_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """切换限制词状态"""
+    result = await crud.toggle_keyword_status(db, keyword_id)
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="关键词不存在"
+        )
+    
+    # 使缓存失效
+    content_filter.invalidate_cache()
+    
+    return {
+        "id": result.id,
+        "keyword": result.keyword,
+        "is_active": result.is_active,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+# ============ 模型管理 ============
+
+class ModelCreate(BaseModel):
+    model_id: str
+    display_name: str = None
+    sort_order: int = 0
+
+
+class ModelSortUpdate(BaseModel):
+    sort_order: int
+
+
+@router.get("/models")
+async def get_allowed_models(
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """获取所有配置的模型"""
+    models = await crud.get_all_allowed_models(db)
+    return [
+        {
+            "id": m.id,
+            "model_id": m.model_id,
+            "display_name": m.display_name,
+            "is_active": m.is_active,
+            "sort_order": m.sort_order,
+            "created_at": m.created_at.isoformat() if m.created_at else None
+        }
+        for m in models
+    ]
+
+
+@router.post("/models")
+async def add_model(
+    data: ModelCreate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """添加允许的模型"""
+    model_id = data.model_id.strip()
+    if not model_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="模型ID不能为空"
+        )
+    
+    result = await crud.add_allowed_model(
+        db, 
+        model_id, 
+        data.display_name.strip() if data.display_name else None,
+        data.sort_order
+    )
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该模型已存在"
+        )
+    
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "display_name": result.display_name,
+        "is_active": result.is_active,
+        "sort_order": result.sort_order,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+@router.delete("/models/{model_db_id}")
+async def delete_model(
+    model_db_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """删除允许的模型"""
+    success = await crud.delete_allowed_model(db, model_db_id)
+    await db.commit()
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型不存在"
+        )
+    
+    return {"message": "删除成功"}
+
+
+@router.post("/models/{model_db_id}/toggle")
+async def toggle_model(
+    model_db_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """切换模型启用状态"""
+    result = await crud.toggle_model_status(db, model_db_id)
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型不存在"
+        )
+    
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "display_name": result.display_name,
+        "is_active": result.is_active,
+        "sort_order": result.sort_order,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+@router.put("/models/{model_db_id}/sort")
+async def update_model_sort(
+    model_db_id: int,
+    data: ModelSortUpdate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """更新模型排序"""
+    result = await crud.update_model_sort_order(db, model_db_id, data.sort_order)
+    await db.commit()
+    
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型不存在"
+        )
+    
+    return {
+        "id": result.id,
+        "model_id": result.model_id,
+        "display_name": result.display_name,
+        "is_active": result.is_active,
+        "sort_order": result.sort_order,
+        "created_at": result.created_at.isoformat() if result.created_at else None
+    }
+
+
+# ============ 用户等级管理 ============
+
+@router.put("/users/{user_id}/tier", response_model=UserResponse)
+async def update_user_tier(
+    user_id: int,
+    data: TierUpdateRequest,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """更新用户等级"""
+    # 检查等级是否有效
+    if data.tier not in ["free", "pro", "plus"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无效的用户等级，必须是 free、pro 或 plus"
+        )
+    
+    # 不能修改管理员的等级
+    target_user = await crud.get_user_by_id(db, user_id)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="用户不存在"
+        )
+    
+    if target_user.role == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="无法修改管理员的等级"
+        )
+    
+    user = await crud.update_user(db, user_id, tier=data.tier)
+    await db.commit()
+    
+    return user
+
+
+@router.get("/tiers")
+async def get_tier_info(
+    current_user: User = Depends(get_admin_user)
+) -> Dict[str, Any]:
+    """获取所有等级配置信息"""
+    return {
+        "tiers": [
+            {
+                "id": tier_id,
+                "name_zh": info["name_zh"],
+                "name_en": info["name_en"],
+                "chat_limit": info["chat_limit"],
+                "image_limit": info["image_limit"]
+            }
+            for tier_id, info in TIER_LIMITS.items()
+            if tier_id != "admin"  # 不返回管理员等级
+        ]
+    }
+
+
+# ============ 使用量统计 ============
+
+@router.get("/usage/stats")
+async def get_usage_stats(
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """获取所有用户的使用量统计"""
+    return await usage_service.get_all_usage_stats(db)

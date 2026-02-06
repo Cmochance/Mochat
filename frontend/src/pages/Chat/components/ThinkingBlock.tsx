@@ -73,7 +73,7 @@ export default function ThinkingBlock({ content, isStreaming = false, hasContent
             transition={{ duration: 0.3 }}
             className="overflow-hidden"
           >
-            <div className="mt-2 p-4 bg-paper-cream/50 border-l-4 border-cyan-ink rounded-r-sm">
+            <div className="mt-2 p-4 bg-paper-cream/50 border-l-4 border-cyan-ink rounded-r-sm max-h-[200px] overflow-y-auto custom-scrollbar">
               <p className="text-sm text-ink-medium whitespace-pre-wrap leading-relaxed">
                 {content}
                 {isStreaming && (

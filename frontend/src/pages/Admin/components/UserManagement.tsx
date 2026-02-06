@@ -9,13 +9,22 @@ import {
   Shield,
   User as UserIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { adminService } from '../../../services/adminService'
 import Loading from '../../../components/common/Loading'
 import Modal from '../../../components/common/Modal'
 import Button from '../../../components/common/Button'
 import type { User } from '../../../types'
+
+// 等级选项
+const TIER_OPTIONS = [
+  { id: 'free', name_zh: '普通用户', name_en: 'Free User' },
+  { id: 'pro', name_zh: '高级用户', name_en: 'Pro User' },
+  { id: 'plus', name_zh: '超级用户', name_en: 'Plus User' },
+]
 
 interface UserManagementProps {
   users: User[]
@@ -24,6 +33,7 @@ interface UserManagementProps {
 }
 
 export default function UserManagement({ users, loading, onRefresh }: UserManagementProps) {
+  const { t, i18n } = useTranslation()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -75,10 +85,31 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
     }
   }
 
+  const handleTierChange = async (userId: number, newTier: string) => {
+    try {
+      await adminService.updateUserTier(userId, newTier)
+      onRefresh()
+    } catch (error) {
+      console.error('更新用户等级失败:', error)
+    }
+  }
+
+  // 获取等级样式
+  const getTierStyle = (tier?: string) => {
+    switch (tier) {
+      case 'plus':
+        return 'bg-amber-100 text-amber-700'
+      case 'pro':
+        return 'bg-cyan-100 text-cyan-700'
+      default:
+        return 'bg-gray-100 text-gray-600'
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loading text="加载用户列表..." />
+        <Loading text={t('admin.users.loadingUsers')} />
       </div>
     )
   }
@@ -87,7 +118,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
     <div className="space-y-6">
       {/* 头部 */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <h2 className="text-2xl font-title text-ink-black">用户管理</h2>
+        <h2 className="text-2xl font-title text-ink-black">{t('admin.users.title')}</h2>
         
         <div className="flex gap-3">
           {/* 搜索 */}
@@ -95,7 +126,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-light" />
             <input
               type="text"
-              placeholder="搜索用户..."
+              placeholder={t('admin.users.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 bg-paper-white border border-paper-aged rounded-sm focus:outline-none focus:border-ink-medium"
@@ -115,13 +146,14 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
           <table className="w-full">
             <thead className="bg-paper-cream">
               <tr>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">用户</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">邮箱</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">密码哈希</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">角色</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">状态</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">注册时间</th>
-                <th className="px-6 py-3 text-right text-sm font-medium text-ink-medium">操作</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.user')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.email')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.passwordHash')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.role')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.tier')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.status')}</th>
+                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.registeredAt')}</th>
+                <th className="px-6 py-3 text-right text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-paper-aged">
@@ -152,13 +184,13 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                       <div className="flex items-center gap-2">
                         <code className="text-xs font-mono text-ink-light bg-paper-cream px-2 py-1 rounded max-w-[120px] truncate">
                           {visiblePasswordIds.has(user.id) 
-                            ? (user.password_hash || '无') 
+                            ? (user.password_hash || t('admin.users.none')) 
                             : '••••••••'}
                         </code>
                         <button
                           className="p-1 rounded hover:bg-paper-cream transition-colors text-ink-light hover:text-ink-dark"
                           onClick={() => togglePasswordVisibility(user.id)}
-                          title={visiblePasswordIds.has(user.id) ? '隐藏' : '显示'}
+                          title={visiblePasswordIds.has(user.id) ? t('common.hide') : t('common.show')}
                         >
                           {visiblePasswordIds.has(user.id) ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -166,23 +198,52 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-sm ${user.role === 'admin' ? 'bg-vermilion/10 text-vermilion' : 'bg-cyan-ink/10 text-cyan-ink'}`}>
-                        {user.role === 'admin' ? '管理员' : '用户'}
+                        {user.role === 'admin' ? t('common.admin') : t('common.user')}
                       </span>
                     </td>
                     <td className="px-6 py-4">
+                      {user.role === 'admin' ? (
+                        <span className="px-2 py-1 text-xs rounded-sm bg-vermilion/10 text-vermilion">
+                          {i18n.language === 'zh' ? '管理员' : 'Admin'}
+                        </span>
+                      ) : (
+                        <div className="relative inline-block">
+                          <select
+                            value={user.tier || 'free'}
+                            onChange={(e) => handleTierChange(user.id, e.target.value)}
+                            className={`
+                              appearance-none px-2 py-1 pr-6 text-xs rounded-sm cursor-pointer
+                              border-0 focus:outline-none focus:ring-2 focus:ring-ink-medium
+                              ${getTierStyle(user.tier)}
+                            `}
+                          >
+                            {TIER_OPTIONS.map((tier) => (
+                              <option key={tier.id} value={tier.id}>
+                                {i18n.language === 'zh' ? tier.name_zh : tier.name_en}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown 
+                            size={12} 
+                            className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-current opacity-60" 
+                          />
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-sm ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {user.is_active ? '正常' : '禁用'}
+                        {user.is_active ? t('common.active') : t('common.disabled')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-ink-light">
-                      {new Date(user.created_at).toLocaleDateString('zh-CN')}
+                      {new Date(user.created_at).toLocaleDateString(i18n.language === 'zh' ? 'zh-CN' : 'en-US')}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           className={`p-2 rounded-sm transition-colors ${user.is_active ? 'hover:bg-yellow-100 text-yellow-600' : 'hover:bg-green-100 text-green-600'}`}
                           onClick={() => handleToggleStatus(user)}
-                          title={user.is_active ? '禁用' : '启用'}
+                          title={user.is_active ? t('common.disable') : t('common.enable')}
                         >
                           {user.is_active ? <UserX size={16} /> : <UserCheck size={16} />}
                         </button>
@@ -192,7 +253,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                             setSelectedUser(user)
                             setShowDeleteModal(true)
                           }}
-                          title="删除"
+                          title={t('common.delete')}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -207,7 +268,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
 
         {filteredUsers.length === 0 && (
           <div className="text-center py-12 text-ink-light">
-            暂无用户数据
+            {t('admin.users.noData')}
           </div>
         )}
       </div>
@@ -216,22 +277,21 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
       <Modal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
-        title="确认删除"
+        title={t('admin.users.confirmDelete')}
       >
         <p className="text-ink-medium mb-6">
-          确定要删除用户 <span className="font-medium text-ink-black">{selectedUser?.username}</span> 吗？
-          此操作不可撤销。
+          {t('admin.users.confirmDeleteMessage', { username: selectedUser?.username })}
         </p>
         <div className="flex gap-3 justify-end">
           <Button variant="ghost" onClick={() => setShowDeleteModal(false)}>
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             variant="seal"
             onClick={handleDeleteUser}
             loading={actionLoading}
           >
-            确认删除
+            {t('admin.users.confirmDelete')}
           </Button>
         </div>
       </Modal>

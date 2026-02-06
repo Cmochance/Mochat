@@ -16,12 +16,14 @@ interface ChatState {
   removeSession: (sessionId: number) => void
   setCurrentSession: (session: ChatSession | null) => void
   setMessages: (messages: Message[]) => void
+  prependMessages: (messages: Message[]) => void  // 在列表前面添加消息
   addMessage: (message: Message) => void
   setLoading: (loading: boolean) => void
   setStreaming: (streaming: boolean) => void
   appendStreamingContent: (content: string) => void
   appendStreamingThinking: (thinking: string) => void
-  clearStreaming: () => void
+  clearStreaming: () => void  // 只清空内容
+  endStreaming: () => void    // 完全结束（清空内容 + isStreaming=false）
   finalizeStreaming: (thinking: string, content: string) => void
 }
 
@@ -49,6 +51,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
   setMessages: (messages) => set({ messages }),
   
+  prependMessages: (newMessages) => set((state) => ({
+    messages: [...newMessages, ...state.messages],
+  })),
+  
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message],
   })),
@@ -65,7 +71,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     streamingThinking: state.streamingThinking + thinking,
   })),
   
+  // 只清空流式内容，不改变 isStreaming 状态
   clearStreaming: () => set({
+    streamingContent: '',
+    streamingThinking: '',
+  }),
+  
+  // 完全结束流式状态（包括 isStreaming）
+  endStreaming: () => set({
     streamingContent: '',
     streamingThinking: '',
     isStreaming: false,

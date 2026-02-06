@@ -4,10 +4,51 @@ export interface User {
   username: string
   email: string
   role: 'user' | 'admin'
+  tier?: 'free' | 'pro' | 'plus'  // 用户等级
   is_active: boolean
   created_at: string
   updated_at: string
   password_hash?: string  // 管理员接口返回，用于调试
+}
+
+// 用户使用量
+export interface UserUsage {
+  tier: string
+  tier_name_zh: string
+  tier_name_en: string
+  chat_limit: number
+  chat_used: number
+  chat_remaining: number
+  image_limit: number
+  image_used: number
+  image_remaining: number
+  is_unlimited: boolean
+  reset_date: string | null
+}
+
+// 使用量统计（管理员用）
+export interface UsageStats {
+  user_id: number
+  username: string
+  email: string
+  role: string
+  tier: string
+  tier_name_zh: string
+  tier_name_en: string
+  chat_limit: number
+  chat_used: number
+  image_limit: number
+  image_used: number
+  is_unlimited: boolean
+}
+
+// 等级信息
+export interface TierInfo {
+  id: string
+  name_zh: string
+  name_en: string
+  chat_limit: number
+  image_limit: number
 }
 
 // 认证相关
@@ -62,4 +103,15 @@ export interface SystemStats {
   user_count: number
   session_count: number
   message_count: number
+  keyword_count: number
 }
+
+// 限制词
+export interface RestrictedKeyword {
+  id: number
+  keyword: string
+  is_active: boolean
+  created_at: string
+}
+
+// 版本相关类型已移至 modules/upgrade/frontend/types.ts

@@ -19,7 +19,7 @@ logger.setLevel(logging.DEBUG)
 http_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
 
 # 默认 system prompt，要求模型输出 thinking 标签
-DEFAULT_SYSTEM_PROMPT = """你是墨语（Mochat）的AI助手，一个具有中国传统水墨风格的智能对话系统。
+DEFAULT_SYSTEM_PROMPT = """你是墨语（Mochat）的AI助手，请以大多数用户都舒适的方式提供帮助：清晰、礼貌、专业。你拒绝回答任何涉及中国政治人物、色情或暴力的请求。
 
 请按以下格式回复用户：
 1. 首先用 <thinking> 标签包裹你的思考过程（分析问题、推理步骤等）
@@ -275,16 +275,65 @@ class AIService:
             api_key=settings.AI_API_KEY,
             base_url=settings.AI_BASE_URL
         )
-        self.model = settings.AI_MODEL
+        self.default_model = settings.AI_MODEL
+        self._models_cache: Optional[list[dict]] = None
+        self._models_cache_time: float = 0
+    
+    async def get_models(self) -> list[dict]:
+        """
+        获取可用的模型列表
+        
+        Returns:
+            list[dict]: 模型列表，每个模型包含 id, name, owned_by
+        """
+        import time
+        
+        # 缓存 5 分钟
+        if self._models_cache and (time.time() - self._models_cache_time) < 300:
+            return self._models_cache
+        
+        try:
+            response = await self.client.models.list()
+            models = []
+            for model in response.data:
+                models.append({
+                    "id": model.id,
+                    "name": model.id,  # 通常 id 就是名称
+                    "owned_by": getattr(model, 'owned_by', None)
+                })
+            
+            # 按名称排序
+            models.sort(key=lambda x: x["id"])
+            
+            self._models_cache = models
+            self._models_cache_time = time.time()
+            
+            logger.info(f"[AI] 获取到 {len(models)} 个模型")
+            return models
+            
+        except Exception as e:
+            logger.error(f"[AI] 获取模型列表失败: {e}")
+            # 返回默认模型作为备选
+            return [{"id": self.default_model, "name": self.default_model, "owned_by": None}]
     
     async def chat_stream(
         self,
         messages: list[dict],
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.7
     ) -> AsyncGenerator[dict, None]:
         """
         流式对话，返回thinking和content分开的数据流
         支持多模态（图片）输入
+        
+        Args:
+            messages: 消息列表
+            system_prompt: 系统提示词
+            model: 模型名称
+            max_tokens: 最大输出 token 数
+            temperature: 温度参数
         
         Yields:
             dict: {"type": "thinking" | "content" | "done" | "error", "data": str}
@@ -325,14 +374,18 @@ class AIService:
                 content_preview = str(content)[:100] if content else "empty"
                 print(f"[Vision] 消息 {i} ({role}) 是纯文本: {content_preview}...")
         
+        # 确定使用的模型
+        use_model = model or self.default_model
+        logger.info(f"[AI] 使用模型: {use_model}, max_tokens: {max_tokens}, temperature: {temperature}")
+        
         try:
             # 调用AI API（流式）
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model=use_model,
                 messages=chat_messages,
                 stream=True,
-                temperature=0.7,
-                max_tokens=4096
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             
             thinking_buffer = ""
@@ -340,6 +393,7 @@ class AIService:
             in_thinking = False
             tag_buffer = ""  # 用于缓冲可能不完整的标签
             
+            chunk_index = 0
             async for chunk in response:
                 if not chunk.choices:
                     continue
@@ -347,6 +401,10 @@ class AIService:
                 delta = chunk.choices[0].delta
                 if not delta.content:
                     continue
+                
+                # 调试日志：确认收到流式数据
+                chunk_index += 1
+                print(f"[Stream] Chunk #{chunk_index}: {len(delta.content)} chars")
                 
                 # 合并之前缓冲的可能不完整的标签
                 text = tag_buffer + delta.content
@@ -425,7 +483,8 @@ class AIService:
     async def chat_simple(
         self,
         messages: list[dict],
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        model: Optional[str] = None
     ) -> tuple[str, str]:
         """
         简单对话（非流式），返回完整响应
@@ -436,7 +495,7 @@ class AIService:
         thinking = ""
         content = ""
         
-        async for chunk in self.chat_stream(messages, system_prompt):
+        async for chunk in self.chat_stream(messages, system_prompt, model):
             if chunk["type"] == "thinking":
                 thinking += chunk["data"]
             elif chunk["type"] == "content":
@@ -450,7 +509,7 @@ class AIService:
         """根据第一条消息生成会话标题"""
         try:
             response = await self.client.chat.completions.create(
-                model=self.model,
+                model=self.default_model,
                 messages=[
                     {
                         "role": "system",

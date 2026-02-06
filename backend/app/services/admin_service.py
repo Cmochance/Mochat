@@ -17,11 +17,13 @@ class AdminService:
         user_count = await crud.get_user_count(db)
         session_count = await crud.get_session_count(db)
         message_count = await crud.get_message_count(db)
+        keyword_count = await crud.get_keyword_count(db)
         
         return {
             "user_count": user_count,
             "session_count": session_count,
-            "message_count": message_count
+            "message_count": message_count,
+            "keyword_count": keyword_count
         }
     
     @staticmethod

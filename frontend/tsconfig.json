@@ -25,9 +25,17 @@
     "paths": {
       "@/*": ["src/*"],
       "@uppic": ["../modules/uppic/frontend/index.ts"],
-      "@uppic/*": ["../modules/uppic/frontend/*"]
+      "@uppic/*": ["../modules/uppic/frontend/*"],
+      "@upword": ["../modules/upword/frontend/index.ts"],
+      "@upword/*": ["../modules/upword/frontend/*"],
+      "@upgrade": ["../modules/upgrade/frontend/index.ts"],
+      "@upgrade/*": ["../modules/upgrade/frontend/*"],
+      "@picgenerate": ["../modules/picgenerate/frontend/index.ts"],
+      "@picgenerate/*": ["../modules/picgenerate/frontend/*"],
+      "@pptgen": ["../modules/pptgen/frontend/index.ts"],
+      "@pptgen/*": ["../modules/pptgen/frontend/*"]
     }
   },
-  "include": ["src", "../modules/uppic/frontend"],
+  "include": ["src", "../modules/uppic/frontend", "../modules/upword/frontend", "../modules/upgrade/frontend", "../modules/picgenerate/frontend", "../modules/pptgen/frontend"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

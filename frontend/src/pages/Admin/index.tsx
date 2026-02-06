@@ -1,25 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { 
   Users, 
   BarChart3, 
   Settings, 
   ArrowLeft,
-  LogOut 
+  LogOut,
+  ShieldAlert,
+  Activity
 } from 'lucide-react'
 import UserManagement from './components/UserManagement'
 import SystemStats from './components/SystemStats'
 import ModelConfig from './components/ModelConfig'
+import KeywordManagement from './components/KeywordManagement'
+import UsageStats from './components/UsageStats'
+import LanguageSwitcher from '../../components/common/LanguageSwitcher'
 import { useAuthStore } from '../../stores/authStore'
 import { adminService } from '../../services/adminService'
 import type { User, SystemStats as SystemStatsType } from '../../types'
 
-type TabType = 'stats' | 'users' | 'config'
+type TabType = 'stats' | 'users' | 'config' | 'keywords' | 'usage'
 
 export default function Admin() {
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
+  const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<TabType>('stats')
   const [stats, setStats] = useState<SystemStatsType | null>(null)
   const [users, setUsers] = useState<User[]>([])
@@ -51,16 +58,18 @@ export default function Admin() {
   }
 
   const tabs = [
-    { id: 'stats' as const, label: '系统概览', icon: BarChart3 },
-    { id: 'users' as const, label: '用户管理', icon: Users },
-    { id: 'config' as const, label: '模型配置', icon: Settings },
+    { id: 'stats' as const, label: t('admin.tabs.stats'), icon: BarChart3 },
+    { id: 'users' as const, label: t('admin.tabs.users'), icon: Users },
+    { id: 'usage' as const, label: t('admin.tabs.usage'), icon: Activity },
+    { id: 'config' as const, label: t('admin.tabs.config'), icon: Settings },
+    { id: 'keywords' as const, label: t('admin.tabs.keywords'), icon: ShieldAlert },
   ]
 
   return (
-    <div className="min-h-screen bg-paper-gradient">
+    <div className="h-screen flex flex-col bg-paper-gradient overflow-hidden">
       {/* 顶部导航 */}
       <motion.header
-        className="bg-ink-dark text-paper-white"
+        className="bg-ink-dark text-paper-white flex-shrink-0"
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
@@ -71,22 +80,22 @@ export default function Admin() {
               onClick={() => navigate('/chat')}
             >
               <ArrowLeft size={20} />
-              返回对话
+              {t('common.backToChat')}
             </button>
             <div className="h-6 w-px bg-ink-medium" />
-            <h1 className="text-xl font-title">后台管理</h1>
+            <h1 className="text-xl font-title">{t('admin.title')}</h1>
           </div>
 
           <div className="flex items-center gap-4">
             <span className="text-paper-cream text-sm">
-              管理员：{user?.username}
+              {t('admin.adminLabel')}{user?.username}
             </span>
             <button
               className="flex items-center gap-2 px-3 py-1.5 bg-vermilion/20 hover:bg-vermilion/30 rounded-sm text-vermilion-light transition-colors"
               onClick={handleLogout}
             >
               <LogOut size={16} />
-              登出
+              {t('common.logout')}
             </button>
           </div>
         </div>
@@ -115,26 +124,33 @@ export default function Admin() {
       </motion.header>
 
       {/* 内容区 */}
-      <main className="container mx-auto px-6 py-8">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          {activeTab === 'stats' && (
-            <SystemStats stats={stats} loading={loading} />
-          )}
-          {activeTab === 'users' && (
-            <UserManagement
-              users={users}
-              loading={loading}
-              onRefresh={loadData}
-            />
-          )}
-          {activeTab === 'config' && <ModelConfig />}
-        </motion.div>
+      <main className="flex-1 overflow-y-auto">
+        <div className="container mx-auto px-6 py-8">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {activeTab === 'stats' && (
+              <SystemStats stats={stats} loading={loading} />
+            )}
+            {activeTab === 'users' && (
+              <UserManagement
+                users={users}
+                loading={loading}
+                onRefresh={loadData}
+              />
+            )}
+            {activeTab === 'usage' && <UsageStats />}
+            {activeTab === 'config' && <ModelConfig />}
+            {activeTab === 'keywords' && <KeywordManagement />}
+          </motion.div>
+        </div>
       </main>
+
+      {/* 语言切换按钮 */}
+      <LanguageSwitcher />
     </div>
   )
 }

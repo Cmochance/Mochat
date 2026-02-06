@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
-from .models import User, ChatSession, Message, SystemConfig
+from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel
 from ..core.security import get_password_hash, verify_password, encrypt_password
 
 
@@ -207,6 +207,56 @@ async def get_session_messages(
     return result.scalars().all()
 
 
+async def get_session_messages_paginated(
+    db: AsyncSession,
+    session_id: int,
+    limit: int = 10,
+    before_id: Optional[int] = None
+) -> tuple[List[Message], bool]:
+    """
+    分页获取会话消息（从新到旧）
+    
+    Args:
+        session_id: 会话 ID
+        limit: 获取数量
+        before_id: 获取此 ID 之前的消息（用于加载更早的消息）
+    
+    Returns:
+        (消息列表, 是否还有更多消息)
+    """
+    query = select(Message).where(Message.session_id == session_id)
+    
+    if before_id:
+        query = query.where(Message.id < before_id)
+    
+    # 按时间倒序获取，这样能拿到最新的 N 条
+    query = query.order_by(Message.id.desc()).limit(limit + 1)
+    
+    result = await db.execute(query)
+    messages = list(result.scalars().all())
+    
+    # 判断是否还有更多消息
+    has_more = len(messages) > limit
+    if has_more:
+        messages = messages[:limit]
+    
+    # 反转为正序（从旧到新）
+    messages.reverse()
+    
+    return messages, has_more
+
+
+async def get_session_message_count(
+    db: AsyncSession,
+    session_id: int
+) -> int:
+    """获取会话消息总数"""
+    result = await db.execute(
+        select(func.count(Message.id)).where(Message.session_id == session_id)
+    )
+    return result.scalar() or 0
+
+
 async def get_message_count(db: AsyncSession) -> int:
     """获取消息总数"""
     result = await db.execute(select(func.count(Message.id)))
@@ -239,3 +289,175 @@ async def set_config(db: AsyncSession, key: str, value: str) -> SystemConfig:
     await db.flush()
     await db.refresh(config)
     return config
+
+
+# ============ 限制词相关 CRUD ============
+
+async def get_all_keywords(
+    db: AsyncSession,
+    active_only: bool = False
+) -> List[RestrictedKeyword]:
+    """获取所有限制词"""
+    query = select(RestrictedKeyword).order_by(RestrictedKeyword.created_at.desc())
+    if active_only:
+        query = query.where(RestrictedKeyword.is_active == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_active_keywords(db: AsyncSession) -> List[str]:
+    """获取所有启用的限制词（仅返回关键词字符串列表）"""
+    result = await db.execute(
+        select(RestrictedKeyword.keyword)
+        .where(RestrictedKeyword.is_active == True)
+    )
+    return [row[0] for row in result.fetchall()]
+
+
+async def add_keyword(
+    db: AsyncSession,
+    keyword: str,
+    created_by: Optional[int] = None
+) -> Optional[RestrictedKeyword]:
+    """添加限制词"""
+    # 检查是否已存在
+    existing = await db.execute(
+        select(RestrictedKeyword).where(RestrictedKeyword.keyword == keyword)
+    )
+    if existing.scalar_one_or_none():
+        return None  # 已存在
+    
+    new_keyword = RestrictedKeyword(
+        keyword=keyword,
+        created_by=created_by
+    )
+    db.add(new_keyword)
+    await db.flush()
+    await db.refresh(new_keyword)
+    return new_keyword
+
+
+async def delete_keyword(db: AsyncSession, keyword_id: int) -> bool:
+    """删除限制词"""
+    result = await db.execute(
+        delete(RestrictedKeyword).where(RestrictedKeyword.id == keyword_id)
+    )
+    return result.rowcount > 0
+
+
+async def toggle_keyword_status(
+    db: AsyncSession,
+    keyword_id: int
+) -> Optional[RestrictedKeyword]:
+    """切换限制词状态"""
+    result = await db.execute(
+        select(RestrictedKeyword).where(RestrictedKeyword.id == keyword_id)
+    )
+    keyword = result.scalar_one_or_none()
+    if keyword:
+        keyword.is_active = not keyword.is_active
+        await db.flush()
+        await db.refresh(keyword)
+    return keyword
+
+
+async def get_keyword_count(db: AsyncSession) -> int:
+    """获取限制词总数"""
+    result = await db.execute(select(func.count(RestrictedKeyword.id)))
+    return result.scalar()
+
+
+# ============ 模型管理相关 CRUD ============
+
+async def get_all_allowed_models(
+    db: AsyncSession,
+    active_only: bool = False
+) -> List[AllowedModel]:
+    """获取所有允许的模型"""
+    query = select(AllowedModel).order_by(AllowedModel.sort_order.asc(), AllowedModel.created_at.asc())
+    if active_only:
+        query = query.where(AllowedModel.is_active == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_active_model_ids(db: AsyncSession) -> List[str]:
+    """获取所有启用的模型 ID 列表"""
+    result = await db.execute(
+        select(AllowedModel.model_id)
+        .where(AllowedModel.is_active == True)
+        .order_by(AllowedModel.sort_order.asc())
+    )
+    return [row[0] for row in result.fetchall()]
+
+
+async def add_allowed_model(
+    db: AsyncSession,
+    model_id: str,
+    display_name: Optional[str] = None,
+    sort_order: int = 0
+) -> Optional[AllowedModel]:
+    """添加允许的模型"""
+    # 检查是否已存在
+    existing = await db.execute(
+        select(AllowedModel).where(AllowedModel.model_id == model_id)
+    )
+    if existing.scalar_one_or_none():
+        return None  # 已存在
+    
+    new_model = AllowedModel(
+        model_id=model_id,
+        display_name=display_name,
+        sort_order=sort_order
+    )
+    db.add(new_model)
+    await db.flush()
+    await db.refresh(new_model)
+    return new_model
+
+
+async def delete_allowed_model(db: AsyncSession, model_db_id: int) -> bool:
+    """删除允许的模型"""
+    result = await db.execute(
+        delete(AllowedModel).where(AllowedModel.id == model_db_id)
+    )
+    return result.rowcount > 0
+
+
+async def toggle_model_status(
+    db: AsyncSession,
+    model_db_id: int
+) -> Optional[AllowedModel]:
+    """切换模型启用状态"""
+    result = await db.execute(
+        select(AllowedModel).where(AllowedModel.id == model_db_id)
+    )
+    model = result.scalar_one_or_none()
+    if model:
+        model.is_active = not model.is_active
+        await db.flush()
+        await db.refresh(model)
+    return model
+
+
+async def update_model_sort_order(
+    db: AsyncSession,
+    model_db_id: int,
+    sort_order: int
+) -> Optional[AllowedModel]:
+    """更新模型排序顺序"""
+    result = await db.execute(
+        select(AllowedModel).where(AllowedModel.id == model_db_id)
+    )
+    model = result.scalar_one_or_none()
+    if model:
+        model.sort_order = sort_order
+        await db.flush()
+        await db.refresh(model)
+    return model
+
+
+async def get_allowed_model_count(db: AsyncSession) -> int:
+    """获取允许的模型总数"""
+    result = await db.execute(select(func.count(AllowedModel.id)))
+    return result.scalar()

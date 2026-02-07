@@ -511,7 +511,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="h-screen max-h-screen flex bg-paper-gradient overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] flex bg-paper-gradient overflow-hidden">
       {/* 版本更新弹窗 (独立模块) */}
       {showVersionModal && (
         <VersionModal versionInfo={versionInfo} onClose={closeVersionModal} />
@@ -582,7 +582,7 @@ export default function Chat() {
       </main>
 
       {/* 语言切换按钮 */}
-      <LanguageSwitcher />
+      <LanguageSwitcher className="top-4 right-3 bottom-auto lg:top-auto lg:right-6 lg:bottom-6" />
     </div>
   )
 }

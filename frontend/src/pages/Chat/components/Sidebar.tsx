@@ -151,7 +151,7 @@ export default function Sidebar({
         {/* 迷你侧边栏 - 收起时显示 */}
         <motion.div
           className={`
-            h-full bg-ink-dark text-paper-white flex flex-col items-center
+            hidden lg:flex h-full bg-ink-dark text-paper-white flex-col items-center
             transition-all duration-300 overflow-hidden
             ${isOpen ? 'w-0 opacity-0' : 'w-16 opacity-100'}
           `}

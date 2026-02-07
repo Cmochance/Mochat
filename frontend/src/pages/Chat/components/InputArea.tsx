@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette, Presentation } from 'lucide-react'
+import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette, Presentation, MoreHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../../stores/authStore'
 import { userService } from '../../../services/userService'
@@ -58,11 +58,15 @@ export default function InputArea({
   const [dragFileType, setDragFileType] = useState<'image' | 'doc' | 'unknown'>('unknown')
   const [fileError, setFileError] = useState<string | null>(null)
   const [showModelPicker, setShowModelPicker] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [showMobileActions, setShowMobileActions] = useState(false)
+  const [showMobileModelPicker, setShowMobileModelPicker] = useState(false)
+  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const desktopTextareaRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
   const dragCounterRef = useRef(0)
   const modelPickerRef = useRef<HTMLDivElement>(null)
+  const mobileActionsRef = useRef<HTMLDivElement>(null)
 
   // 获取显示的模型名称（优先使用自定义名称）
   const getModelDisplayName = (model: ModelInfo) => {
@@ -119,14 +123,18 @@ export default function InputArea({
 
   // 清除文件错误
   const clearFileError = () => setFileError(null)
+  const closeMobileMenus = () => {
+    setShowMobileActions(false)
+    setShowMobileModelPicker(false)
+  }
 
   // 自动调整高度
   useEffect(() => {
-    const textarea = textareaRef.current
-    if (textarea) {
+    const textareas = [mobileTextareaRef.current, desktopTextareaRef.current].filter(Boolean) as HTMLTextAreaElement[]
+    textareas.forEach((textarea) => {
       textarea.style.height = 'auto'
       textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
-    }
+    })
   }, [content])
 
   // 清理预览 URL
@@ -385,21 +393,26 @@ export default function InputArea({
     setContent('')
     removeImage()
     removeDoc()
+    closeMobileMenus()
   }
 
-  // 点击外部关闭模型选择器
+  // 点击外部关闭模型选择器与移动端更多菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (modelPickerRef.current && !modelPickerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (modelPickerRef.current && !modelPickerRef.current.contains(target)) {
         setShowModelPicker(false)
+      }
+      if (mobileActionsRef.current && !mobileActionsRef.current.contains(target)) {
+        closeMobileMenus()
       }
     }
     
-    if (showModelPicker) {
+    if (showModelPicker || showMobileActions) {
       document.addEventListener('mousedown', handleClickOutside)
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showModelPicker])
+  }, [showModelPicker, showMobileActions])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -410,10 +423,12 @@ export default function InputArea({
 
   const triggerImageInput = () => {
     imageInputRef.current?.click()
+    closeMobileMenus()
   }
 
   const triggerDocInput = () => {
     docInputRef.current?.click()
+    closeMobileMenus()
   }
 
   const canSend = (content.trim() || imagePreview || docPreview) && !disabled && !isProcessing
@@ -442,6 +457,7 @@ export default function InputArea({
       `}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -563,31 +579,267 @@ export default function InputArea({
           )}
         </AnimatePresence>
 
-        <div className="relative flex items-end gap-3">
-          {/* 隐藏的图片文件输入 */}
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
+        {/* 隐藏的图片文件输入 */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          onChange={handleImageSelect}
+          className="hidden"
+        />
 
-          {/* 隐藏的文档文件输入 */}
-          <input
-            ref={docInputRef}
-            type="file"
-            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            onChange={handleDocSelect}
-            className="hidden"
-          />
+        {/* 隐藏的文档文件输入 */}
+        <input
+          ref={docInputRef}
+          type="file"
+          accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          onChange={handleDocSelect}
+          className="hidden"
+        />
 
+        {/* 移动端：主行 + 更多菜单 */}
+        <div className="sm:hidden" ref={mobileActionsRef}>
+          <div className="relative flex items-end gap-2">
+            <motion.button
+              onClick={() => {
+                setShowMobileActions((prev) => {
+                  const next = !prev
+                  if (!next) {
+                    setShowMobileModelPicker(false)
+                  }
+                  return next
+                })
+              }}
+              disabled={disabled || isProcessing}
+              className={`
+                p-3 rounded-sm shrink-0
+                ${!disabled && !isProcessing
+                  ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
+                  : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
+                }
+                transition-colors duration-300
+              `}
+              whileHover={!disabled && !isProcessing ? { scale: 1.05 } : {}}
+              whileTap={!disabled && !isProcessing ? { scale: 0.95 } : {}}
+              title="更多操作"
+            >
+              <MoreHorizontal size={20} />
+            </motion.button>
+
+            <div className="min-w-0 flex-1 relative">
+              <textarea
+                ref={mobileTextareaRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isDrawMode
+                  ? t('input.drawModePlaceholder')
+                  : isPPTMode
+                    ? t('input.pptModePlaceholder')
+                    : t('input.placeholder')
+                }
+                disabled={disabled || isProcessing}
+                rows={1}
+                className={`
+                  w-full px-4 py-3 pr-10
+                  bg-paper-white border-2
+                  ${isDrawMode ? 'border-cyan-ink/50' : isPPTMode ? 'border-vermilion/50' : 'border-paper-aged'}
+                  rounded-sm resize-none
+                  text-ink-black placeholder-ink-faint
+                  focus:outline-none focus:border-ink-medium
+                  transition-colors duration-300
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  font-body
+                `}
+                style={{ minHeight: '52px', maxHeight: '200px' }}
+              />
+              <span className="absolute right-3 bottom-3 text-xs text-ink-faint">
+                {content.length}
+              </span>
+            </div>
+
+            <motion.button
+              onClick={handleSubmit}
+              disabled={!canSend}
+              className={`
+                p-3 rounded-sm shrink-0
+                ${canSend
+                  ? isDrawMode
+                    ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/80'
+                    : isPPTMode
+                      ? 'bg-vermilion text-paper-white hover:bg-vermilion/80'
+                      : 'bg-ink-black text-paper-white hover:bg-ink-dark'
+                  : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                }
+                transition-colors duration-300
+              `}
+              whileHover={canSend ? { scale: 1.05 } : {}}
+              whileTap={canSend ? { scale: 0.95 } : {}}
+              title={isDrawMode ? t('input.generateImage') : isPPTMode ? t('input.generatePpt') : t('input.sendMessage')}
+            >
+              {isProcessing ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : isDrawMode ? (
+                <Palette size={20} />
+              ) : isPPTMode ? (
+                <Presentation size={20} />
+              ) : (
+                <Send size={20} />
+              )}
+            </motion.button>
+
+            <AnimatePresence>
+              {showMobileActions && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  className="absolute bottom-full left-0 mb-2 w-[calc(100vw-2rem)] max-w-[22rem]
+                    rounded-sm border-2 border-paper-aged bg-paper-white shadow-lg z-50 p-2"
+                >
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={triggerImageInput}
+                      disabled={disabled || isProcessing || isDrawMode || isPPTMode}
+                      className={`
+                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
+                        ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
+                          ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
+                          : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      <ImagePlus size={16} className="shrink-0" />
+                      <span className="truncate">{t('input.uploadImage')}</span>
+                    </button>
+
+                    <button
+                      onClick={triggerDocInput}
+                      disabled={disabled || isProcessing || isDrawMode || isPPTMode}
+                      className={`
+                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
+                        ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
+                          ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
+                          : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      <FileText size={16} className="shrink-0" />
+                      <span className="truncate">{t('input.uploadDoc')}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        onDrawModeChange?.(!isDrawMode)
+                        if (!isDrawMode) onPPTModeChange?.(false)
+                        closeMobileMenus()
+                      }}
+                      disabled={disabled || isProcessing || isPPTMode}
+                      className={`
+                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
+                        ${isDrawMode
+                          ? 'bg-cyan-ink text-paper-white'
+                          : !disabled && !isProcessing && !isPPTMode
+                            ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
+                            : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      <Palette size={16} className="shrink-0" />
+                      <span className="truncate">{isDrawMode ? t('input.exitDrawMode') : t('input.drawMode')}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        onPPTModeChange?.(!isPPTMode)
+                        if (!isPPTMode) onDrawModeChange?.(false)
+                        closeMobileMenus()
+                      }}
+                      disabled={disabled || isProcessing || isDrawMode}
+                      className={`
+                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
+                        ${isPPTMode
+                          ? 'bg-vermilion text-paper-white'
+                          : !disabled && !isProcessing && !isDrawMode
+                            ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
+                            : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                        }
+                      `}
+                    >
+                      <Presentation size={16} className="shrink-0" />
+                      <span className="truncate">{isPPTMode ? t('input.exitPptMode') : t('input.pptMode')}</span>
+                    </button>
+                  </div>
+
+                  {models.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-paper-aged/70">
+                      <button
+                        onClick={() => setShowMobileModelPicker(!showMobileModelPicker)}
+                        disabled={disabled || isProcessing}
+                        className={`
+                          w-full px-3 py-2 rounded-sm text-sm flex items-center justify-between gap-2
+                          ${!disabled && !isProcessing
+                            ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
+                            : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                          }
+                        `}
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <Cpu size={14} className="shrink-0" />
+                          <span className="truncate">
+                            {displayModelObj ? getModelDisplayName(displayModelObj) : t('input.selectModel')}
+                          </span>
+                        </span>
+                        <ChevronUp
+                          size={14}
+                          className={`shrink-0 transition-transform ${showMobileModelPicker ? 'rotate-180' : ''}`}
+                        />
+                      </button>
+
+                      <AnimatePresence>
+                        {showMobileModelPicker && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 6 }}
+                            className="mt-2 max-h-48 overflow-y-auto rounded-sm border border-paper-aged"
+                          >
+                            {models.map((model) => (
+                              <button
+                                key={model.id}
+                                onClick={() => {
+                                  onModelChange?.(model.id)
+                                  closeMobileMenus()
+                                }}
+                                className={`
+                                  w-full px-3 py-2 text-left text-sm
+                                  hover:bg-paper-cream transition-colors
+                                  ${model.id === displayModelId ? 'bg-paper-cream text-ink-black font-medium' : 'text-ink-medium'}
+                                  border-b border-paper-aged/50 last:border-b-0
+                                `}
+                              >
+                                <div className="truncate" title={model.id}>{getModelDisplayName(model)}</div>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* 桌面端：保留原布局 */}
+        <div className="hidden sm:flex relative items-end gap-3">
           {/* 图片上传按钮 */}
           <motion.button
             onClick={triggerImageInput}
             disabled={disabled || isProcessing || isDrawMode || isPPTMode}
             className={`
-              p-3 rounded-sm
+              p-3 rounded-sm shrink-0
               ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
                 ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
@@ -606,7 +858,7 @@ export default function InputArea({
             onClick={triggerDocInput}
             disabled={disabled || isProcessing || isDrawMode || isPPTMode}
             className={`
-              p-3 rounded-sm
+              p-3 rounded-sm shrink-0
               ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
                 ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
@@ -624,11 +876,11 @@ export default function InputArea({
           <motion.button
             onClick={() => {
               onDrawModeChange?.(!isDrawMode)
-              if (!isDrawMode) onPPTModeChange?.(false) // 互斥
+              if (!isDrawMode) onPPTModeChange?.(false)
             }}
             disabled={disabled || isProcessing || isPPTMode}
             className={`
-              p-3 rounded-sm
+              p-3 rounded-sm shrink-0
               ${isDrawMode
                 ? 'bg-cyan-ink text-paper-white border-2 border-cyan-ink'
                 : !disabled && !isProcessing && !isPPTMode
@@ -648,11 +900,11 @@ export default function InputArea({
           <motion.button
             onClick={() => {
               onPPTModeChange?.(!isPPTMode)
-              if (!isPPTMode) onDrawModeChange?.(false) // 互斥
+              if (!isPPTMode) onDrawModeChange?.(false)
             }}
             disabled={disabled || isProcessing || isDrawMode}
             className={`
-              p-3 rounded-sm
+              p-3 rounded-sm shrink-0
               ${isPPTMode
                 ? 'bg-vermilion text-paper-white border-2 border-vermilion'
                 : !disabled && !isProcessing && !isDrawMode
@@ -669,13 +921,13 @@ export default function InputArea({
           </motion.button>
 
           {/* 输入框 */}
-          <div className="flex-1 relative">
+          <div className="min-w-0 flex-1 relative">
             <textarea
-              ref={textareaRef}
+              ref={desktopTextareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isDrawMode 
+              placeholder={isDrawMode
                 ? t('input.drawModePlaceholder')
                 : isPPTMode
                   ? t('input.pptModePlaceholder')
@@ -696,8 +948,6 @@ export default function InputArea({
               `}
               style={{ minHeight: '52px', maxHeight: '200px' }}
             />
-            
-            {/* 字数统计 */}
             <span className="absolute right-3 bottom-3 text-xs text-ink-faint">
               {content.length}
             </span>
@@ -708,7 +958,7 @@ export default function InputArea({
             onClick={handleSubmit}
             disabled={!canSend}
             className={`
-              p-3 rounded-sm
+              p-3 rounded-sm shrink-0
               ${canSend
                 ? isDrawMode
                   ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/80'
@@ -736,7 +986,7 @@ export default function InputArea({
 
           {/* 模型选择器 */}
           {models.length > 0 && (
-            <div className="relative" ref={modelPickerRef}>
+            <div className="relative shrink-0" ref={modelPickerRef}>
               <motion.button
                 onClick={() => setShowModelPicker(!showModelPicker)}
                 disabled={disabled || isProcessing}
@@ -756,13 +1006,12 @@ export default function InputArea({
                 <span className="max-w-[100px] truncate">
                   {displayModelObj ? getModelDisplayName(displayModelObj) : t('input.selectModel')}
                 </span>
-                <ChevronUp 
-                  size={14} 
+                <ChevronUp
+                  size={14}
                   className={`transition-transform ${showModelPicker ? 'rotate-180' : ''}`}
                 />
               </motion.button>
 
-              {/* 上拉选项 */}
               <AnimatePresence>
                 {showModelPicker && (
                   <motion.div

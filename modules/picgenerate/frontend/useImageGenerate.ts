@@ -5,9 +5,9 @@
 import { useState, useCallback, useRef } from 'react'
 import type { GenerateOptions, GenerateResult, PicgenConfig, StreamChunk, GenerateResultData } from './types'
 
-const DEFAULT_CONFIG: PicgenConfig = {
+const DEFAULT_CONFIG = {
   apiBasePath: '/api/chat/image',
-}
+} satisfies PicgenConfig
 
 function generateRequestId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -30,6 +30,7 @@ function buildGenerateUrl(apiBasePath: string, stream: boolean): string {
 
 export function useImageGenerate(config?: PicgenConfig) {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config }
+  const apiBasePath = mergedConfig.apiBasePath ?? DEFAULT_CONFIG.apiBasePath
   
   const [isGenerating, setIsGenerating] = useState(false)
   const [thinking, setThinking] = useState('')  // thinking 内容
@@ -65,7 +66,7 @@ export function useImageGenerate(config?: PicgenConfig) {
     }
 
     try {
-      const response = await fetch(buildGenerateUrl(mergedConfig.apiBasePath || DEFAULT_CONFIG.apiBasePath, true), {
+      const response = await fetch(buildGenerateUrl(apiBasePath, true), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -140,7 +141,7 @@ export function useImageGenerate(config?: PicgenConfig) {
       setIsGenerating(false)
       abortControllerRef.current = null
     }
-  }, [mergedConfig.apiBasePath])
+  }, [apiBasePath])
 
   /**
    * 同步生成图像（简单模式，无 thinking 输出）
@@ -161,7 +162,7 @@ export function useImageGenerate(config?: PicgenConfig) {
     }
 
     try {
-      const res = await fetch(buildGenerateUrl(mergedConfig.apiBasePath || DEFAULT_CONFIG.apiBasePath, false), {
+      const res = await fetch(buildGenerateUrl(apiBasePath, false), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -200,7 +201,7 @@ export function useImageGenerate(config?: PicgenConfig) {
     } finally {
       setIsGenerating(false)
     }
-  }, [mergedConfig.apiBasePath])
+  }, [apiBasePath])
 
   /**
    * 取消当前生成

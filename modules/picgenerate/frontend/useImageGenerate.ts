@@ -6,7 +6,26 @@ import { useState, useCallback, useRef } from 'react'
 import type { GenerateOptions, GenerateResult, PicgenConfig, StreamChunk, GenerateResultData } from './types'
 
 const DEFAULT_CONFIG: PicgenConfig = {
-  apiBasePath: '/picgen',
+  apiBasePath: '/api/chat/image',
+}
+
+function generateRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `img-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function buildGenerateUrl(apiBasePath: string, stream: boolean): string {
+  const normalized = apiBasePath.endsWith('/')
+    ? apiBasePath.slice(0, -1)
+    : apiBasePath
+
+  // 兼容旧微服务直连路径（/picgen）与新网关路径（/api/chat/image）
+  if (normalized.startsWith('/api/chat/')) {
+    return `${normalized}/generate${stream ? '/stream' : ''}`
+  }
+  return `${normalized}/api/generate${stream ? '/stream' : ''}`
 }
 
 export function useImageGenerate(config?: PicgenConfig) {
@@ -39,13 +58,14 @@ export function useImageGenerate(config?: PicgenConfig) {
     const token = localStorage.getItem('token')
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Request-ID': generateRequestId(),
     }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
 
     try {
-      const response = await fetch(`${mergedConfig.apiBasePath}/api/generate/stream`, {
+      const response = await fetch(buildGenerateUrl(mergedConfig.apiBasePath || DEFAULT_CONFIG.apiBasePath, true), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -134,13 +154,14 @@ export function useImageGenerate(config?: PicgenConfig) {
     const token = localStorage.getItem('token')
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Request-ID': generateRequestId(),
     }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`
     }
 
     try {
-      const res = await fetch(`${mergedConfig.apiBasePath}/api/generate`, {
+      const res = await fetch(buildGenerateUrl(mergedConfig.apiBasePath || DEFAULT_CONFIG.apiBasePath, false), {
         method: 'POST',
         headers,
         body: JSON.stringify({

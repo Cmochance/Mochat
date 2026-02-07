@@ -263,6 +263,9 @@ class ChatService:
                 await crud.update_session(db, session_id, title=title)
             
             await db.commit()
+        else:
+            # 明确无内容返回为失败路径，便于上层准确计数
+            yield {"type": "error", "data": "AI 未返回有效内容"}
     
     @staticmethod
     async def regenerate_response(

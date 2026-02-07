@@ -24,6 +24,10 @@ export interface UserUsage {
   image_remaining: number
   is_unlimited: boolean
   reset_date: string | null
+  total_chat_count?: number
+  total_image_count?: number
+  total_ppt_count?: number
+  last_used_at?: string | null
 }
 
 // 使用量统计（管理员用）
@@ -39,7 +43,43 @@ export interface UsageStats {
   chat_used: number
   image_limit: number
   image_used: number
+  ppt_used?: number
+  chat_failed_today?: number
+  image_failed_today?: number
+  ppt_failed_today?: number
+  chat_total_success?: number
+  image_total_success?: number
+  ppt_total_success?: number
+  chat_total_failed?: number
+  image_total_failed?: number
+  ppt_total_failed?: number
+  filtered_success_count?: number
+  filtered_failed_count?: number
+  last_used_at?: string | null
   is_unlimited: boolean
+}
+
+export interface UsageEvent {
+  id: number
+  user_id: number
+  username: string
+  email: string
+  action: 'chat' | 'image' | 'ppt'
+  status: 'success' | 'failed'
+  request_id: string
+  session_id: number | null
+  amount: number
+  error_code: string | null
+  source: string
+  occurred_at: string | null
+  created_at: string | null
+}
+
+export interface UsageEventsResponse {
+  total: number
+  page: number
+  page_size: number
+  items: UsageEvent[]
 }
 
 // 等级信息

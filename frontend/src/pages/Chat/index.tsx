@@ -62,14 +62,14 @@ export default function Chat() {
     generate: generateImage, 
     isGenerating: isDrawing, 
     reset: resetDraw 
-  } = useImageGenerate({ apiBasePath: '/picgen' })
+  } = useImageGenerate({ apiBasePath: '/api/chat/image' })
   
   // PPT 生成 Hook
   const {
     generatePPT,
     isGenerating: isGeneratingPPT,
     reset: resetPPT
-  } = usePPTGenerate({ apiBase: '/pptgen', userId: user?.id?.toString() })
+  } = usePPTGenerate({ apiBase: '/api/chat/ppt', userId: user?.id?.toString() })
   
   // 挂载时根据屏幕大小设置侧边栏状态
   useEffect(() => {

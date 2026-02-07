@@ -1,5 +1,26 @@
 import api from './api'
-import type { User, SystemStats, RestrictedKeyword, UsageStats, TierInfo } from '../types'
+import type {
+  User,
+  SystemStats,
+  RestrictedKeyword,
+  UsageStats,
+  TierInfo,
+  UsageEventsResponse,
+} from '../types'
+
+export interface UsageStatsQuery {
+  start_at?: string
+  end_at?: string
+  action?: 'chat' | 'image' | 'ppt'
+  status?: 'success' | 'failed'
+  q?: string
+  page?: number
+  page_size?: number
+}
+
+export interface UsageEventsQuery extends UsageStatsQuery {
+  user_id?: number
+}
 
 export const adminService = {
   // 获取系统统计
@@ -129,8 +150,56 @@ export const adminService = {
   // ============ 使用量统计 ============
 
   // 获取所有用户使用量统计
-  async getUsageStats(): Promise<UsageStats[]> {
-    const response = await api.get<UsageStats[]>('/admin/usage/stats')
+  async getUsageStats(query: UsageStatsQuery = {}): Promise<UsageStats[]> {
+    const response = await api.get<UsageStats[]>('/admin/usage/stats', {
+      params: query,
+    })
+    return response.data
+  },
+
+  // 获取使用量事件流水
+  async getUsageEvents(query: UsageEventsQuery = {}): Promise<UsageEventsResponse> {
+    const response = await api.get<UsageEventsResponse>('/admin/usage/events', {
+      params: query,
+    })
+    return response.data
+  },
+
+  // 导出使用量事件 CSV
+  async exportUsageEvents(query: UsageEventsQuery = {}): Promise<void> {
+    const response = await api.get<Blob>('/admin/usage/export', {
+      params: query,
+      responseType: 'blob',
+    })
+
+    const disposition = response.headers['content-disposition'] as string | undefined
+    const defaultName = `usage_events_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`
+    const fileNameMatch = disposition?.match(/filename=([^;]+)/i)
+    const filename = fileNameMatch ? fileNameMatch[1].replace(/\"/g, '').trim() : defaultName
+
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  },
+
+  // 触发统计对账
+  async reconcileUsage(userId?: number): Promise<{
+    generated_at: string
+    summary: {
+      users_checked: number
+      user_total_mismatches: number
+      aggregate_mismatches: number
+    }
+  }> {
+    const response = await api.get('/admin/usage/reconcile', {
+      params: userId ? { user_id: userId } : undefined,
+    })
     return response.data
   },
 }

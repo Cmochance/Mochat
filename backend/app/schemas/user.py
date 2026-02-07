@@ -74,6 +74,10 @@ class UserUsageResponse(BaseModel):
     image_remaining: int
     is_unlimited: bool
     reset_date: Optional[str] = None
+    total_chat_count: int = 0
+    total_image_count: int = 0
+    total_ppt_count: int = 0
+    last_used_at: Optional[str] = None
 
 
 class TierUpdateRequest(BaseModel):

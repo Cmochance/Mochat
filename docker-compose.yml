@@ -13,6 +13,8 @@ services:
       - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}
       - AI_MODEL=${AI_MODEL:-gpt-4}
       - CORS_ORIGINS=http://localhost:3721,http://127.0.0.1:3721
+      - PICGEN_INTERNAL_URL=${PICGEN_INTERNAL_URL:-http://picgenerate:3903}
+      - PPTGEN_INTERNAL_URL=${PPTGEN_INTERNAL_URL:-http://pptgen:3904}
       # 验证码模块配置
       - RESEND_API_KEY=${RESEND_API_KEY:-}
       - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-noreply@auth.mochance.xyz}

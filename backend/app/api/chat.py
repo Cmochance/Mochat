@@ -4,9 +4,13 @@
 import json
 import os
 import tempfile
+import asyncio
+import uuid
+from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse, FileResponse
+import httpx
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -27,12 +31,35 @@ from ..services.ai_service import ai_service
 from ..services.usage_service import usage_service
 from ..db import crud
 from ..core.dependencies import get_current_active_user
+from ..core.config import settings
 from ..db.models import User
 
 router = APIRouter()
 
 # 自定义模板路径
 CUSTOM_REFERENCE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "custom_reference.docx")
+
+
+class ImageGenerateRequest(BaseModel):
+    """图像生成网关请求"""
+    prompt: str
+    size: str = "1024x1024"
+    quality: str = "standard"
+    user_id: str | None = None  # 仅兼容旧参数，网关会忽略
+
+
+class PPTGenerateRequest(BaseModel):
+    """PPT 生成网关请求"""
+    prompt: str
+    user_id: str | None = None  # 仅兼容旧参数，网关会忽略
+
+
+def _resolve_request_id(x_request_id: str | None) -> str:
+    return (x_request_id or "").strip() or str(uuid.uuid4())
+
+
+def _sse(data: dict) -> str:
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @router.get("/models", response_model=ModelsResponse)
@@ -192,6 +219,7 @@ async def save_message(
 @router.post("/completions")
 async def chat_completions(
     request: ChatRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -203,27 +231,63 @@ async def chat_completions(
     data: {"type": "content", "data": "..."}
     data: {"type": "done", "data": "..."}
     """
-    import asyncio
-    
+    request_id = _resolve_request_id(x_request_id)
+
     # 检查对话限额
     can_send, error_msg = await usage_service.check_chat_limit(db, current_user)
     if not can_send:
+        await usage_service.record_usage_event(
+            db,
+            user=current_user,
+            action="chat",
+            status="failed",
+            request_id=request_id,
+            session_id=request.session_id,
+            error_code="chat_limit_exceeded",
+            source="chat_completions",
+        )
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=error_msg
         )
-    
+
     async def generate():
-        async for chunk in chat_service.send_message_stream(
-            db, request.session_id, current_user, request.content, request.model
-        ):
-            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-            # 强制事件循环立即处理，确保数据被发送
-            await asyncio.sleep(0)
-        
-        # 对话成功完成后增加计数
-        await usage_service.increment_chat_count(db, current_user)
-        await db.commit()
+        stream_success = True
+        error_code = None
+        started_at = datetime.utcnow()
+        try:
+            async for chunk in chat_service.send_message_stream(
+                db, request.session_id, current_user, request.content, request.model
+            ):
+                if chunk.get("type") == "error":
+                    stream_success = False
+                    error_code = "chat_stream_error"
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                # 强制事件循环立即处理，确保数据被发送
+                await asyncio.sleep(0)
+        except asyncio.CancelledError:
+            stream_success = False
+            error_code = "chat_stream_cancelled"
+            raise
+        except Exception:
+            stream_success = False
+            error_code = "chat_stream_exception"
+            raise
+        finally:
+            status_value = "success" if stream_success else "failed"
+            await usage_service.record_usage_event(
+                db,
+                user=current_user,
+                action="chat",
+                status=status_value,
+                request_id=request_id,
+                session_id=request.session_id,
+                error_code=error_code,
+                source="chat_completions",
+                occurred_at=started_at,
+            )
+            await db.commit()
     
     return StreamingResponse(
         generate(),
@@ -233,8 +297,320 @@ async def chat_completions(
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
             "Content-Type": "text/event-stream; charset=utf-8",
+            "X-Request-ID": request_id,
         }
     )
+
+
+@router.post("/image/generate/stream")
+async def generate_image_stream(
+    request: ImageGenerateRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """图像生成网关（经主后端记账并转发到微服务）"""
+    request_id = _resolve_request_id(x_request_id)
+
+    can_send, error_msg = await usage_service.check_image_limit(db, current_user)
+    if not can_send:
+        await usage_service.record_usage_event(
+            db,
+            user=current_user,
+            action="image",
+            status="failed",
+            request_id=request_id,
+            error_code="image_limit_exceeded",
+            source="chat_image_gateway",
+        )
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=error_msg)
+
+    async def generate():
+        stream_success = False
+        error_code = None
+        started_at = datetime.utcnow()
+
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{settings.PICGEN_INTERNAL_URL}/api/generate/stream",
+                    headers={"X-Request-ID": request_id},
+                    json={
+                        "prompt": request.prompt,
+                        "size": request.size,
+                        "quality": request.quality,
+                        "user_id": str(current_user.id),  # 强制使用鉴权用户
+                    },
+                ) as upstream:
+                    if upstream.status_code >= 400:
+                        error_code = f"image_upstream_http_{upstream.status_code}"
+                        yield _sse({"type": "error", "data": f"图像服务调用失败（{upstream.status_code}）"})
+                        yield _sse({"type": "done", "data": ""})
+                        return
+
+                    async for line in upstream.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+
+                        payload_raw = line[6:]
+                        try:
+                            payload = json.loads(payload_raw)
+                        except json.JSONDecodeError:
+                            continue
+
+                        event_type = payload.get("type")
+                        if event_type == "content":
+                            result = payload.get("data") if isinstance(payload.get("data"), dict) else None
+                            if result and result.get("success"):
+                                stream_success = True
+                            elif result and result.get("success") is False:
+                                error_code = "image_generation_failed"
+                        elif event_type == "error":
+                            error_code = "image_upstream_error"
+
+                        yield _sse(payload)
+        except asyncio.CancelledError:
+            stream_success = False
+            error_code = "image_stream_cancelled"
+            raise
+        except Exception as exc:
+            stream_success = False
+            error_code = "image_gateway_exception"
+            yield _sse({"type": "error", "data": f"图像网关异常: {str(exc)}"})
+            yield _sse({"type": "done", "data": ""})
+        finally:
+            await usage_service.record_usage_event(
+                db,
+                user=current_user,
+                action="image",
+                status="success" if stream_success else "failed",
+                request_id=request_id,
+                error_code=None if stream_success else error_code,
+                source="chat_image_gateway",
+                occurred_at=started_at,
+            )
+            await db.commit()
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "X-Request-ID": request_id,
+        },
+    )
+
+
+@router.post("/image/generate")
+async def generate_image(
+    request: ImageGenerateRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """图像生成同步网关（兼容旧调用）"""
+    request_id = _resolve_request_id(x_request_id)
+
+    can_send, error_msg = await usage_service.check_image_limit(db, current_user)
+    if not can_send:
+        await usage_service.record_usage_event(
+            db,
+            user=current_user,
+            action="image",
+            status="failed",
+            request_id=request_id,
+            error_code="image_limit_exceeded",
+            source="chat_image_gateway_sync",
+        )
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=error_msg)
+
+    started_at = datetime.utcnow()
+    stream_success = False
+    error_code = None
+    response_data = {}
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            upstream = await client.post(
+                f"{settings.PICGEN_INTERNAL_URL}/api/generate",
+                headers={"X-Request-ID": request_id},
+                json={
+                    "prompt": request.prompt,
+                    "size": request.size,
+                    "quality": request.quality,
+                    "user_id": str(current_user.id),
+                },
+            )
+        if upstream.status_code >= 400:
+            error_code = f"image_upstream_http_{upstream.status_code}"
+            raise HTTPException(status_code=upstream.status_code, detail="图像服务调用失败")
+
+        response_data = upstream.json() if upstream.content else {}
+        stream_success = bool(response_data.get("success") and response_data.get("image_url"))
+        if not stream_success:
+            error_code = "image_generation_failed"
+        return response_data
+    except HTTPException:
+        raise
+    except Exception as exc:
+        error_code = "image_gateway_exception"
+        raise HTTPException(status_code=500, detail=f"图像网关异常: {str(exc)}")
+    finally:
+        await usage_service.record_usage_event(
+            db,
+            user=current_user,
+            action="image",
+            status="success" if stream_success else "failed",
+            request_id=request_id,
+            error_code=None if stream_success else error_code,
+            source="chat_image_gateway_sync",
+            occurred_at=started_at,
+        )
+        await db.commit()
+
+
+@router.post("/ppt/generate/stream")
+async def generate_ppt_stream(
+    request: PPTGenerateRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """PPT 生成网关（经主后端记账并转发到微服务）"""
+    request_id = _resolve_request_id(x_request_id)
+
+    async def generate():
+        stream_success = False
+        error_code = None
+        started_at = datetime.utcnow()
+
+        try:
+            async with httpx.AsyncClient(timeout=360.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{settings.PPTGEN_INTERNAL_URL}/api/generate/stream",
+                    headers={"X-Request-ID": request_id},
+                    json={
+                        "prompt": request.prompt,
+                        "user_id": str(current_user.id),  # 强制使用鉴权用户
+                    },
+                ) as upstream:
+                    if upstream.status_code >= 400:
+                        error_code = f"ppt_upstream_http_{upstream.status_code}"
+                        yield _sse({"type": "error", "data": f"PPT 服务调用失败（{upstream.status_code}）"})
+                        yield _sse({"type": "done", "data": ""})
+                        return
+
+                    async for line in upstream.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+
+                        payload_raw = line[6:]
+                        try:
+                            payload = json.loads(payload_raw)
+                        except json.JSONDecodeError:
+                            continue
+
+                        event_type = payload.get("type")
+                        if event_type == "content":
+                            result = payload.get("data") if isinstance(payload.get("data"), dict) else None
+                            if result and result.get("success"):
+                                stream_success = True
+                            elif result and result.get("success") is False:
+                                error_code = "ppt_generation_failed"
+                        elif event_type == "error":
+                            error_code = "ppt_upstream_error"
+
+                        yield _sse(payload)
+        except asyncio.CancelledError:
+            stream_success = False
+            error_code = "ppt_stream_cancelled"
+            raise
+        except Exception as exc:
+            stream_success = False
+            error_code = "ppt_gateway_exception"
+            yield _sse({"type": "error", "data": f"PPT 网关异常: {str(exc)}"})
+            yield _sse({"type": "done", "data": ""})
+        finally:
+            await usage_service.record_usage_event(
+                db,
+                user=current_user,
+                action="ppt",
+                status="success" if stream_success else "failed",
+                request_id=request_id,
+                error_code=None if stream_success else error_code,
+                source="chat_ppt_gateway",
+                occurred_at=started_at,
+            )
+            await db.commit()
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "X-Request-ID": request_id,
+        },
+    )
+
+
+@router.post("/ppt/generate")
+async def generate_ppt(
+    request: PPTGenerateRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """PPT 生成同步网关（兼容旧调用）"""
+    request_id = _resolve_request_id(x_request_id)
+    started_at = datetime.utcnow()
+    stream_success = False
+    error_code = None
+
+    try:
+        async with httpx.AsyncClient(timeout=360.0) as client:
+            upstream = await client.post(
+                f"{settings.PPTGEN_INTERNAL_URL}/api/generate",
+                headers={"X-Request-ID": request_id},
+                json={
+                    "prompt": request.prompt,
+                    "user_id": str(current_user.id),
+                },
+            )
+        if upstream.status_code >= 400:
+            error_code = f"ppt_upstream_http_{upstream.status_code}"
+            raise HTTPException(status_code=upstream.status_code, detail="PPT 服务调用失败")
+
+        response_data = upstream.json() if upstream.content else {}
+        stream_success = bool(response_data.get("success") and response_data.get("pptUrl"))
+        if not stream_success:
+            error_code = "ppt_generation_failed"
+        return response_data
+    except HTTPException:
+        raise
+    except Exception as exc:
+        error_code = "ppt_gateway_exception"
+        raise HTTPException(status_code=500, detail=f"PPT 网关异常: {str(exc)}")
+    finally:
+        await usage_service.record_usage_event(
+            db,
+            user=current_user,
+            action="ppt",
+            status="success" if stream_success else "failed",
+            request_id=request_id,
+            error_code=None if stream_success else error_code,
+            source="chat_ppt_gateway_sync",
+            occurred_at=started_at,
+        )
+        await db.commit()
 
 
 @router.post("/sessions/{session_id}/regenerate")

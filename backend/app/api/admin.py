@@ -1,8 +1,11 @@
 """
 管理API路由 - 处理后台管理请求
 """
+import csv
+import io
+from datetime import datetime
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +15,7 @@ from ..schemas.user import UserResponse, UserUpdate, UserAdminResponse, TierUpda
 from ..services.admin_service import admin_service
 from ..services.content_filter import content_filter
 from ..services.usage_service import usage_service, TIER_LIMITS
+from ..services.usage_reconcile_service import usage_reconcile_service
 from ..core.dependencies import get_admin_user
 from ..db.models import User
 
@@ -442,8 +446,129 @@ async def get_tier_info(
 
 @router.get("/usage/stats")
 async def get_usage_stats(
+    response: Response,
+    start_at: datetime | None = Query(default=None),
+    end_at: datetime | None = Query(default=None),
+    action: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=500),
     current_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[Dict[str, Any]]:
     """获取所有用户的使用量统计"""
-    return await usage_service.get_all_usage_stats(db)
+    result = await usage_service.get_usage_stats(
+        db,
+        start_at=start_at,
+        end_at=end_at,
+        action=action,
+        status=status,
+        q=q,
+        page=page,
+        page_size=page_size,
+    )
+    response.headers["X-Total-Count"] = str(result["total"])
+    response.headers["X-Page"] = str(result["page"])
+    response.headers["X-Page-Size"] = str(result["page_size"])
+    return result["items"]
+
+
+@router.get("/usage/events")
+async def get_usage_events(
+    start_at: datetime | None = Query(default=None),
+    end_at: datetime | None = Query(default=None),
+    action: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=500),
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """分页查询使用量事件流水"""
+    return await usage_service.list_usage_events(
+        db,
+        start_at=start_at,
+        end_at=end_at,
+        action=action,
+        status=status,
+        q=q,
+        user_id=user_id,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/usage/export")
+async def export_usage_events(
+    start_at: datetime | None = Query(default=None),
+    end_at: datetime | None = Query(default=None),
+    action: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    q: str | None = Query(default=None),
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """按筛选条件导出使用量事件 CSV"""
+    rows = await usage_service.export_usage_events(
+        db,
+        start_at=start_at,
+        end_at=end_at,
+        action=action,
+        status=status,
+        q=q,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id",
+        "user_id",
+        "username",
+        "email",
+        "action",
+        "status",
+        "request_id",
+        "session_id",
+        "amount",
+        "error_code",
+        "source",
+        "occurred_at",
+        "created_at",
+    ])
+    for row in rows:
+        writer.writerow([
+            row.get("id"),
+            row.get("user_id"),
+            row.get("username"),
+            row.get("email"),
+            row.get("action"),
+            row.get("status"),
+            row.get("request_id"),
+            row.get("session_id"),
+            row.get("amount"),
+            row.get("error_code"),
+            row.get("source"),
+            row.get("occurred_at"),
+            row.get("created_at"),
+        ])
+
+    csv_data = output.getvalue()
+    filename = f"usage_events_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/usage/reconcile")
+async def reconcile_usage(
+    user_id: int | None = Query(default=None),
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """执行 usage_events / aggregates / user_usages 对账"""
+    return await usage_reconcile_service.reconcile(db, user_id=user_id)

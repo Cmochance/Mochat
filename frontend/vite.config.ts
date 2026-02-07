@@ -60,18 +60,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/upgrade/, ''),
       },
-      // Picgenerate AI 图像生成服务代理 (Docker 端口 30903)
-      '/picgen': {
-        target: 'http://localhost:30903',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/picgen/, ''),
-      },
-      // PPT 生成服务代理 (Docker 端口 30904)
-      '/pptgen': {
-        target: 'http://localhost:30904',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/pptgen/, ''),
-      },
     },
   },
 })

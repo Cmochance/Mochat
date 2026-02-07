@@ -46,34 +46,71 @@ async def migrate_db(conn):
     """
     def check_and_migrate(connection):
         inspector = inspect(connection)
+        table_names = inspector.get_table_names()
+
+        def add_column_if_missing(table_name: str, column_name: str, alter_sql: str) -> None:
+            if table_name not in table_names:
+                return
+            columns = [col["name"] for col in inspector.get_columns(table_name)]
+            if column_name in columns:
+                return
+            print(f"[Migration] Adding '{column_name}' column to {table_name} table...")
+            connection.execute(text(alter_sql))
+            print(f"[Migration] Column '{column_name}' added successfully.")
         
-        # 检查 users 表是否存在
-        if 'users' in inspector.get_table_names():
-            columns = [col['name'] for col in inspector.get_columns('users')]
-            
-            # 添加 password_encrypted 列（如果不存在）
-            if 'password_encrypted' not in columns:
-                print("[Migration] Adding 'password_encrypted' column to users table...")
-                connection.execute(text(
-                    "ALTER TABLE users ADD COLUMN password_encrypted VARCHAR(500)"
-                ))
-                print("[Migration] Column 'password_encrypted' added successfully.")
-            
-            # 添加 last_seen_version 列（如果不存在）
-            if 'last_seen_version' not in columns:
-                print("[Migration] Adding 'last_seen_version' column to users table...")
-                connection.execute(text(
-                    "ALTER TABLE users ADD COLUMN last_seen_version VARCHAR(20)"
-                ))
-                print("[Migration] Column 'last_seen_version' added successfully.")
-            
-            # 添加 tier 列（如果不存在）- 用户等级
-            if 'tier' not in columns:
-                print("[Migration] Adding 'tier' column to users table...")
-                connection.execute(text(
-                    "ALTER TABLE users ADD COLUMN tier VARCHAR(20) DEFAULT 'free'"
-                ))
-                print("[Migration] Column 'tier' added successfully.")
+        # users 表历史迁移
+        add_column_if_missing(
+            "users",
+            "password_encrypted",
+            "ALTER TABLE users ADD COLUMN password_encrypted VARCHAR(500)",
+        )
+        add_column_if_missing(
+            "users",
+            "last_seen_version",
+            "ALTER TABLE users ADD COLUMN last_seen_version VARCHAR(20)",
+        )
+        add_column_if_missing(
+            "users",
+            "tier",
+            "ALTER TABLE users ADD COLUMN tier VARCHAR(20) DEFAULT 'free'",
+        )
+
+        # user_usages 表扩展字段迁移
+        add_column_if_missing(
+            "user_usages",
+            "total_chat_count",
+            "ALTER TABLE user_usages ADD COLUMN total_chat_count INTEGER DEFAULT 0",
+        )
+        add_column_if_missing(
+            "user_usages",
+            "total_image_count",
+            "ALTER TABLE user_usages ADD COLUMN total_image_count INTEGER DEFAULT 0",
+        )
+        add_column_if_missing(
+            "user_usages",
+            "total_ppt_count",
+            "ALTER TABLE user_usages ADD COLUMN total_ppt_count INTEGER DEFAULT 0",
+        )
+        add_column_if_missing(
+            "user_usages",
+            "last_used_at",
+            "ALTER TABLE user_usages ADD COLUMN last_used_at DATETIME",
+        )
+        add_column_if_missing(
+            "user_usages",
+            "last_chat_at",
+            "ALTER TABLE user_usages ADD COLUMN last_chat_at DATETIME",
+        )
+        add_column_if_missing(
+            "user_usages",
+            "last_image_at",
+            "ALTER TABLE user_usages ADD COLUMN last_image_at DATETIME",
+        )
+        add_column_if_missing(
+            "user_usages",
+            "last_ppt_at",
+            "ALTER TABLE user_usages ADD COLUMN last_ppt_at DATETIME",
+        )
     
     await conn.run_sync(check_and_migrate)
 

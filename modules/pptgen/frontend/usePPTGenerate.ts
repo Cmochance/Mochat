@@ -11,8 +11,23 @@ import type {
 } from './types';
 
 export function usePPTGenerate(config: UsePPTGenerateConfig = {}): UsePPTGenerateReturn {
-  const { apiBase = '/pptgen', userId = 'anonymous' } = config;
+  const { apiBase = '/api/chat/ppt', userId = 'anonymous' } = config;
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const generateRequestId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+    return `ppt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  }
+
+  const buildGenerateUrl = (stream: boolean) => {
+    const normalized = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase
+    if (normalized.startsWith('/api/chat/')) {
+      return `${normalized}/generate${stream ? '/stream' : ''}`
+    }
+    return `${normalized}/api/generate${stream ? '/stream' : ''}`
+  }
 
   const reset = useCallback(() => {
     setIsGenerating(false);
@@ -26,11 +41,18 @@ export function usePPTGenerate(config: UsePPTGenerateConfig = {}): UsePPTGenerat
       setIsGenerating(true);
 
       try {
-        const response = await fetch(`${apiBase}/api/generate/stream`, {
+        const token = localStorage.getItem('token')
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'X-Request-ID': generateRequestId(),
+        }
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+        }
+
+        const response = await fetch(buildGenerateUrl(true), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             prompt: request.prompt,
             user_id: request.userId || userId,

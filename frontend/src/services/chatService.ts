@@ -1,6 +1,13 @@
 import api from './api'
 import type { ChatSession, Message, StreamChunk } from '../types'
 
+const generateRequestId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 // 分页消息响应
 interface MessagesPaginatedResponse {
   messages: Message[]
@@ -81,6 +88,7 @@ export const chatService = {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'X-Request-ID': generateRequestId(),
       },
       body: JSON.stringify({
         session_id: sessionId,
@@ -158,6 +166,7 @@ export const chatService = {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'X-Request-ID': generateRequestId(),
       },
     })
 

@@ -40,7 +40,7 @@ export default function Welcome() {
   const decorativeChars = t('welcome.decorativeChars', { returnObjects: true }) as string[]
 
   return (
-    <div className="min-h-screen bg-paper-gradient overflow-hidden">
+    <div className="h-[100dvh] bg-paper-gradient overflow-x-hidden overflow-y-auto">
       {/* 水墨背景装饰 */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <motion.div
@@ -90,6 +90,7 @@ export default function Welcome() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
         >
+          <LanguageSwitcher position="inline" />
           {isAuthenticated ? (
             <Button onClick={() => navigate('/chat')}>
               {t('welcome.enterChat')}
@@ -225,9 +226,6 @@ export default function Welcome() {
       <footer className="relative z-10 text-center py-8 text-ink-light text-sm">
         <p>{t('welcome.footer')}</p>
       </footer>
-
-      {/* 语言切换按钮 */}
-      <LanguageSwitcher />
     </div>
   )
 }

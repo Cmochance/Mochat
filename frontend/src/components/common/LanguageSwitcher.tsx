@@ -5,9 +5,10 @@ import { setLanguage } from '../../i18n'
 
 interface LanguageSwitcherProps {
   className?: string
+  position?: 'fixed' | 'inline'
 }
 
-export default function LanguageSwitcher({ className = '' }: LanguageSwitcherProps) {
+export default function LanguageSwitcher({ className = '', position = 'fixed' }: LanguageSwitcherProps) {
   const { t, i18n } = useTranslation()
   const currentLang = i18n.language.startsWith('zh') ? 'zh' : 'en'
   const currentLanguageLabel = currentLang === 'zh' ? '中文' : 'English'
@@ -18,7 +19,10 @@ export default function LanguageSwitcher({ className = '' }: LanguageSwitcherPro
 
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 ${className}`}
+      className={position === 'fixed'
+        ? `fixed bottom-6 right-6 z-50 ${className}`
+        : `relative z-10 ${className}`
+      }
     >
       <motion.button
         onClick={toggleLanguage}

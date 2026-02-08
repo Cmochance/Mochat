@@ -582,7 +582,7 @@ export default function Chat() {
       </main>
 
       {/* 语言切换按钮 */}
-      <LanguageSwitcher className="top-4 right-3 bottom-auto lg:top-auto lg:right-6 lg:bottom-6" />
+      <LanguageSwitcher className="top-4 right-3 bottom-auto lg:top-auto lg:right-6 lg:bottom-2" />
     </div>
   )
 }

@@ -839,7 +839,7 @@ export default function InputArea({
             onClick={triggerImageInput}
             disabled={disabled || isProcessing || isDrawMode || isPPTMode}
             className={`
-              p-3 rounded-sm shrink-0
+              p-3 rounded-sm shrink-0 mb-2
               ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
                 ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
@@ -858,7 +858,7 @@ export default function InputArea({
             onClick={triggerDocInput}
             disabled={disabled || isProcessing || isDrawMode || isPPTMode}
             className={`
-              p-3 rounded-sm shrink-0
+              p-3 rounded-sm shrink-0 mb-2
               ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
                 ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
                 : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
@@ -880,7 +880,7 @@ export default function InputArea({
             }}
             disabled={disabled || isProcessing || isPPTMode}
             className={`
-              p-3 rounded-sm shrink-0
+              p-3 rounded-sm shrink-0 mb-2
               ${isDrawMode
                 ? 'bg-cyan-ink text-paper-white border-2 border-cyan-ink'
                 : !disabled && !isProcessing && !isPPTMode
@@ -904,7 +904,7 @@ export default function InputArea({
             }}
             disabled={disabled || isProcessing || isDrawMode}
             className={`
-              p-3 rounded-sm shrink-0
+              p-3 rounded-sm shrink-0 mb-2
               ${isPPTMode
                 ? 'bg-vermilion text-paper-white border-2 border-vermilion'
                 : !disabled && !isProcessing && !isDrawMode
@@ -958,7 +958,7 @@ export default function InputArea({
             onClick={handleSubmit}
             disabled={!canSend}
             className={`
-              p-3 rounded-sm shrink-0
+              p-3 rounded-sm shrink-0 mb-2
               ${canSend
                 ? isDrawMode
                   ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/80'
@@ -986,7 +986,7 @@ export default function InputArea({
 
           {/* 模型选择器 */}
           {models.length > 0 && (
-            <div className="relative shrink-0" ref={modelPickerRef}>
+            <div className="relative shrink-0 mb-2" ref={modelPickerRef}>
               <motion.button
                 onClick={() => setShowModelPicker(!showModelPicker)}
                 disabled={disabled || isProcessing}

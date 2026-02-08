@@ -16,8 +16,8 @@ export default function LanguageSwitcher({ className = '' }: LanguageSwitcherPro
   const currentLang = i18n.language
 
   const languages = [
-    { code: 'zh', label: '中文', flag: '🇨🇳' },
-    { code: 'en', label: 'English', flag: '🇺🇸' },
+    { code: 'zh', label: '中文' },
+    { code: 'en', label: 'English' },
   ]
 
   const currentLanguage = languages.find(l => l.code === currentLang) || languages[0]
@@ -50,24 +50,23 @@ export default function LanguageSwitcher({ className = '' }: LanguageSwitcherPro
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            initial={{ opacity: 0, y: 6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            exit={{ opacity: 0, y: 6, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="absolute bottom-full mb-2 right-0 bg-paper-white border-2 border-paper-aged rounded-sm shadow-lg overflow-hidden min-w-[120px]"
+            className="absolute bottom-full mb-1 right-0 bg-paper-white border border-paper-aged rounded-md shadow-md overflow-hidden min-w-[120px]"
           >
             {languages.map((lang) => (
               <button
                 key={lang.code}
                 onClick={() => handleLanguageChange(lang.code)}
                 className={`
-                  w-full px-4 py-2.5 text-left text-sm flex items-center gap-2
+                  w-full px-4 py-2 text-left text-sm
                   hover:bg-paper-cream transition-colors
-                  ${lang.code === currentLang ? 'bg-paper-cream text-ink-black font-medium' : 'text-ink-medium'}
+                  ${lang.code === currentLang ? 'text-cyan-ink font-medium bg-paper-cream/60' : 'text-ink-medium'}
                   border-b border-paper-aged/50 last:border-b-0
                 `}
               >
-                <span>{lang.flag}</span>
                 <span>{lang.label}</span>
               </button>
             ))}
@@ -79,18 +78,16 @@ export default function LanguageSwitcher({ className = '' }: LanguageSwitcherPro
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          flex items-center gap-2 px-4 py-2.5 rounded-sm
-          bg-paper-white border-2 border-paper-aged
-          text-ink-medium hover:text-ink-black hover:bg-paper-cream
-          shadow-md hover:shadow-lg
-          transition-all duration-200
+          flex items-center gap-1.5 px-3 py-1.5 rounded-md
+          text-sm text-ink-medium/80 hover:text-ink-black hover:bg-paper-cream
+          transition-colors duration-200
         `}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
         title={t('language.switch')}
       >
-        <Globe size={18} />
-        <span className="text-sm font-medium">{currentLanguage.flag} {currentLanguage.label}</span>
+        <Globe className="w-4 h-4" />
+        <span className="hidden sm:inline">{currentLanguage.label}</span>
       </motion.button>
     </div>
   )

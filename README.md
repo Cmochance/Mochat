@@ -87,10 +87,21 @@ cp .env.example .env
 ```env
 SECRET_KEY=your-secret-key
 DATABASE_URL=sqlite+aiosqlite:///./mochat.db
+AUTH_PROVIDER=legacy
+# AUTH_PROVIDER=supabase 时需要配置：
+# SUPABASE_URL=https://your-project-ref.supabase.co
+# SUPABASE_ANON_KEY=your-supabase-anon-key
+# SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 AI_API_KEY=your-openai-api-key
 AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4
 CORS_ORIGINS=http://localhost:3721
+```
+
+### Supabase 迁移脚本
+
+```bash
+python backend/scripts/migrate_sqlite_to_supabase.py --help
 ```
 
 ## 🌐 端口配置

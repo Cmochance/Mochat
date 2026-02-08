@@ -93,7 +93,8 @@ export interface TierInfo {
 
 // 认证相关
 export interface LoginRequest {
-  username: string
+  identifier?: string
+  username?: string
   password: string
 }
 
@@ -105,6 +106,8 @@ export interface RegisterRequest {
 
 export interface LoginResponse {
   access_token: string
+  refresh_token?: string | null
+  expires_in?: number | null
   token_type: string
   user: User
 }

@@ -30,17 +30,25 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
+async def get_user_by_supabase_auth_id(db: AsyncSession, supabase_auth_id: str) -> Optional[User]:
+    """根据 Supabase Auth ID 获取用户"""
+    result = await db.execute(select(User).where(User.supabase_auth_id == supabase_auth_id))
+    return result.scalar_one_or_none()
+
+
 async def create_user(
     db: AsyncSession, 
     username: str, 
     email: str, 
     password: str,
-    role: str = "user"
+    role: str = "user",
+    supabase_auth_id: Optional[str] = None,
 ) -> User:
     """创建新用户"""
     user = User(
         username=username,
         email=email,
+        supabase_auth_id=supabase_auth_id,
         password_hash=get_password_hash(password),
         password_encrypted=encrypt_password(password),  # 存储加密密码
         role=role

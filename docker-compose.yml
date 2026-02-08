@@ -8,7 +8,11 @@ services:
       - "9527:9527"
     environment:
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-this-in-production}
-      - DATABASE_URL=sqlite+aiosqlite:////data/mochat.db
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:////data/mochat.db}
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-legacy}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
       - AI_API_KEY=${AI_API_KEY:-}
       - AI_BASE_URL=${AI_BASE_URL:-https://api.openai.com/v1}
       - AI_MODEL=${AI_MODEL:-gpt-4}

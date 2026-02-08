@@ -8,6 +8,72 @@ const generateRequestId = () => {
   return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+const clearAuthAndRedirect = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+  localStorage.removeItem('auth-storage')
+  if (window.location.pathname !== '/auth/login') {
+    window.location.href = '/auth/login'
+  }
+}
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  const refreshToken = localStorage.getItem('refresh_token')
+  if (!refreshToken) return null
+
+  const response = await fetch('/api/auth/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
+  if (!response.ok) return null
+
+  const data = await response.json() as {
+    access_token?: string
+    refresh_token?: string | null
+  }
+  if (!data.access_token) return null
+
+  localStorage.setItem('token', data.access_token)
+  if (data.refresh_token) {
+    localStorage.setItem('refresh_token', data.refresh_token)
+  }
+  return data.access_token
+}
+
+const fetchWithAuthRetry = async (
+  url: string,
+  init: RequestInit,
+  retried: boolean = false
+): Promise<Response> => {
+  const token = localStorage.getItem('token')
+  const headers = new Headers(init.headers || {})
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(url, { ...init, headers })
+  if (response.status !== 401 || retried) {
+    if (response.status === 401 && retried) {
+      clearAuthAndRedirect()
+    }
+    return response
+  }
+
+  const nextToken = await refreshAccessToken()
+  if (!nextToken) {
+    clearAuthAndRedirect()
+    return response
+  }
+
+  const retryHeaders = new Headers(init.headers || {})
+  retryHeaders.set('Authorization', `Bearer ${nextToken}`)
+  return fetch(url, { ...init, headers: retryHeaders })
+}
+
 // 分页消息响应
 interface MessagesPaginatedResponse {
   messages: Message[]
@@ -81,13 +147,10 @@ export const chatService = {
     onChunk: (chunk: StreamChunk) => void,
     model?: string
   ): Promise<void> {
-    const token = localStorage.getItem('token')
-    
-    const response = await fetch('/api/chat/completions', {
+    const response = await fetchWithAuthRetry('/api/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
         'X-Request-ID': generateRequestId(),
       },
       body: JSON.stringify({
@@ -160,12 +223,9 @@ export const chatService = {
     sessionId: number,
     onChunk: (chunk: StreamChunk) => void
   ): Promise<void> {
-    const token = localStorage.getItem('token')
-    
-    const response = await fetch(`/api/chat/sessions/${sessionId}/regenerate`, {
+    const response = await fetchWithAuthRetry(`/api/chat/sessions/${sessionId}/regenerate`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'X-Request-ID': generateRequestId(),
       },
     })
@@ -244,13 +304,10 @@ export const chatService = {
 
   // 导出为 Word 文档
   async exportToDocx(content: string, filename: string = 'export'): Promise<void> {
-    const token = localStorage.getItem('token')
-    
-    const response = await fetch('/api/chat/export/docx', {
+    const response = await fetchWithAuthRetry('/api/chat/export/docx', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ content, filename }),
     })

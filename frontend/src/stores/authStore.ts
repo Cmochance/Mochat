@@ -4,12 +4,13 @@ import type { User, UserUsage } from '../types'
 
 interface AuthState {
   token: string | null
+  refreshToken: string | null
   user: User | null
   usage: UserUsage | null
   isAuthenticated: boolean
   
   // Actions
-  setAuth: (token: string, user: User) => void
+  setAuth: (token: string, refreshToken: string | null, user: User) => void
   logout: () => void
   updateUser: (user: Partial<User>) => void
   setUsage: (usage: UserUsage) => void
@@ -20,18 +21,26 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       token: null,
+      refreshToken: null,
       user: null,
       usage: null,
       isAuthenticated: false,
 
-      setAuth: (token, user) => {
+      setAuth: (token, refreshToken, user) => {
         localStorage.setItem('token', token)
-        set({ token, user, isAuthenticated: true })
+        if (refreshToken) {
+          localStorage.setItem('refresh_token', refreshToken)
+        } else {
+          localStorage.removeItem('refresh_token')
+        }
+        set({ token, refreshToken, user, isAuthenticated: true })
       },
 
       logout: () => {
         localStorage.removeItem('token')
-        set({ token: null, user: null, usage: null, isAuthenticated: false })
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('auth-storage')
+        set({ token: null, refreshToken: null, user: null, usage: null, isAuthenticated: false })
       },
 
       updateUser: (userData) => {
@@ -54,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         token: state.token,
+        refreshToken: state.refreshToken,
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         // 不持久化 usage，每次刷新时重新获取

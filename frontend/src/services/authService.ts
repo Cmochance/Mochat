@@ -21,10 +21,20 @@ interface ResetPasswordRequest {
   new_password: string
 }
 
+interface RefreshTokenRequest {
+  refresh_token: string
+}
+
 export const authService = {
   // 登录
   async login(data: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>('/auth/login', data)
+    return response.data
+  },
+
+  // 刷新 token
+  async refreshToken(data: RefreshTokenRequest): Promise<LoginResponse> {
+    const response = await api.post<LoginResponse>('/auth/refresh', data)
     return response.data
   },
 

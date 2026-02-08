@@ -57,6 +57,16 @@ async def migrate_db(conn):
             print(f"[Migration] Adding '{column_name}' column to {table_name} table...")
             connection.execute(text(alter_sql))
             print(f"[Migration] Column '{column_name}' added successfully.")
+
+        def add_index_if_missing(table_name: str, index_name: str, create_sql: str) -> None:
+            if table_name not in table_names:
+                return
+            indexes = [idx.get("name") for idx in inspector.get_indexes(table_name)]
+            if index_name in indexes:
+                return
+            print(f"[Migration] Creating index '{index_name}' on {table_name} table...")
+            connection.execute(text(create_sql))
+            print(f"[Migration] Index '{index_name}' created successfully.")
         
         # users 表历史迁移
         add_column_if_missing(
@@ -73,6 +83,16 @@ async def migrate_db(conn):
             "users",
             "tier",
             "ALTER TABLE users ADD COLUMN tier VARCHAR(20) DEFAULT 'free'",
+        )
+        add_column_if_missing(
+            "users",
+            "supabase_auth_id",
+            "ALTER TABLE users ADD COLUMN supabase_auth_id VARCHAR(64)",
+        )
+        add_index_if_missing(
+            "users",
+            "uq_users_supabase_auth_id",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_supabase_auth_id ON users (supabase_auth_id)",
         )
 
         # user_usages 表扩展字段迁移

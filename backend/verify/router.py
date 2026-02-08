@@ -1,10 +1,12 @@
 """
 验证码API路由
 """
-from fastapi import APIRouter, Request, HTTPException, status
+from fastapi import APIRouter, Request, HTTPException, status, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 from .schemas import SendCodeRequest, SendCodeResponse
 from .service import VerificationService
 from .config import config
+from app.db.database import get_db
 
 router = APIRouter(prefix="/verify", tags=["验证码"])
 
@@ -27,7 +29,8 @@ def get_client_ip(request: Request) -> str:
 @router.post("/send", response_model=SendCodeResponse)
 async def send_verification_code(
     request: SendCodeRequest,
-    req: Request
+    req: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     发送验证码到邮箱
@@ -43,6 +46,7 @@ async def send_verification_code(
     ip = get_client_ip(req)
     
     success, message, cooldown = await VerificationService.send_code(
+        db,
         email=request.email,
         purpose=request.purpose,
         ip=ip
@@ -63,7 +67,11 @@ async def send_verification_code(
 
 
 @router.get("/cooldown")
-async def get_cooldown(email: str, purpose: str):
+async def get_cooldown(
+    email: str,
+    purpose: str,
+    db: AsyncSession = Depends(get_db),
+):
     """
     获取验证码发送冷却时间
     
@@ -75,7 +83,7 @@ async def get_cooldown(email: str, purpose: str):
             detail="无效的验证用途"
         )
     
-    cooldown = VerificationService.get_cooldown(email, purpose)
+    cooldown = await VerificationService.get_cooldown(db, email, purpose)
     
     return {
         "email": email,

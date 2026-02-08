@@ -25,6 +25,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
+    supabase_auth_id = Column(String(64), unique=True, index=True, nullable=True)
     password_hash = Column(String(255), nullable=False)
     password_encrypted = Column(String(500), nullable=True)  # AES加密的密码（管理员可查看）
     role = Column(String(20), default="user")  # user, admin
@@ -164,3 +165,30 @@ class AllowedModel(Base):
     sort_order = Column(Integer, default=0)  # 排序顺序
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VerificationCode(Base):
+    """验证码持久化表"""
+    __tablename__ = "verification_codes"
+    __table_args__ = (
+        UniqueConstraint("email", "purpose", name="uq_verification_codes_email_purpose"),
+        Index("idx_verification_codes_expires_at", "expires_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    purpose = Column(String(50), nullable=False, index=True)
+    code = Column(String(20), nullable=False)
+    attempts = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    verified = Column(Boolean, nullable=False, default=False)
+    expires_at = Column(DateTime, nullable=False)
+
+
+class VerificationIPLimit(Base):
+    """验证码IP限流持久化表"""
+    __tablename__ = "verification_ip_limits"
+
+    ip = Column(String(64), primary_key=True)
+    count = Column(Integer, nullable=False, default=0)
+    reset_at = Column(DateTime, nullable=False)

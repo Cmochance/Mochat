@@ -3,6 +3,7 @@
 """
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from pydantic import model_validator
 from .user import UserResponse
 
 
@@ -16,8 +17,20 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     """登录请求模型"""
-    username: str
+    identifier: Optional[str] = None  # 用户名或邮箱
+    username: Optional[str] = None  # 兼容旧客户端
     password: str
+
+    @model_validator(mode="after")
+    def validate_identifier(self):
+        if not (self.identifier or self.username):
+            raise ValueError("identifier 或 username 至少提供一个")
+        return self
+
+
+class RefreshTokenRequest(BaseModel):
+    """刷新令牌请求模型"""
+    refresh_token: str = Field(..., min_length=1)
 
 
 class TokenResponse(BaseModel):
@@ -29,6 +42,8 @@ class TokenResponse(BaseModel):
 class LoginResponse(BaseModel):
     """登录响应模型"""
     access_token: str
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None
     token_type: str = "bearer"
     user: UserResponse
 

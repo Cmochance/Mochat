@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./mochat.db"
+    AUTH_PROVIDER: str = "legacy"  # legacy | supabase
+
+    # Supabase 配置
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
     
     # AI配置
     AI_API_KEY: str = ""

@@ -5,18 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.database import get_db
-from ..db import crud
 from ..schemas.auth import (
     RegisterRequest, 
     LoginRequest, 
     LoginResponse,
+    RefreshTokenRequest,
     ChangePasswordRequest,
     ResetPasswordRequest
 )
 from ..schemas.user import UserResponse
 from ..services.auth_service import AuthService
 from ..core.dependencies import get_current_active_user
-from ..core.security import get_password_hash
 from ..db.models import User
 
 # 导入验证码服务
@@ -40,7 +39,8 @@ async def register(
     需要先通过 /api/verify/send 发送验证码到邮箱
     """
     # 验证验证码
-    is_valid, msg, _ = VerificationService.verify_code(
+    is_valid, msg, _ = await VerificationService.verify_code(
+        db,
         email=request.email,
         code=request.code,
         purpose=verify_config.PURPOSE_REGISTER
@@ -74,7 +74,7 @@ async def register(
         )
     
     # 消费验证（防止重复使用）
-    VerificationService.consume_verification(request.email, verify_config.PURPOSE_REGISTER)
+    await VerificationService.consume_verification(db, request.email, verify_config.PURPOSE_REGISTER)
     
     return user
 
@@ -85,21 +85,49 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     """用户登录"""
-    token, user, error = await AuthService.login(
+    identifier = request.identifier or request.username or ""
+    auth_payload, user, error = await AuthService.login(
         db,
-        username=request.username,
+        identifier=identifier,
         password=request.password
     )
     
-    if error:
+    if error or not auth_payload or not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=error
+            detail=error or "登录失败"
         )
     
     return LoginResponse(
-        access_token=token,
-        token_type="bearer",
+        access_token=auth_payload["access_token"],
+        refresh_token=auth_payload.get("refresh_token"),
+        expires_in=auth_payload.get("expires_in"),
+        token_type=auth_payload.get("token_type", "bearer"),
+        user=UserResponse.model_validate(user)
+    )
+
+
+@router.post("/refresh", response_model=LoginResponse)
+async def refresh(
+    request: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """刷新访问令牌"""
+    auth_payload, user, error = await AuthService.refresh_login(
+        db,
+        refresh_token=request.refresh_token,
+    )
+    if error or not auth_payload or not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=error or "刷新失败"
+        )
+
+    return LoginResponse(
+        access_token=auth_payload["access_token"],
+        refresh_token=auth_payload.get("refresh_token"),
+        expires_in=auth_payload.get("expires_in"),
+        token_type=auth_payload.get("token_type", "bearer"),
         user=UserResponse.model_validate(user)
     )
 
@@ -152,7 +180,8 @@ async def reset_password(
     需要先通过 /api/verify/send 发送验证码到邮箱
     """
     # 验证验证码
-    is_valid, msg, _ = VerificationService.verify_code(
+    is_valid, msg, _ = await VerificationService.verify_code(
+        db,
         email=request.email,
         code=request.code,
         purpose=verify_config.PURPOSE_RESET_PASSWORD
@@ -171,24 +200,19 @@ async def reset_password(
             detail=error_msg
         )
     
-    # 查找用户
-    user = await crud.get_user_by_email(db, request.email)
-    if not user:
+    success, error = await AuthService.reset_password_by_email(
+        db,
+        email=request.email,
+        new_password=request.new_password,
+    )
+    if not success:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="该邮箱未注册"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error
         )
     
-    # 更新密码
-    await crud.update_user(
-        db,
-        user.id,
-        password_hash=get_password_hash(request.new_password)
-    )
-    await db.commit()
-    
     # 消费验证
-    VerificationService.consume_verification(request.email, verify_config.PURPOSE_RESET_PASSWORD)
+    await VerificationService.consume_verification(db, request.email, verify_config.PURPOSE_RESET_PASSWORD)
     
     return {"message": "密码重置成功"}
 

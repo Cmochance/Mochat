@@ -15,7 +15,7 @@ export default function Login() {
   const { t } = useTranslation()
   
   const [formData, setFormData] = useState({
-    username: '',
+    identifier: '',
     password: '',
   })
   const [error, setError] = useState('')
@@ -28,7 +28,7 @@ export default function Login() {
 
     try {
       const response = await authService.login(formData)
-      setAuth(response.access_token, response.user)
+      setAuth(response.access_token, response.refresh_token || null, response.user)
       navigate('/chat')
     } catch (err: any) {
       setError(err.response?.data?.detail || t('login.loginFailed'))
@@ -139,8 +139,8 @@ export default function Login() {
             <Input
               label={t('login.username')}
               placeholder={t('login.usernamePlaceholder')}
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              value={formData.identifier}
+              onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
               icon={<User size={18} />}
               required
             />

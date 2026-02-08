@@ -27,7 +27,7 @@ import os
 import secrets
 import sys
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -193,6 +193,44 @@ async def fetch_counts(conn: AsyncConnection, table_names: List[str]) -> Dict[st
     return counts
 
 
+def _coerce_row_for_insert(row: Dict[str, Any], table_obj) -> Dict[str, Any]:
+    coerced: Dict[str, Any] = {}
+    for col in table_obj.c:
+        if col.name not in row:
+            continue
+        value = row[col.name]
+        if value is None:
+            coerced[col.name] = None
+            continue
+
+        py_type = None
+        try:
+            py_type = col.type.python_type
+        except Exception:
+            py_type = None
+
+        if py_type is datetime and isinstance(value, str):
+            try:
+                coerced[col.name] = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except Exception:
+                coerced[col.name] = value
+            continue
+
+        if py_type is date and isinstance(value, str):
+            try:
+                coerced[col.name] = date.fromisoformat(value[:10])
+            except Exception:
+                coerced[col.name] = value
+            continue
+
+        if py_type is bool and isinstance(value, int):
+            coerced[col.name] = bool(value)
+            continue
+
+        coerced[col.name] = value
+    return coerced
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Mochat SQLite -> Supabase 迁移工具")
     parser.add_argument(
@@ -346,10 +384,41 @@ async def main() -> int:
 
             source_data["users"] = migrated_users
 
+            # 清洗孤儿引用（SQLite 可能存在未启用 FK 约束的历史脏数据）
+            valid_user_ids = {int(row.get("id")) for row in source_data.get("users", []) if row.get("id") is not None}
+            original_chat_sessions = source_data.get("chat_sessions", [])
+            source_data["chat_sessions"] = [
+                row for row in original_chat_sessions
+                if row.get("user_id") is not None and int(row.get("user_id")) in valid_user_ids
+            ]
+            valid_session_ids = {int(row.get("id")) for row in source_data.get("chat_sessions", []) if row.get("id") is not None}
+            original_messages = source_data.get("messages", [])
+            source_data["messages"] = [
+                row for row in original_messages
+                if row.get("session_id") is not None and int(row.get("session_id")) in valid_session_ids
+            ]
+
+            # 其余按 user_id 关联的表也做保护性过滤
+            for table_name in ["user_usages", "usage_events", "usage_daily_aggregates"]:
+                original_rows = source_data.get(table_name, [])
+                source_data[table_name] = [
+                    row for row in original_rows
+                    if row.get("user_id") is not None and int(row.get("user_id")) in valid_user_ids
+                ]
+
+            dropped_sessions = len(original_chat_sessions) - len(source_data.get("chat_sessions", []))
+            dropped_messages = len(original_messages) - len(source_data.get("messages", []))
+            if dropped_sessions or dropped_messages:
+                print(
+                    f"[WARN] 发现并过滤孤儿数据: chat_sessions={dropped_sessions}, messages={dropped_messages}"
+                )
+
             # 反射目标元数据
             metadata = MetaData()
             await target_conn.run_sync(lambda c: metadata.reflect(bind=c, only=TABLE_ORDER))
 
+            if target_conn.in_transaction():
+                await target_conn.commit()
             tx = await target_conn.begin()
             try:
                 truncate_tables = [t for t in TABLE_ORDER if t in target_tables]
@@ -368,8 +437,7 @@ async def main() -> int:
                     table_obj = metadata.tables.get(table)
                     if table_obj is None:
                         continue
-                    allowed_columns = set(table_obj.c.keys())
-                    payload = [{k: v for k, v in row.items() if k in allowed_columns} for row in rows]
+                    payload = [_coerce_row_for_insert(row, table_obj) for row in rows]
                     await target_conn.execute(table_obj.insert(), payload)
 
                 for table, column in ID_TABLES:

@@ -7,6 +7,7 @@ from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
 from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel
+from ..core.config import settings
 from ..core.security import get_password_hash, verify_password, encrypt_password
 
 
@@ -50,7 +51,8 @@ async def create_user(
         email=email,
         supabase_auth_id=supabase_auth_id,
         password_hash=get_password_hash(password),
-        password_encrypted=encrypt_password(password),  # 存储加密密码
+        # Supabase Auth 模式下不再存储可逆加密密码（避免重复存储敏感信息）
+        password_encrypted=encrypt_password(password) if settings.AUTH_PROVIDER == "legacy" else None,
         role=role
     )
     db.add(user)

@@ -223,7 +223,7 @@ class AuthService:
                 db,
                 user.id,
                 password_hash=get_password_hash(new_password),
-                password_encrypted=encrypt_password(new_password),
+                password_encrypted=None,
             )
             return True, None
 
@@ -260,11 +260,12 @@ class AuthService:
             if not success:
                 return False, update_error or "密码重置失败"
 
+        password_encrypted = None if AuthService._use_supabase_auth() else encrypt_password(new_password)
         await crud.update_user(
             db,
             user.id,
             password_hash=get_password_hash(new_password),
-            password_encrypted=encrypt_password(new_password),
+            password_encrypted=password_encrypted,
         )
         return True, None
 

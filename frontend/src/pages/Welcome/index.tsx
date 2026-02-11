@@ -285,19 +285,6 @@ export default function Welcome() {
             </div>
           </div>
 
-          <div className="hidden items-center gap-1 rounded-full border border-line-soft bg-paper-white/80 p-1 lg:flex">
-            {viewTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveView(tab.key)}
-                className={tabClassName(activeView === tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
           <div className="flex items-center gap-2">
             <LanguageSwitcher position="inline" />
             {isAuthenticated ? (
@@ -324,7 +311,7 @@ export default function Welcome() {
             <p className="mb-4 inline-flex items-center rounded-full border border-line-soft bg-paper-white/70 px-3 py-1 text-xs font-ui text-text-secondary">
               {t('welcome.heroBadge')}
             </p>
-            <h1 className="font-title text-5xl leading-tight text-ink-black md:text-6xl lg:text-7xl">
+            <h1 className="font-title text-5xl leading-tight text-ink-black md:text-6xl lg:text-6xl xl:text-7xl md:whitespace-nowrap">
               {t('welcome.heroTitle')}
             </h1>
             <p className="mt-4 max-w-2xl text-base font-ui leading-relaxed text-text-secondary md:text-lg">

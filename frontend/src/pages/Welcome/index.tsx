@@ -314,7 +314,7 @@ export default function Welcome() {
         <section id="main-stage" className="mt-14">
           <Card elevated className="overflow-hidden p-0">
             <div className="border-b border-line-soft bg-paper-white/80 px-4 py-3 md:px-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="inline-flex items-center gap-1 rounded-full border border-line-soft bg-paper-white p-1">
                   {viewTabs.map((tab) => (
                     <button
@@ -327,7 +327,6 @@ export default function Welcome() {
                     </button>
                   ))}
                 </div>
-                <span className="text-xs font-ui text-text-muted">{t('welcome.views.switchHint')}</span>
               </div>
             </div>
 

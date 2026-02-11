@@ -232,11 +232,11 @@ export default function Welcome() {
         <p className="text-base font-title text-ink-black">{t('welcome.sections.ctaTitle')}</p>
         <p className="mt-1 text-sm font-ui text-text-secondary">{t('welcome.sections.ctaSubtitle')}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2.5">
-          <Button onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
+          <Button className="h-11 w-36" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
             {isAuthenticated ? t('welcome.startChat') : t('welcome.getStarted')}
           </Button>
           {!isAuthenticated && (
-            <Button variant="outline" onClick={() => navigate('/auth/login')}>
+            <Button className="h-11 w-36" variant="outline" onClick={() => navigate('/auth/login')}>
               {t('common.login')}
             </Button>
           )}
@@ -269,15 +269,15 @@ export default function Welcome() {
           </div>
 
           <div className="flex items-center gap-2">
-            <LanguageSwitcher position="inline" />
+            <LanguageSwitcher position="inline" buttonClassName="h-11 w-28 justify-center" />
             {isAuthenticated ? (
-              <Button onClick={() => navigate('/chat')}>{t('welcome.enterChat')}</Button>
+              <Button className="h-11 w-28" onClick={() => navigate('/chat')}>{t('welcome.enterChat')}</Button>
             ) : (
               <>
-                <Button variant="outline" onClick={() => navigate('/auth/login')}>
+                <Button className="h-11 w-28" variant="outline" onClick={() => navigate('/auth/login')}>
                   {t('common.login')}
                 </Button>
-                <Button variant="seal" onClick={() => navigate('/auth/register')}>
+                <Button className="h-11 w-28" variant="seal" onClick={() => navigate('/auth/register')}>
                   {t('common.register')}
                 </Button>
               </>
@@ -310,10 +310,10 @@ export default function Welcome() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
+              <Button size="lg" className="h-12 w-40" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
                 {isAuthenticated ? t('welcome.startChat') : t('welcome.getStarted')}
               </Button>
-              <Button size="lg" variant="outline" onClick={scrollToStage}>
+              <Button size="lg" className="h-12 w-40" variant="outline" onClick={scrollToStage}>
                 {t('welcome.learnMore')}
               </Button>
             </div>

@@ -6,9 +6,14 @@ import { setLanguage } from '../../i18n'
 interface LanguageSwitcherProps {
   className?: string
   position?: 'fixed' | 'inline'
+  buttonClassName?: string
 }
 
-export default function LanguageSwitcher({ className = '', position = 'fixed' }: LanguageSwitcherProps) {
+export default function LanguageSwitcher({
+  className = '',
+  position = 'fixed',
+  buttonClassName = '',
+}: LanguageSwitcherProps) {
   const { t, i18n } = useTranslation()
   const currentLang = i18n.language.startsWith('zh') ? 'zh' : 'en'
   const currentLanguageLabel = currentLang === 'zh' ? '中文' : 'English'
@@ -31,6 +36,7 @@ export default function LanguageSwitcher({ className = '', position = 'fixed' }:
           text-sm font-ui text-ink-medium/90
           border-paper-aged bg-paper-white/80 backdrop-blur-sm
           transition-colors duration-200 hover:border-line-strong hover:bg-paper-cream hover:text-ink-black
+          ${buttonClassName}
         `}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}

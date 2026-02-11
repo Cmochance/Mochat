@@ -180,7 +180,7 @@ export default function Welcome() {
   const formatSponsorPrice = (price: string) => {
     const isNumeric = /^\d+(\.\d+)?$/.test(price.trim())
     if (!isNumeric) return price
-    return `${price} ${t('welcome.pricing.unit')}`
+    return `${price} ${t('welcome.pricing.unit')} · ${t('welcome.pricing.billing')}`
   }
 
   const renderPricingView = () => (

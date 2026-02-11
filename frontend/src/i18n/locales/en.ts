@@ -136,7 +136,8 @@ export default {
     },
     pricing: {
       recommended: 'Popular',
-      unit: '/month',
+      unit: 'USD',
+      billing: 'one-time',
       plans: [
         {
           name: 'Free Use',

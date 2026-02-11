@@ -136,7 +136,8 @@ export default {
     },
     pricing: {
       recommended: '热门',
-      unit: '元/月',
+      unit: '元',
+      billing: '一次性',
       plans: [
         {
           name: '免费使用',

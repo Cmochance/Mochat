@@ -77,6 +77,12 @@ export default function Welcome() {
         : 'border-line-soft bg-paper-white text-text-secondary hover:border-line-strong hover:text-text-primary',
     ].join(' ')
 
+  const viewLinkMap: Partial<Record<WelcomeView, string>> = {
+    features: 'mocdraw.mochance.xyz',
+    ecosystem: 'mocletter.mochance.xyz',
+    faq: 'mochan.mochance.xyz',
+  }
+
   const scrollToStage = () => {
     document.getElementById('main-stage')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -213,14 +219,31 @@ export default function Welcome() {
     </div>
   )
 
+  const renderSharedCta = () => (
+    <div className="rounded-lg border border-line-soft bg-paper-cream/60 p-4 text-center md:p-5">
+      <p className="text-base font-title text-ink-black">{t('welcome.sections.ctaTitle')}</p>
+      <p className="mt-1 text-sm font-ui text-text-secondary">{t('welcome.sections.ctaSubtitle')}</p>
+      <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+        <Button className="h-11 w-36" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
+          {isAuthenticated ? t('welcome.startChat') : t('welcome.getStarted')}
+        </Button>
+        {!isAuthenticated && (
+          <Button className="h-11 w-36" variant="outline" onClick={() => navigate('/auth/login')}>
+            {t('common.login')}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+
   const renderCityView = () => (
-    <div className="space-y-6">
+    <div>
       <SectionHeader
         align="center"
         title={t('welcome.inkCity.title')}
         subtitle={t('welcome.inkCity.subtitle')}
       />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
         {inkCityCards.map((item) => (
           <Card key={item.title}>
             <h4 className="text-lg font-title text-ink-black">{item.title}</h4>
@@ -228,24 +251,10 @@ export default function Welcome() {
           </Card>
         ))}
       </div>
-      <div className="rounded-lg border border-line-soft bg-paper-cream/60 p-4 text-center md:p-5">
-        <p className="text-base font-title text-ink-black">{t('welcome.sections.ctaTitle')}</p>
-        <p className="mt-1 text-sm font-ui text-text-secondary">{t('welcome.sections.ctaSubtitle')}</p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2.5">
-          <Button className="h-11 w-36" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
-            {isAuthenticated ? t('welcome.startChat') : t('welcome.getStarted')}
-          </Button>
-          {!isAuthenticated && (
-            <Button className="h-11 w-36" variant="outline" onClick={() => navigate('/auth/login')}>
-              {t('common.login')}
-            </Button>
-          )}
-        </div>
-      </div>
     </div>
   )
 
-  const renderStageContent = () => {
+  const renderStageMainContent = () => {
     if (activeView === 'overview') return renderOverviewView()
     if (activeView === 'features') return renderFeaturesView()
     if (activeView === 'ecosystem') return renderEcosystemView()
@@ -346,7 +355,24 @@ export default function Welcome() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25 }}
               >
-                {renderStageContent()}
+                <div className="space-y-6">
+                  {renderStageMainContent()}
+
+                  {viewLinkMap[activeView] && (
+                    <div className="flex justify-end">
+                      <a
+                        href={`https://${viewLinkMap[activeView]}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-ui text-text-secondary underline decoration-line-soft underline-offset-4 transition-colors hover:text-ink-black"
+                      >
+                        {viewLinkMap[activeView]}
+                      </a>
+                    </div>
+                  )}
+
+                  {renderSharedCta()}
+                </div>
               </motion.div>
             </div>
           </Card>

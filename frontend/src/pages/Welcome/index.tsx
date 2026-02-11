@@ -180,7 +180,7 @@ export default function Welcome() {
   const formatSponsorPrice = (price: string) => {
     const isNumeric = /^\d+(\.\d+)?$/.test(price.trim())
     if (!isNumeric) return price
-    return `${price} ${t('welcome.pricing.unit')} · ${t('welcome.pricing.billing')}`
+    return `${price} ${t('welcome.pricing.unit')}`
   }
 
   const renderPricingView = () => (
@@ -224,7 +224,7 @@ export default function Welcome() {
       <p className="text-base font-title text-ink-black">{t('welcome.sections.ctaTitle')}</p>
       <p className="mt-1 text-sm font-ui text-text-secondary">{t('welcome.sections.ctaSubtitle')}</p>
       <div className="mt-4 flex flex-wrap justify-center gap-2.5">
-        <Button className="h-11 w-36" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
+        <Button className="h-11 w-36" onClick={() => navigate('/chat')}>
           {isAuthenticated ? t('welcome.startChat') : t('welcome.getStarted')}
         </Button>
         {!isAuthenticated && (

@@ -261,6 +261,8 @@ export default {
       title: 'Start a new conversation',
       description: 'Enter your prompt to begin generating results.',
     },
+    authRequiredTitle: 'Please log in or register',
+    authRequiredDescription: 'Guests can view the chat interface, but sending content requires login or registration.',
     // User tiers
     tier: {
       free: 'Free User',

@@ -8,19 +8,6 @@ import Admin from './pages/Admin'
 
 // 使用静态导入，避免部分环境下路由懒加载 chunk 导入失败导致空白页
 
-// 路由保护组件
-function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuthStore()
-  const location = useLocation()
-  
-  if (!isAuthenticated) {
-    const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
-    return <Navigate to={`/auth/login?redirect=${redirect}`} replace />
-  }
-  
-  return <>{children}</>
-}
-
 // 管理员路由保护
 function AdminRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, user } = useAuthStore()
@@ -48,15 +35,8 @@ function App() {
         {/* 认证页面 */}
         <Route path="/auth/*" element={<Auth />} />
         
-        {/* 对话页面 - 需要登录 */}
-        <Route
-          path="/chat/*"
-          element={
-            <ProtectedRoute>
-              <Chat />
-            </ProtectedRoute>
-          }
-        />
+        {/* 对话页面 */}
+        <Route path="/chat/*" element={<Chat />} />
         
         {/* 管理页面 - 需要管理员权限 */}
         <Route

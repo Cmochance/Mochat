@@ -61,7 +61,7 @@ export default function Sidebar({
   username,
 }: SidebarProps) {
   const navigate = useNavigate()
-  const { logout, user, usage, setUsage } = useAuthStore()
+  const { logout, user, usage, setUsage, isAuthenticated } = useAuthStore()
   const { t, i18n } = useTranslation()
   
   // 检测是否为大屏幕 - 大屏幕不需要遮罩层
@@ -76,21 +76,23 @@ export default function Sidebar({
 
   // 获取用户使用量信息
   const fetchUsage = useCallback(async () => {
+    if (!isAuthenticated) return
     try {
       const usageData = await userService.getUsage()
       setUsage(usageData)
     } catch (error) {
       console.error('获取使用量信息失败:', error)
     }
-  }, [setUsage])
+  }, [isAuthenticated, setUsage])
 
   // 初始化时获取使用量
   useEffect(() => {
+    if (!isAuthenticated) return
     fetchUsage()
     // 每 30 秒刷新一次使用量
     const interval = setInterval(fetchUsage, 30000)
     return () => clearInterval(interval)
-  }, [fetchUsage])
+  }, [fetchUsage, isAuthenticated])
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -119,6 +121,10 @@ export default function Sidebar({
   }
 
   const handleLogout = () => {
+    if (!isAuthenticated) {
+      navigate('/auth/login?redirect=%2Fchat')
+      return
+    }
     logout()
     navigate('/auth/login')
   }
@@ -199,7 +205,7 @@ export default function Sidebar({
               onClick={handleLogout}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
-              title={`${username} - ${t('chat.clickToLogout')}`}
+              title={isAuthenticated ? `${username} - ${t('chat.clickToLogout')}` : `${username} - ${t('common.login')}`}
             >
               <span className="text-paper-white font-body">
                 {username.charAt(0).toUpperCase()}
@@ -387,7 +393,7 @@ export default function Sidebar({
                 whileTap={{ scale: 0.98 }}
               >
                 <LogOut size={16} />
-                {t('common.logout')}
+                {isAuthenticated ? t('common.logout') : t('common.login')}
               </motion.button>
             </div>
           </div>

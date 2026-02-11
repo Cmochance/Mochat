@@ -18,6 +18,8 @@ interface InputAreaProps {
   onSend: (content: string, model?: string) => void
   onGenerateImage?: (prompt: string) => void
   onGeneratePPT?: (prompt: string) => void
+  isAuthenticated?: boolean
+  onAuthRequired?: () => void
   disabled?: boolean
   models?: ModelInfo[]
   currentModel?: string
@@ -38,6 +40,8 @@ export default function InputArea({
   onSend,
   onGenerateImage,
   onGeneratePPT,
+  isAuthenticated = true,
+  onAuthRequired,
   disabled = false,
   models = [],
   currentModel,
@@ -258,6 +262,10 @@ export default function InputArea({
 
   const handleSubmit = async () => {
     if ((!content.trim() && !imagePreview && !docPreview) || disabled || isProcessing) return
+    if (!isAuthenticated) {
+      onAuthRequired?.()
+      return
+    }
 
     if (isDrawMode && content.trim()) {
       try {

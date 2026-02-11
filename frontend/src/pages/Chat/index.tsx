@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea, { type ModelInfo } from './components/InputArea'
 import LanguageSwitcher from '../../components/common/LanguageSwitcher'
+import Button from '../../components/common/Button'
+import Modal from '../../components/common/Modal'
 import { useVersion, VersionModal } from '@upgrade'
 import { useImageGenerate } from '@picgenerate'
 import { usePPTGenerate } from '@pptgen'
@@ -15,7 +18,8 @@ import { useAuthStore } from '../../stores/authStore'
 import type { StreamChunk } from '../../types'
 
 export default function Chat() {
-  const { user } = useAuthStore()
+  const navigate = useNavigate()
+  const { user, isAuthenticated } = useAuthStore()
   const { t } = useTranslation()
   const {
     sessions,
@@ -56,6 +60,11 @@ export default function Chat() {
   
   // PPT 模式状态
   const [isPPTMode, setIsPPTMode] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  // 是否还有更多历史消息
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  // 是否正在加载更多消息
+  const [loadingMore, setLoadingMore] = useState(false)
   
   // 绘图 Hook
   const { 
@@ -79,15 +88,29 @@ export default function Chat() {
 
   // 加载会话列表
   useEffect(() => {
+    if (!isAuthenticated) {
+      setSessions([])
+      setCurrentSession(null)
+      setMessages([])
+      setHasMoreMessages(false)
+      return
+    }
     loadSessions()
-  }, [])
+  }, [isAuthenticated])
 
   // 加载模型列表
   useEffect(() => {
+    if (!isAuthenticated) {
+      setModels([])
+      setCurrentModel('')
+      setDefaultModel('')
+      return
+    }
     loadModels()
-  }, [])
+  }, [isAuthenticated])
 
   const loadModels = async () => {
+    if (!isAuthenticated) return
     try {
       const data = await chatService.getModels()
       setModels(data.models)
@@ -112,19 +135,20 @@ export default function Chat() {
 
   // 加载消息
   useEffect(() => {
-    if (currentSession) {
+    if (isAuthenticated && currentSession) {
       loadMessages(currentSession.id)
     }
-  }, [currentSession?.id])
+  }, [isAuthenticated, currentSession?.id])
 
   // 保存当前会话 ID 到 localStorage
   useEffect(() => {
-    if (currentSession) {
+    if (isAuthenticated && currentSession) {
       localStorage.setItem('mochat_last_session_id', String(currentSession.id))
     }
-  }, [currentSession?.id])
+  }, [isAuthenticated, currentSession?.id])
 
   const loadSessions = async () => {
+    if (!isAuthenticated) return
     try {
       const data = await chatService.getSessions()
       setSessions(data)
@@ -146,11 +170,6 @@ export default function Chat() {
       console.error('加载会话失败:', error)
     }
   }
-
-  // 是否还有更多历史消息
-  const [hasMoreMessages, setHasMoreMessages] = useState(false)
-  // 是否正在加载更多消息
-  const [loadingMore, setLoadingMore] = useState(false)
 
   // 过滤消息中的文档内容
   const filterMessages = (data: typeof messages) => {
@@ -183,7 +202,7 @@ export default function Chat() {
 
   // 加载更多历史消息
   const loadMoreMessages = async () => {
-    if (!currentSession || loadingMore || !hasMoreMessages || messages.length === 0) return
+    if (!isAuthenticated || !currentSession || loadingMore || !hasMoreMessages || messages.length === 0) return
     
     setLoadingMore(true)
     try {
@@ -203,6 +222,10 @@ export default function Chat() {
   }
 
   const handleNewSession = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     try {
       const session = await chatService.createSession()
       addSession(session)
@@ -214,6 +237,10 @@ export default function Chat() {
   }
 
   const handleDeleteSession = async (sessionId: number) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     try {
       await chatService.deleteSession(sessionId)
       removeSession(sessionId)
@@ -226,6 +253,10 @@ export default function Chat() {
   }
 
   const handleSendMessage = async (content: string, model?: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     if (!currentSession) {
       // 如果没有当前会话，先创建一个
       const session = await chatService.createSession()
@@ -290,6 +321,10 @@ export default function Chat() {
 
   // 处理绘图请求
   const handleGenerateImage = async (prompt: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     if (!currentSession) {
       // 如果没有当前会话，先创建一个
       const session = await chatService.createSession()
@@ -369,6 +404,10 @@ export default function Chat() {
 
   // 处理 PPT 生成请求
   const handleGeneratePPT = async (prompt: string) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     if (!currentSession) {
       const session = await chatService.createSession()
       addSession(session)
@@ -465,6 +504,10 @@ export default function Chat() {
 
   // 重新生成最后一条 AI 消息
   const handleRegenerate = async () => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     if (!currentSession || isStreaming) return
 
     // 移除最后一条 AI 消息
@@ -516,6 +559,39 @@ export default function Chat() {
       {showVersionModal && (
         <VersionModal versionInfo={versionInfo} onClose={closeVersionModal} />
       )}
+
+      <Modal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        title={t('chat.authRequiredTitle')}
+        size="sm"
+      >
+        <p className="text-sm font-ui leading-relaxed text-text-secondary">
+          {t('chat.authRequiredDescription')}
+        </p>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            className="h-10 px-5"
+            onClick={() => {
+              setShowAuthModal(false)
+              navigate('/auth/login?redirect=%2Fchat')
+            }}
+          >
+            {t('common.login')}
+          </Button>
+          <Button
+            variant="seal"
+            className="h-10 px-5"
+            onClick={() => {
+              setShowAuthModal(false)
+              navigate('/auth/register?redirect=%2Fchat')
+            }}
+          >
+            {t('common.register')}
+          </Button>
+        </div>
+      </Modal>
 
       {/* 侧边栏 */}
         <Sidebar
@@ -571,6 +647,8 @@ export default function Chat() {
           onSend={handleSendMessage}
           onGenerateImage={handleGenerateImage}
           onGeneratePPT={handleGeneratePPT}
+          isAuthenticated={isAuthenticated}
+          onAuthRequired={() => setShowAuthModal(true)}
           disabled={isStreaming || isDrawing || isGeneratingPPT}
           models={models}
           currentModel={currentModel}

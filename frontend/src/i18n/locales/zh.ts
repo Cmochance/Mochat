@@ -261,6 +261,8 @@ export default {
       title: '开始新的对话',
       description: '输入内容后即可开始生成结果。',
     },
+    authRequiredTitle: '请登录或注册',
+    authRequiredDescription: '未登录状态下可浏览对话界面，但发送内容前需要先完成登录或注册。',
     // 用户等级
     tier: {
       free: '普通用户',

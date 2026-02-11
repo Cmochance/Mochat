@@ -307,9 +307,7 @@ export default function Welcome() {
             <h1
               className={[
                 'font-title leading-tight text-ink-black',
-                isEnglish
-                  ? 'text-[clamp(1.8rem,3vw,2.2rem)] md:whitespace-nowrap'
-                  : 'text-5xl md:text-6xl lg:text-7xl',
+                'text-[clamp(1.8rem,3vw,2.2rem)] md:whitespace-nowrap',
               ].join(' ')}
             >
               {t('welcome.heroTitle')}
@@ -319,7 +317,7 @@ export default function Welcome() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" className="h-12 w-40" onClick={() => navigate(isAuthenticated ? '/chat' : '/auth/register')}>
+              <Button size="lg" className="h-12 w-40" onClick={() => navigate('/chat')}>
                 {isAuthenticated ? t('welcome.startChat') : t('welcome.getStarted')}
               </Button>
               <Button size="lg" className="h-12 w-40" variant="outline" onClick={scrollToStage}>

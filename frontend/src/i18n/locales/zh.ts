@@ -257,8 +257,8 @@ export default {
       ppt: 'PPT',
     },
     empty: {
-      title: '开始你的第一段对话',
-      description: '选择对话模式后输入内容，即可开始生成结果。',
+      title: '开始新的对话',
+      description: '输入内容后即可开始生成结果。',
     },
     // 用户等级
     tier: {
@@ -293,6 +293,7 @@ export default {
     generateImage: '生成图像',
     generatePpt: '生成 PPT',
     selectModel: '选择模型',
+    basicActions: '基础功能',
     dropImage: '释放以上传图片',
     dropDoc: '释放以上传文档',
     unknownFormat: '未知格式文件，请上传图片或Word文档',

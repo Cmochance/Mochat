@@ -257,8 +257,8 @@ export default {
       ppt: 'PPT',
     },
     empty: {
-      title: 'Start your first conversation',
-      description: 'Pick a mode and enter your prompt to begin generating results.',
+      title: 'Start a new conversation',
+      description: 'Enter your prompt to begin generating results.',
     },
     // User tiers
     tier: {
@@ -293,6 +293,7 @@ export default {
     generateImage: 'Generate image',
     generatePpt: 'Generate PPT',
     selectModel: 'Select model',
+    basicActions: 'Tools',
     dropImage: 'Drop to upload image',
     dropDoc: 'Drop to upload document',
     unknownFormat: 'Unknown file format, please upload image or Word document',

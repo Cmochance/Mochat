@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { Palette, Presentation, MessageSquareText } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea, { type ModelInfo } from './components/InputArea'
@@ -13,7 +12,7 @@ import { usePPTGenerate } from '@pptgen'
 import { chatService } from '../../services/chatService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
-import type { ChatMode, StreamChunk } from '../../types'
+import type { StreamChunk } from '../../types'
 
 export default function Chat() {
   const { user } = useAuthStore()
@@ -511,11 +510,6 @@ export default function Chat() {
     }
   }
 
-  const handleQuickAction = (mode: ChatMode) => {
-    setIsDrawMode(mode === 'draw')
-    setIsPPTMode(mode === 'ppt')
-  }
-
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex overflow-hidden bg-canvas-gradient">
       {/* 版本更新弹窗 (独立模块) */}
@@ -555,20 +549,6 @@ export default function Chat() {
             <h1 className="truncate text-xl font-title text-ink-black">
               {currentSession?.title || t('chat.newChat')}
             </h1>
-            <div className="mt-0.5 hidden items-center gap-2 text-xs font-ui text-text-secondary md:flex">
-              <span className="inline-flex items-center gap-1 rounded-md bg-paper-cream px-2 py-0.5">
-                <MessageSquareText size={12} />
-                {t('chat.quick.chat')}
-              </span>
-              <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${isDrawMode ? 'bg-cyan-ink text-paper-white' : 'bg-paper-cream'}`}>
-                <Palette size={12} />
-                {t('chat.quick.draw')}
-              </span>
-              <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${isPPTMode ? 'bg-vermilion text-paper-white' : 'bg-paper-cream'}`}>
-                <Presentation size={12} />
-                {t('chat.quick.ppt')}
-              </span>
-            </div>
           </div>
         </motion.header>
 
@@ -584,7 +564,6 @@ export default function Chat() {
           loadingMore={loadingMore}
           onLoadMore={loadMoreMessages}
           onRegenerate={handleRegenerate}
-          onQuickAction={handleQuickAction}
         />
 
         {/* 输入区域 */}

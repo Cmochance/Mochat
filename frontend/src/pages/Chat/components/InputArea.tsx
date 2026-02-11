@@ -382,24 +382,6 @@ export default function InputArea({
 
         <div className="flex flex-col gap-2 md:gap-3">
           <div className="flex items-end gap-2 md:gap-3">
-            <ComposerToolbar
-              disabled={disabled}
-              isProcessing={isProcessing}
-              isDrawMode={isDrawMode}
-              isPPTMode={isPPTMode}
-              onImageUpload={triggerImageInput}
-              onDocUpload={triggerDocInput}
-              onToggleDraw={() => {
-                onDrawModeChange?.(!isDrawMode)
-                if (!isDrawMode) onPPTModeChange?.(false)
-              }}
-              onTogglePPT={() => {
-                onPPTModeChange?.(!isPPTMode)
-                if (!isPPTMode) onDrawModeChange?.(false)
-              }}
-              className="hidden sm:flex"
-            />
-
             <ComposerTextArea
               value={content}
               onChange={setContent}
@@ -439,7 +421,15 @@ export default function InputArea({
             </motion.button>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <ModelPicker
+              models={models}
+              currentModel={currentModel}
+              defaultModel={defaultModel}
+              disabled={disabled || isProcessing}
+              onModelChange={onModelChange}
+            />
+
             <ComposerToolbar
               disabled={disabled}
               isProcessing={isProcessing}
@@ -455,18 +445,8 @@ export default function InputArea({
                 onPPTModeChange?.(!isPPTMode)
                 if (!isPPTMode) onDrawModeChange?.(false)
               }}
-              className="sm:hidden"
+              className="ml-0"
             />
-
-            <div className="ml-auto">
-              <ModelPicker
-                models={models}
-                currentModel={currentModel}
-                defaultModel={defaultModel}
-                disabled={disabled || isProcessing}
-                onModelChange={onModelChange}
-              />
-            </div>
           </div>
         </div>
 

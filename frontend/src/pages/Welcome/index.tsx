@@ -302,8 +302,9 @@ export default function Welcome() {
           </div>
         </nav>
 
-        <section className="mt-12 grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+        <section className="mt-12">
           <motion.div
+            className="mx-auto max-w-5xl"
             initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -311,7 +312,7 @@ export default function Welcome() {
             <p className="mb-4 inline-flex items-center rounded-full border border-line-soft bg-paper-white/70 px-3 py-1 text-xs font-ui text-text-secondary">
               {t('welcome.heroBadge')}
             </p>
-            <h1 className="font-title text-5xl leading-tight text-ink-black md:text-6xl lg:text-6xl xl:text-7xl md:whitespace-nowrap">
+            <h1 className="font-title text-5xl leading-tight text-ink-black md:text-6xl lg:text-7xl">
               {t('welcome.heroTitle')}
             </h1>
             <p className="mt-4 max-w-2xl text-base font-ui leading-relaxed text-text-secondary md:text-lg">
@@ -326,29 +327,6 @@ export default function Welcome() {
                 {t('welcome.learnMore')}
               </Button>
             </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, x: 25 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-          >
-            <Card elevated className="overflow-hidden p-0">
-              <div className="border-b border-line-soft bg-ink-dark px-4 py-3 text-paper-white">
-                <p className="font-ui text-sm">{t('welcome.previewHeader')}</p>
-              </div>
-              <div className="space-y-3 bg-paper-white/80 p-4">
-                <div className="max-w-[90%] rounded-lg bg-paper-cream px-3 py-2 text-sm font-ui text-text-primary">
-                  {t('welcome.previewUser')}
-                </div>
-                <div className="ml-auto max-w-[90%] rounded-lg bg-ink-black px-3 py-2 text-sm font-ui text-paper-white">
-                  {t('welcome.previewAssistant')}
-                </div>
-                <div className="rounded-lg border border-line-soft bg-paper-white px-3 py-2 text-sm font-ui text-text-secondary">
-                  {t('welcome.previewThinking')}
-                </div>
-              </div>
-            </Card>
           </motion.div>
         </section>
 

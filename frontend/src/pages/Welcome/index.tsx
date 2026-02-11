@@ -16,11 +16,6 @@ interface PricingPlan {
   points: string[]
 }
 
-interface FaqItem {
-  q: string
-  a: string
-}
-
 type WelcomeView = 'overview' | 'features' | 'ecosystem' | 'pricing' | 'faq'
 
 interface WelcomeViewTab {
@@ -57,18 +52,18 @@ export default function Welcome() {
     },
   ]
 
-  const integrations = t('welcome.integrations', { returnObjects: true }) as string[]
   const pricingPlans = t('welcome.pricing.plans', { returnObjects: true }) as PricingPlan[]
-  const faqItems = t('welcome.faq.items', { returnObjects: true }) as FaqItem[]
   const trustPoints = t('welcome.trustPoints', { returnObjects: true }) as string[]
+  const inkTextCards = t('welcome.inkText.cards', { returnObjects: true }) as Array<{ title: string; description: string }>
+  const inkCityCards = t('welcome.inkCity.cards', { returnObjects: true }) as Array<{ title: string; description: string }>
 
   const viewTabs = useMemo<WelcomeViewTab[]>(
     () => [
       { key: 'overview', label: t('welcome.views.overview') },
       { key: 'features', label: t('welcome.views.features') },
       { key: 'ecosystem', label: t('welcome.views.ecosystem') },
-      { key: 'pricing', label: t('welcome.views.pricing') },
       { key: 'faq', label: t('welcome.views.faq') },
+      { key: 'pricing', label: t('welcome.views.pricing') },
     ],
     [t]
   )
@@ -158,42 +153,27 @@ export default function Welcome() {
   )
 
   const renderEcosystemView = () => (
-    <div className="space-y-6">
+    <div>
       <SectionHeader
-        title={t('welcome.sections.integrationTitle')}
-        subtitle={t('welcome.sections.integrationSubtitle')}
+        title={t('welcome.inkText.title')}
+        subtitle={t('welcome.inkText.subtitle')}
       />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <h3 className="text-xl font-title text-ink-black">{t('welcome.sections.trustTitle')}</h3>
-          <p className="mt-2 text-sm font-ui text-text-secondary">{t('welcome.sections.trustSubtitle')}</p>
-          <div className="mt-4 space-y-2">
-            {trustPoints.map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm font-ui text-text-secondary">
-                <CheckCircle2 className="h-4 w-4 text-cyan-ink" />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <h3 className="text-xl font-title text-ink-black">{t('welcome.sections.integrationTitle')}</h3>
-          <p className="mt-2 text-sm font-ui text-text-secondary">{t('welcome.sections.integrationSubtitle')}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {integrations.map((item) => (
-              <span
-                key={item}
-                className="rounded-md border border-line-soft bg-paper-white px-3 py-1.5 text-xs font-ui text-text-secondary"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </Card>
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        {inkTextCards.map((item) => (
+          <Card key={item.title}>
+            <h3 className="text-xl font-title text-ink-black">{item.title}</h3>
+            <p className="mt-2 text-sm font-ui text-text-secondary">{item.description}</p>
+          </Card>
+        ))}
       </div>
     </div>
   )
+
+  const formatSponsorPrice = (price: string) => {
+    const isNumeric = /^\d+(\.\d+)?$/.test(price.trim())
+    if (!isNumeric) return price
+    return `${price} ${t('welcome.pricing.unit')}`
+  }
 
   const renderPricingView = () => (
     <div>
@@ -216,7 +196,7 @@ export default function Welcome() {
                 </span>
               )}
             </div>
-            <p className="mt-3 text-3xl font-title text-ink-black">{plan.price}</p>
+            <p className="mt-3 text-3xl font-title text-ink-black">{formatSponsorPrice(plan.price)}</p>
             <ul className="mt-4 space-y-2">
               {plan.points.map((point) => (
                 <li key={point} className="flex items-center gap-2 text-sm font-ui text-text-secondary">
@@ -231,18 +211,18 @@ export default function Welcome() {
     </div>
   )
 
-  const renderFaqView = () => (
+  const renderCityView = () => (
     <div className="space-y-6">
       <SectionHeader
         align="center"
-        title={t('welcome.sections.faqTitle')}
-        subtitle={t('welcome.sections.faqSubtitle')}
+        title={t('welcome.inkCity.title')}
+        subtitle={t('welcome.inkCity.subtitle')}
       />
       <div className="grid gap-4 lg:grid-cols-2">
-        {faqItems.map((item) => (
-          <Card key={item.q}>
-            <h4 className="text-lg font-title text-ink-black">{item.q}</h4>
-            <p className="mt-2 text-sm font-ui text-text-secondary">{item.a}</p>
+        {inkCityCards.map((item) => (
+          <Card key={item.title}>
+            <h4 className="text-lg font-title text-ink-black">{item.title}</h4>
+            <p className="mt-2 text-sm font-ui text-text-secondary">{item.description}</p>
           </Card>
         ))}
       </div>
@@ -267,8 +247,9 @@ export default function Welcome() {
     if (activeView === 'overview') return renderOverviewView()
     if (activeView === 'features') return renderFeaturesView()
     if (activeView === 'ecosystem') return renderEcosystemView()
+    if (activeView === 'faq') return renderCityView()
     if (activeView === 'pricing') return renderPricingView()
-    return renderFaqView()
+    return renderOverviewView()
   }
 
   return (

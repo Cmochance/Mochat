@@ -43,6 +43,14 @@ export default {
     startChat: 'Start Chat',
     learnMore: 'Learn More',
     enterChat: 'Enter Chat',
+    views: {
+      overview: 'Overview',
+      features: 'Features',
+      ecosystem: 'Ecosystem',
+      pricing: 'Pricing',
+      faq: 'FAQ',
+      switchHint: 'Use the top-left tabs to switch page views',
+    },
     // Features
     features: {
       smartDialogue: {

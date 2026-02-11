@@ -43,6 +43,14 @@ export default {
     startChat: '开始对话',
     learnMore: '了解更多',
     enterChat: '进入对话',
+    views: {
+      overview: '总览',
+      features: '能力',
+      ecosystem: '生态',
+      pricing: '套餐',
+      faq: '答疑',
+      switchHint: '左上角切换页面视图',
+    },
     // 特性
     features: {
       smartDialogue: {

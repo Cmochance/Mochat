@@ -117,7 +117,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
   return (
     <div className="space-y-6">
       {/* 头部 */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+      <div className="sticky top-0 z-10 flex flex-col gap-4 rounded-md border border-line-soft bg-paper-white/90 p-3 backdrop-blur-sm sm:flex-row sm:justify-between">
         <h2 className="text-2xl font-title text-ink-black">{t('admin.users.title')}</h2>
         
         <div className="flex gap-3">
@@ -129,7 +129,7 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
               placeholder={t('admin.users.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-paper-white border border-paper-aged rounded-sm focus:outline-none focus:border-ink-medium"
+              className="pl-10 pr-4 py-2 bg-paper-white border border-line-soft rounded-sm focus:outline-none focus:border-ink-medium"
             />
           </div>
           

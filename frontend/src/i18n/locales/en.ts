@@ -32,7 +32,13 @@ export default {
   welcome: {
     brand: 'Mochat',
     slogan: 'Mochat',
+    heroBadge: 'Ink-inspired SaaS AI Workspace',
+    heroTitle: 'Turn Every Conversation Into Structured Output',
     description: 'Where ink meets wisdom. Begin your AI conversation journey at the crossroads of tradition and modernity.',
+    previewHeader: 'Live Workspace Preview',
+    previewUser: 'Please summarize the key findings from this experiment report.',
+    previewAssistant: 'Done. I extracted 3 core takeaways with next-step recommendations.',
+    previewThinking: 'Reasoning is visible for easier review and verification.',
     getStarted: 'Get Started',
     startChat: 'Start Chat',
     learnMore: 'Learn More',
@@ -53,8 +59,57 @@ export default {
       },
       secureReliable: {
         title: 'Mochan Sci-Writer',
-        description: 'Scientific expert, input your data, one-click generate high-quality论文',
+        description: 'Scientific expert, input your data and generate high-quality papers in one click',
       },
+    },
+    integrations: ['OpenAI Compatible API', 'R2 Storage', 'FastAPI', 'React', 'Markdown', 'DOCX/PPT'],
+    trustPoints: [
+      'Streaming output with visible reasoning for process traceability',
+      'Document parsing and multimodal input in one workspace',
+      'Admin controls for models, quotas, and content policies',
+    ],
+    sections: {
+      featuresTitle: 'Core Capabilities',
+      featuresSubtitle: 'Run conversation, creation, analysis, and collaboration in one workflow.',
+      trustTitle: 'Reliable and Controllable',
+      trustSubtitle: 'From access control to quota auditing, designed for production usage.',
+      integrationTitle: 'Integrations',
+      integrationSubtitle: 'Connect with your existing engineering and content systems quickly.',
+      pricingTitle: 'Plan Options',
+      pricingSubtitle: 'Choose by team stage and scale up smoothly.',
+      faqTitle: 'FAQ',
+      faqSubtitle: 'Key notes on deployment, models, and data processing.',
+      ctaTitle: 'Ready to Start?',
+      ctaSubtitle: 'Enter Mochat and run your AI workflows in one place.',
+    },
+    pricing: {
+      recommended: 'Recommended',
+      plans: [
+        {
+          name: 'Starter',
+          price: 'Free',
+          points: ['Daily chat quota', 'Base model access', 'Session history management'],
+        },
+        {
+          name: 'Pro',
+          price: '$14 / month',
+          highlight: true,
+          points: ['Higher quotas', 'Image + PPT modes', 'Priority response and admin controls'],
+        },
+        {
+          name: 'Team',
+          price: 'Contact Us',
+          points: ['Multi-member collaboration', 'Advanced policy and audit', 'Custom model/deployment support'],
+        },
+      ],
+    },
+    faq: {
+      items: [
+        { q: 'Can I use custom models?', a: 'Yes. Admin settings let you configure allowed models and defaults.' },
+        { q: 'How are uploaded docs handled?', a: 'Documents are parsed for current chat context with controlled storage policies.' },
+        { q: 'Is mobile supported?', a: 'Yes. The main flows are optimized for both mobile and desktop.' },
+        { q: 'How do I manage quotas?', a: 'Admins can inspect usage, export events, and run reconciliation from the dashboard.' },
+      ],
     },
     // Decorative characters
     decorativeChars: ['Poetry', 'Calligraphy', 'Painting', 'Seal'],
@@ -143,6 +198,15 @@ export default {
     adminPanel: 'Admin Panel',
     clickToLogout: 'Click to logout',
     manage: 'Admin',
+    quick: {
+      chat: 'Chat',
+      draw: 'Draw',
+      ppt: 'PPT',
+    },
+    empty: {
+      title: 'Start your first conversation',
+      description: 'Pick a mode and enter your prompt to begin generating results.',
+    },
     // User tiers
     tier: {
       free: 'Free User',

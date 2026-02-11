@@ -146,7 +146,7 @@ export function useDocUpload(config: UpwordConfig) {
     // 验证文件
     const validation = validateDoc(file)
     if (!validation.valid) {
-      setState(s => ({ ...s, error: validation.error || '文件验证失败' }))
+      setState((s: UploadState) => ({ ...s, error: validation.error || '文件验证失败' }))
       return null
     }
 
@@ -168,7 +168,7 @@ export function useDocUpload(config: UpwordConfig) {
       const contentType = file.type || 'application/octet-stream'
       await uploadToR2(file, presign.uploadUrl, contentType)
 
-      setState(s => ({
+      setState((s: UploadState) => ({
         ...s,
         isUploading: false,
         isParsing: true,
@@ -211,7 +211,7 @@ export function useDocUpload(config: UpwordConfig) {
    * 清除错误
    */
   const clearError = useCallback(() => {
-    setState(s => ({ ...s, error: null, progress: 'idle' }))
+    setState((s: UploadState) => ({ ...s, error: null, progress: 'idle' }))
   }, [])
 
   return {

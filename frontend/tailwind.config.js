@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 水墨色系
+        // Legacy palette
         ink: {
           black: '#1a1a1a',
           dark: '#2d2d2d',
@@ -28,48 +28,57 @@ export default {
         },
         cyan: {
           ink: '#3d5a5b',
-        }
+        },
+        // Semantic palette for refreshed UI
+        canvas: {
+          DEFAULT: '#f4efe6',
+          soft: '#f8f4ed',
+          elevated: '#fffdf9',
+        },
+        text: {
+          primary: '#1f1f1f',
+          secondary: '#505050',
+          muted: '#7a7a7a',
+        },
+        line: {
+          soft: '#ddd5c8',
+          strong: '#bfb3a1',
+        },
+        accent: {
+          seal: '#b73b34',
+          info: '#365c5b',
+          danger: '#b73b34',
+        },
+        jade: '#2f8a63',
       },
       fontFamily: {
-        // 书法风格标题字体
         title: ['"Ma Shan Zheng"', '"ZCOOL XiaoWei"', 'serif'],
-        // 正文字体
         body: ['"Noto Serif SC"', '"Source Han Serif CN"', 'serif'],
-        // 等宽字体
+        ui: ['"Noto Sans SC"', '"PingFang SC"', '"Helvetica Neue"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       backgroundImage: {
-        // 宣纸纹理渐变
         'paper-gradient': 'linear-gradient(180deg, #f7f5f0 0%, #ebe7df 100%)',
-        // 墨晕效果
+        'canvas-gradient': 'radial-gradient(circle at top right, #fcf8f0 0%, #f4efe6 42%, #ece2d1 100%)',
         'ink-wash': 'radial-gradient(ellipse at center, rgba(26,26,26,0.1) 0%, transparent 70%)',
       },
       boxShadow: {
         'ink': '0 4px 20px rgba(26, 26, 26, 0.15)',
         'ink-lg': '0 8px 40px rgba(26, 26, 26, 0.2)',
+        'panel': '0 12px 30px rgba(23, 23, 23, 0.08)',
       },
       animation: {
-        'ink-spread': 'inkSpread 0.6s ease-out forwards',
-        'fade-in': 'fadeIn 0.5s ease-out forwards',
         'slide-up': 'slideUp 0.4s ease-out forwards',
-        'brush-stroke': 'brushStroke 0.8s ease-in-out forwards',
+        'soft-pulse': 'softPulse 2.5s ease-in-out infinite',
       },
       keyframes: {
-        inkSpread: {
-          '0%': { transform: 'scale(0)', opacity: '0.8' },
-          '100%': { transform: 'scale(1)', opacity: '0' },
-        },
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
         slideUp: {
           '0%': { transform: 'translateY(20px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
-        brushStroke: {
-          '0%': { strokeDashoffset: '100%' },
-          '100%': { strokeDashoffset: '0%' },
+        softPulse: {
+          '0%, 100%': { opacity: '0.6' },
+          '50%': { opacity: '1' },
         },
       },
     },

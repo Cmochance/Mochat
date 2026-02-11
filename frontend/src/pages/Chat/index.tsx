@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
+import { Palette, Presentation, MessageSquareText } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import InputArea, { type ModelInfo } from './components/InputArea'
@@ -12,7 +13,7 @@ import { usePPTGenerate } from '@pptgen'
 import { chatService } from '../../services/chatService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
-import type { StreamChunk } from '../../types'
+import type { ChatMode, StreamChunk } from '../../types'
 
 export default function Chat() {
   const { user } = useAuthStore()
@@ -317,7 +318,7 @@ export default function Chat() {
       // 调用绘图模块
       const result = await generateImage(
         { prompt, userId: user?.id?.toString() || 'anonymous' },
-        (thinkingChunk) => {
+        (thinkingChunk: string) => {
           // thinking 回调，实时更新
           flushSync(() => {
             appendStreamingThinking(thinkingChunk)
@@ -396,7 +397,7 @@ export default function Chat() {
     try {
       const result = await generatePPT(
         { prompt },
-        (thinkingChunk) => {
+        (thinkingChunk: string) => {
           flushSync(() => {
             appendStreamingThinking(thinkingChunk)
           })
@@ -510,8 +511,13 @@ export default function Chat() {
     }
   }
 
+  const handleQuickAction = (mode: ChatMode) => {
+    setIsDrawMode(mode === 'draw')
+    setIsPPTMode(mode === 'ppt')
+  }
+
   return (
-    <div className="h-[100dvh] max-h-[100dvh] flex bg-paper-gradient overflow-hidden">
+    <div className="h-[100dvh] max-h-[100dvh] flex overflow-hidden bg-canvas-gradient">
       {/* 版本更新弹窗 (独立模块) */}
       {showVersionModal && (
         <VersionModal versionInfo={versionInfo} onClose={closeVersionModal} />
@@ -530,10 +536,10 @@ export default function Chat() {
         />
 
       {/* 主内容区 - 严格高度约束 */}
-      <main className="flex-1 flex flex-col min-w-0 min-h-0 max-h-full overflow-hidden">
+      <main className="flex-1 flex min-h-0 min-w-0 max-h-full flex-col overflow-hidden">
         {/* 头部 */}
         <motion.header
-          className="h-16 border-b border-paper-aged bg-paper-white/80 backdrop-blur-sm flex items-center px-6 flex-shrink-0"
+          className="h-16 border-b border-line-soft bg-paper-white/80 backdrop-blur-sm flex-shrink-0 flex items-center px-4 md:px-6"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -545,9 +551,25 @@ export default function Chat() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-xl font-title text-ink-black truncate">
-            {currentSession?.title || t('chat.newChat')}
-          </h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-xl font-title text-ink-black">
+              {currentSession?.title || t('chat.newChat')}
+            </h1>
+            <div className="mt-0.5 hidden items-center gap-2 text-xs font-ui text-text-secondary md:flex">
+              <span className="inline-flex items-center gap-1 rounded-md bg-paper-cream px-2 py-0.5">
+                <MessageSquareText size={12} />
+                {t('chat.quick.chat')}
+              </span>
+              <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${isDrawMode ? 'bg-cyan-ink text-paper-white' : 'bg-paper-cream'}`}>
+                <Palette size={12} />
+                {t('chat.quick.draw')}
+              </span>
+              <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${isPPTMode ? 'bg-vermilion text-paper-white' : 'bg-paper-cream'}`}>
+                <Presentation size={12} />
+                {t('chat.quick.ppt')}
+              </span>
+            </div>
+          </div>
         </motion.header>
 
         {/* 消息区域 */}
@@ -562,6 +584,7 @@ export default function Chat() {
           loadingMore={loadingMore}
           onLoadMore={loadMoreMessages}
           onRegenerate={handleRegenerate}
+          onQuickAction={handleQuickAction}
         />
 
         {/* 输入区域 */}
@@ -582,7 +605,7 @@ export default function Chat() {
       </main>
 
       {/* 语言切换按钮 */}
-      <LanguageSwitcher className="top-4 right-3 bottom-auto lg:top-auto lg:right-6 lg:bottom-2" />
+      <LanguageSwitcher className="right-4 top-4" />
     </div>
   )
 }

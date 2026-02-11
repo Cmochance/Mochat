@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Welcome from './pages/Welcome'
 import Auth from './pages/Auth'
@@ -8,22 +9,26 @@ import Admin from './pages/Admin'
 // 使用静态导入，避免部分环境下路由懒加载 chunk 导入失败导致空白页
 
 // 路由保护组件
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuthStore()
+  const location = useLocation()
   
   if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />
+    const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
+    return <Navigate to={`/auth/login?redirect=${redirect}`} replace />
   }
   
   return <>{children}</>
 }
 
 // 管理员路由保护
-function AdminRoute({ children }: { children: React.ReactNode }) {
+function AdminRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, user } = useAuthStore()
+  const location = useLocation()
   
   if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />
+    const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
+    return <Navigate to={`/auth/login?redirect=${redirect}`} replace />
   }
   
   if (user?.role !== 'admin') {

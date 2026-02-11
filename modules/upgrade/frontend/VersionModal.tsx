@@ -3,7 +3,7 @@
  */
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Sparkles, CheckCircle, ChevronDown } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type MouseEvent } from 'react'
 import type { VersionInfo, VersionHistoryItem } from './types'
 
 interface VersionModalProps {
@@ -81,7 +81,7 @@ export function VersionModal({ versionInfo, onClose }: VersionModalProps) {
 
   // 切换展开/收起
   const toggleExpand = (majorVersion: string) => {
-    setExpandedMajors(prev => {
+    setExpandedMajors((prev: Set<string>) => {
       const next = new Set(prev)
       if (next.has(majorVersion)) {
         next.delete(majorVersion)
@@ -113,7 +113,7 @@ export function VersionModal({ versionInfo, onClose }: VersionModalProps) {
           initial={{ scale: 0.9, y: 20 }}
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.9, y: 20 }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
         >
           {/* 头部装饰条 */}
           <div className="h-2 bg-gradient-to-r from-cyan-ink via-ink-black to-vermilion" />
@@ -144,9 +144,9 @@ export function VersionModal({ versionInfo, onClose }: VersionModalProps) {
           {/* 内容区 */}
           <div className="px-6 py-4 max-h-80 overflow-y-auto custom-scrollbar">
             <div className="space-y-3">
-              {versionGroups.map((group, groupIndex) => {
+              {versionGroups.map((group: VersionGroup, groupIndex: number) => {
                 const isCurrent = group.major.version === versionInfo.current_version || 
-                  group.minors.some(m => m.version === versionInfo.current_version)
+                  group.minors.some((m: VersionHistoryItem) => m.version === versionInfo.current_version)
                 const hasMinors = group.minors.length > 0
                 const expanded = isExpanded(group.major.version)
 
@@ -213,7 +213,7 @@ export function VersionModal({ versionInfo, onClose }: VersionModalProps) {
                           className="overflow-hidden"
                         >
                           <div className="ml-6 mt-2 space-y-2 border-l-2 border-ink-faint/30 pl-4">
-                            {group.minors.map((minor, minorIndex) => {
+                            {group.minors.map((minor: VersionHistoryItem, minorIndex: number) => {
                               const isMinorCurrent = minor.version === versionInfo.current_version
 
                               return (

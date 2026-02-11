@@ -135,6 +135,9 @@ export interface StreamChunk {
   data: string
 }
 
+// 聊天输入模式
+export type ChatMode = 'chat' | 'draw' | 'ppt'
+
 // API响应类型
 export interface ApiResponse<T> {
   data?: T

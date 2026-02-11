@@ -20,23 +20,24 @@ export default function LanguageSwitcher({ className = '', position = 'fixed' }:
   return (
     <div
       className={position === 'fixed'
-        ? `fixed bottom-6 right-6 z-50 ${className}`
+        ? `fixed right-4 top-4 z-50 ${className}`
         : `relative z-10 ${className}`
       }
     >
       <motion.button
         onClick={toggleLanguage}
         className={`
-          flex items-center gap-1.5 px-3 py-1.5 rounded-md
-          text-sm text-ink-medium/80 hover:text-ink-black hover:bg-paper-cream
-          transition-colors duration-200
+          flex items-center gap-1.5 rounded-md border px-3 py-1.5
+          text-sm font-ui text-ink-medium/90
+          border-paper-aged bg-paper-white/80 backdrop-blur-sm
+          transition-colors duration-200 hover:border-line-strong hover:bg-paper-cream hover:text-ink-black
         `}
-        whileHover={{ scale: 1.01 }}
+        whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         title={`${t('language.switch')}: ${currentLanguageLabel}`}
       >
         <Globe className="w-4 h-4" />
-        <span className="hidden sm:inline">{currentLanguageLabel}</span>
+        <span className="hidden md:inline">{currentLanguageLabel}</span>
       </motion.button>
     </div>
   )

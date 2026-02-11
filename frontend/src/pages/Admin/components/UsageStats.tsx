@@ -146,6 +146,7 @@ export default function UsageStats() {
 
   return (
     <div className="space-y-6">
+      <div className="sticky top-0 z-10 rounded-md border border-line-soft bg-paper-white/90 p-3 backdrop-blur-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-title text-ink-black flex items-center gap-2">
           <Activity className="text-cyan-ink" />
@@ -190,8 +191,9 @@ export default function UsageStats() {
           </motion.button>
         </div>
       </div>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-md border border-line-soft bg-paper-white/90 p-3">
         <input
           type="text"
           placeholder={t('admin.users.searchPlaceholder')}

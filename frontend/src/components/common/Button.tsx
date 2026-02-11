@@ -3,7 +3,7 @@ import { ReactNode } from 'react'
 
 interface ButtonProps {
   children: ReactNode
-  variant?: 'ink' | 'seal' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'outline' | 'seal' | 'danger' | 'ink' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   loading?: boolean
@@ -24,18 +24,29 @@ export default function Button({
   type = 'button',
   className = '',
 }: ButtonProps) {
-  const baseStyles = 'relative overflow-hidden font-body transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed'
-  
+  const normalizedVariant = variant === 'ink'
+    ? 'primary'
+    : variant === 'ghost'
+      ? 'outline'
+      : variant
+
+  const baseStyles = `
+    relative overflow-hidden rounded-md border font-ui
+    transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50
+  `
+
   const variants = {
-    ink: 'bg-ink-black text-paper-white hover:shadow-ink active:scale-95',
-    seal: 'bg-vermilion text-paper-white border-2 border-vermilion hover:bg-vermilion-light hover:shadow-ink active:scale-95',
-    ghost: 'bg-transparent text-ink-black border border-ink-light hover:bg-ink-black/5 active:scale-95',
+    primary: 'border-ink-black bg-ink-black text-paper-white hover:bg-ink-dark hover:border-ink-dark hover:shadow-ink',
+    secondary: 'border-line-soft bg-paper-cream text-text-primary hover:bg-paper-aged/80',
+    outline: 'border-line-strong bg-transparent text-text-primary hover:bg-paper-cream/50',
+    seal: 'border-accent-seal bg-accent-seal text-paper-white hover:border-vermilion-light hover:bg-vermilion-light hover:shadow-ink',
+    danger: 'border-accent-danger bg-accent-danger text-paper-white hover:bg-vermilion-dark hover:border-vermilion-dark',
   }
-  
+
   const sizes = {
-    sm: 'px-4 py-1.5 text-sm',
-    md: 'px-6 py-2.5 text-base',
-    lg: 'px-8 py-3 text-lg',
+    sm: 'px-3.5 py-2 text-sm',
+    md: 'px-4.5 py-2.5 text-sm',
+    lg: 'px-6 py-3 text-base',
   }
 
   return (
@@ -45,24 +56,14 @@ export default function Button({
       onClick={onClick}
       className={`
         ${baseStyles}
-        ${variants[variant]}
+        ${variants[normalizedVariant]}
         ${sizes[size]}
         ${fullWidth ? 'w-full' : ''}
         ${className}
       `}
-      whileHover={{ scale: disabled ? 1 : 1.02 }}
-      whileTap={{ scale: disabled ? 1 : 0.98 }}
+      whileHover={{ scale: disabled ? 1 : 1.015 }}
+      whileTap={{ scale: disabled ? 1 : 0.985 }}
     >
-      {/* 墨晕效果 */}
-      <motion.span
-        className="absolute inset-0 bg-white/20 rounded-full"
-        initial={{ scale: 0, opacity: 0 }}
-        whileHover={{ scale: 3, opacity: 0.3 }}
-        transition={{ duration: 0.4 }}
-        style={{ transformOrigin: 'center' }}
-      />
-      
-      {/* 内容 */}
       <span className="relative z-10 flex items-center justify-center gap-2">
         {loading && (
           <motion.span

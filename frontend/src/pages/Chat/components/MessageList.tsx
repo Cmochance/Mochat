@@ -1,9 +1,13 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { MessageSquareText, Palette, Presentation } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import MessageItem from './MessageItem'
 import StreamingMessage from './StreamingMessage'
 import Loading from '../../../components/common/Loading'
-import type { Message } from '../../../types'
+import Button from '../../../components/common/Button'
+import EmptyState from '../../../components/common/EmptyState'
+import type { ChatMode, Message } from '../../../types'
 
 interface MessageListProps {
   messages: Message[]
@@ -16,6 +20,7 @@ interface MessageListProps {
   loadingMore?: boolean  // 是否正在加载更多
   onLoadMore?: () => void  // 加载更多回调
   onRegenerate?: () => void  // 重新生成最后一条AI消息
+  onQuickAction?: (mode: ChatMode) => void
 }
 
 // 获取滚动位置存储的 key（localStorage - 持久保存）
@@ -34,7 +39,9 @@ export default function MessageList({
   loadingMore = false,
   onLoadMore,
   onRegenerate,
+  onQuickAction,
 }: MessageListProps) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const topRef = useRef<HTMLDivElement>(null)
@@ -131,7 +138,7 @@ export default function MessageList({
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loading text="加载中..." />
+        <Loading text={t('common.loading')} />
       </div>
     )
   }
@@ -161,12 +168,31 @@ export default function MessageList({
         {/* 空状态 */}
         {messages.length === 0 && !isStreaming && !hasMore && (
           <motion.div
-            className="text-center py-20"
+            className="py-14"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <div className="text-6xl font-title text-ink-light/30 mb-4">墨</div>
-            <p className="text-ink-light">开始一段新的对话吧</p>
+            <EmptyState
+              icon={<div className="text-6xl font-title text-ink-light/50">墨</div>}
+              title={t('chat.empty.title')}
+              description={t('chat.empty.description')}
+              actions={
+                <>
+                  <Button variant="secondary" onClick={() => onQuickAction?.('chat')}>
+                    <MessageSquareText size={16} />
+                    {t('chat.quick.chat')}
+                  </Button>
+                  <Button variant="outline" onClick={() => onQuickAction?.('draw')}>
+                    <Palette size={16} />
+                    {t('chat.quick.draw')}
+                  </Button>
+                  <Button variant="outline" onClick={() => onQuickAction?.('ppt')}>
+                    <Presentation size={16} />
+                    {t('chat.quick.ppt')}
+                  </Button>
+                </>
+              }
+            />
           </motion.div>
         )}
 

@@ -96,7 +96,7 @@ export default function KeywordManagement() {
       {/* 头部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <motion.div 
-          className="bg-white border border-ink-light/30 p-4 rounded-sm"
+          className="bg-paper-white border border-line-soft p-4 rounded-sm"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -112,7 +112,7 @@ export default function KeywordManagement() {
         </motion.div>
 
         <motion.div 
-          className="bg-white border border-ink-light/30 p-4 rounded-sm"
+          className="bg-paper-white border border-line-soft p-4 rounded-sm"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -129,7 +129,7 @@ export default function KeywordManagement() {
         </motion.div>
 
         <motion.div 
-          className="bg-white border border-ink-light/30 p-4 rounded-sm"
+          className="bg-paper-white border border-line-soft p-4 rounded-sm"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
@@ -148,7 +148,7 @@ export default function KeywordManagement() {
 
       {/* 添加新限制词 */}
       <motion.div 
-        className="bg-white border border-ink-light/30 p-4 rounded-sm"
+        className="bg-paper-white border border-line-soft p-4 rounded-sm"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
@@ -200,18 +200,18 @@ export default function KeywordManagement() {
           placeholder={t('admin.keywords.searchPlaceholder')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-ink-light/30 rounded-sm focus:border-vermilion focus:outline-none"
+          className="w-full rounded-sm border border-line-soft bg-paper-white pl-10 pr-4 py-2 focus:border-vermilion focus:outline-none"
         />
       </div>
 
       {/* 限制词列表 */}
       <motion.div 
-        className="bg-white border border-ink-light/30 rounded-sm overflow-hidden"
+        className="bg-paper-white border border-line-soft rounded-sm overflow-hidden"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
       >
-        <div className="border-b border-ink-light/30 px-4 py-3 bg-paper-cream/50">
+        <div className="border-b border-line-soft px-4 py-3 bg-paper-cream/50">
           <h3 className="font-title">{t('admin.keywords.keywordList')}</h3>
         </div>
 

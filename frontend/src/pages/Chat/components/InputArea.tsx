@@ -1,43 +1,41 @@
-import { useState, useRef, useEffect, DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, ImagePlus, FileText, X, Loader2, ExternalLink, AlertCircle, ChevronUp, Cpu, Palette, Presentation, MoreHorizontal } from 'lucide-react'
+import { AlertCircle, Loader2, Send, Palette, Presentation } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '../../../stores/authStore'
 import { userService } from '../../../services/userService'
-// 从独立模块导入
 import { useImageUpload, type ImagePreview } from '@uppic'
 import { useDocUpload } from '@upword'
+import type { ChatMode } from '../../../types'
+import ComposerAttachment from './composer/ComposerAttachment'
+import ComposerTextArea from './composer/ComposerTextArea'
+import ComposerToolbar from './composer/ComposerToolbar'
+import ModelPicker, { type PickerModel } from './composer/ModelPicker'
 
-// 模型信息类型
-export interface ModelInfo {
-  id: string
-  name: string
-  owned_by?: string | null
-}
+export interface ModelInfo extends PickerModel {}
 
 interface InputAreaProps {
   onSend: (content: string, model?: string) => void
-  onGenerateImage?: (prompt: string) => void  // 绘图模式发送
-  onGeneratePPT?: (prompt: string) => void    // PPT 模式发送
+  onGenerateImage?: (prompt: string) => void
+  onGeneratePPT?: (prompt: string) => void
   disabled?: boolean
   models?: ModelInfo[]
   currentModel?: string
   defaultModel?: string
   onModelChange?: (model: string) => void
-  isDrawMode?: boolean  // 是否绘图模式
-  onDrawModeChange?: (mode: boolean) => void  // 切换绘图模式
-  isPPTMode?: boolean   // 是否 PPT 模式
-  onPPTModeChange?: (mode: boolean) => void   // 切换 PPT 模式
+  isDrawMode?: boolean
+  onDrawModeChange?: (mode: boolean) => void
+  isPPTMode?: boolean
+  onPPTModeChange?: (mode: boolean) => void
 }
 
-// Word 文档预览类型
 interface DocPreview {
   file: File
-  localUrl: string  // 本地 blob URL，用于下载
+  localUrl: string
 }
 
-export default function InputArea({ 
-  onSend, 
+export default function InputArea({
+  onSend,
   onGenerateImage,
   onGeneratePPT,
   disabled = false,
@@ -51,60 +49,26 @@ export default function InputArea({
   onPPTModeChange,
 }: InputAreaProps) {
   const { t } = useTranslation()
+  const { user } = useAuthStore()
+
   const [content, setContent] = useState('')
   const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null)
   const [docPreview, setDocPreview] = useState<DocPreview | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragFileType, setDragFileType] = useState<'image' | 'doc' | 'unknown'>('unknown')
   const [fileError, setFileError] = useState<string | null>(null)
-  const [showModelPicker, setShowModelPicker] = useState(false)
-  const [showMobileActions, setShowMobileActions] = useState(false)
-  const [showMobileModelPicker, setShowMobileModelPicker] = useState(false)
-  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const desktopTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const dragCounterRef = useRef(0)
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
-  const dragCounterRef = useRef(0)
-  const modelPickerRef = useRef<HTMLDivElement>(null)
-  const mobileActionsRef = useRef<HTMLDivElement>(null)
 
-  // 获取显示的模型名称（优先使用自定义名称）
-  const getModelDisplayName = (model: ModelInfo) => {
-    // 优先使用后端返回的 name（可能是自定义名称），否则从 id 提取
-    if (model.name && model.name !== model.id) {
-      return model.name
-    }
-    // 从 id 提取简化名称
-    const parts = model.id.split('/')
-    return parts[parts.length - 1]
-  }
-
-  // 根据 ID 获取模型对象
-  const getModelById = (modelId: string): ModelInfo | undefined => {
-    return models.find(m => m.id === modelId)
-  }
-
-  // 当前显示的模型 ID
-  const displayModelId = currentModel || defaultModel || (models[0]?.id)
-  // 当前显示的模型对象
-  const displayModelObj = displayModelId ? getModelById(displayModelId) : undefined
-  
-  const { user } = useAuthStore()
-  
-  // 使用 uppic 模块的 hook
-  const { 
-    uploadImage, 
-    validateImage, 
-    isUploading: isUploadingImage, 
-    error: imageError, 
-    clearError: clearImageError 
-  } = useImageUpload({
+  const { uploadImage, validateImage, isUploading: isUploadingImage, error: imageError, clearError: clearImageError } = useImageUpload({
     apiBase: '/uppic',
     folder: 'chat-images',
     userId: user?.id?.toString() || 'anonymous',
   })
 
-  // 使用 upword 模块的 hook
   const {
     uploadAndParse,
     validateDoc,
@@ -120,127 +84,87 @@ export default function InputArea({
 
   const isProcessing = isUploadingImage || isProcessingDoc
   const error = imageError || docError || fileError
+  const displayModelId = currentModel || defaultModel || models[0]?.id
+  const mode: ChatMode = isDrawMode ? 'draw' : isPPTMode ? 'ppt' : 'chat'
 
-  // 清除文件错误
-  const clearFileError = () => setFileError(null)
-  const closeMobileMenus = () => {
-    setShowMobileActions(false)
-    setShowMobileModelPicker(false)
-  }
-
-  // 自动调整高度
   useEffect(() => {
-    const textareas = [mobileTextareaRef.current, desktopTextareaRef.current].filter(Boolean) as HTMLTextAreaElement[]
-    textareas.forEach((textarea) => {
-      textarea.style.height = 'auto'
-      textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
-    })
+    if (!textareaRef.current) return
+    textareaRef.current.style.height = 'auto'
+    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
   }, [content])
 
-  // 清理预览 URL
   useEffect(() => {
     return () => {
-      if (imagePreview?.previewUrl) {
-        URL.revokeObjectURL(imagePreview.previewUrl)
-      }
-      if (docPreview?.localUrl) {
-        URL.revokeObjectURL(docPreview.localUrl)
-      }
+      if (imagePreview?.previewUrl) URL.revokeObjectURL(imagePreview.previewUrl)
+      if (docPreview?.localUrl) URL.revokeObjectURL(docPreview.localUrl)
     }
   }, [imagePreview, docPreview])
 
-  // 判断是否为 Word 文档
-  const isWordDocument = (file: File): boolean => {
+  const clearFileError = () => setFileError(null)
+
+  const isWordDocument = (file: File) => {
     const wordMimeTypes = [
       'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ]
-    const wordExtensions = ['.doc', '.docx']
     const fileName = file.name.toLowerCase()
-    return wordMimeTypes.includes(file.type) || wordExtensions.some(ext => fileName.endsWith(ext))
+    return wordMimeTypes.includes(file.type) || fileName.endsWith('.doc') || fileName.endsWith('.docx')
   }
 
-  // 处理图片选择
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    processImageFile(file)
-    if (imageInputRef.current) {
-      imageInputRef.current.value = ''
-    }
-  }
-
-  // 处理文档选择
-  const handleDocSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    processDocFile(file)
-    if (docInputRef.current) {
-      docInputRef.current.value = ''
-    }
-  }
-
-  // 处理图片文件
   const processImageFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
-    
     const validation = validateImage(file)
     if (!validation.valid) return
-    
     const previewUrl = URL.createObjectURL(file)
     setImagePreview({ file, previewUrl })
     clearImageError()
     clearFileError()
   }
 
-  // 处理文档文件
   const processDocFile = (file: File) => {
     if (!isWordDocument(file)) return
-    
     const validation = validateDoc(file)
     if (!validation.valid) return
-    
     const localUrl = URL.createObjectURL(file)
     setDocPreview({ file, localUrl })
     clearDocError()
     clearFileError()
   }
 
-  // 统一的文件处理函数（用于拖拽）
   const processFile = (file: File) => {
     clearFileError()
     if (file.type.startsWith('image/')) {
       processImageFile(file)
-    } else if (isWordDocument(file)) {
-      processDocFile(file)
-    } else {
-      setFileError(t('input.unknownFormat'))
-      // 3秒后自动清除错误
-      setTimeout(() => setFileError(null), 3000)
+      return
     }
+    if (isWordDocument(file)) {
+      processDocFile(file)
+      return
+    }
+    setFileError(t('input.unknownFormat'))
+    setTimeout(() => setFileError(null), 3000)
   }
 
-  // 检测拖拽文件类型
   const detectDragFileType = (e: DragEvent<HTMLDivElement>): 'image' | 'doc' | 'unknown' => {
     const items = e.dataTransfer.items
     if (!items || items.length === 0) return 'unknown'
-    
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < items.length; i += 1) {
       const item = items[i]
       if (item.type.startsWith('image/')) return 'image'
-      if (item.type === 'application/msword' || 
-          item.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      if (
+        item.type === 'application/msword' ||
+        item.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ) {
         return 'doc'
       }
     }
     return 'unknown'
   }
 
-  // 拖拽事件处理
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
-    dragCounterRef.current++
+    dragCounterRef.current += 1
     if (!disabled && !isProcessing && e.dataTransfer.types.includes('Files')) {
       setIsDragging(true)
       setDragFileType(detectDragFileType(e))
@@ -250,7 +174,7 @@ export default function InputArea({
   const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
-    dragCounterRef.current--
+    dragCounterRef.current -= 1
     if (dragCounterRef.current === 0) {
       setIsDragging(false)
       setDragFileType('unknown')
@@ -268,192 +192,119 @@ export default function InputArea({
     setIsDragging(false)
     setDragFileType('unknown')
     dragCounterRef.current = 0
-
     if (disabled || isProcessing) return
-
     const files = e.dataTransfer.files
-    if (files.length === 0) return
-
-    const file = files[0]
-    processFile(file)
+    if (!files.length) return
+    processFile(files[0])
   }
 
   const removeImage = () => {
-    if (imagePreview?.previewUrl) {
-      URL.revokeObjectURL(imagePreview.previewUrl)
-    }
+    if (imagePreview?.previewUrl) URL.revokeObjectURL(imagePreview.previewUrl)
     setImagePreview(null)
     clearImageError()
   }
 
   const removeDoc = () => {
-    if (docPreview?.localUrl) {
-      URL.revokeObjectURL(docPreview.localUrl)
-    }
+    if (docPreview?.localUrl) URL.revokeObjectURL(docPreview.localUrl)
     setDocPreview(null)
     clearDocError()
   }
 
-  // 打开文档（下载本地文件）
   const openDoc = () => {
     if (!docPreview) return
-    
-    // 使用本地 blob URL 触发下载
     const link = document.createElement('a')
     link.href = docPreview.localUrl
-    link.download = docPreview.file.name  // 设置下载文件名
+    link.download = docPreview.file.name
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
   }
 
+  const buildMessageContent = async () => {
+    let messageContent = content.trim()
+    let imageUrl: string | undefined
+    let docInfo: { key: string; filename: string } | undefined
+
+    if (imagePreview) {
+      const result = await uploadImage(imagePreview.file)
+      if (!result) return null
+      imageUrl = result.url
+    }
+
+    if (docPreview) {
+      const result = await uploadAndParse(docPreview.file)
+      if (!result) return null
+      docInfo = { key: result.key, filename: docPreview.file.name }
+    }
+
+    if (imageUrl) {
+      const imageMarkdown = `![图片](${imageUrl})`
+      messageContent = messageContent ? `${messageContent}\n\n${imageMarkdown}` : imageMarkdown
+    }
+
+    if (docInfo) {
+      const docTag = `<!-- DOC:${docInfo.filename}:${docInfo.key} --><!-- /DOC -->`
+      messageContent = messageContent ? `${messageContent}\n\n${docTag}` : docTag
+    }
+
+    return messageContent
+  }
+
+  const resetComposer = () => {
+    setContent('')
+    removeImage()
+    removeDoc()
+  }
+
   const handleSubmit = async () => {
     if ((!content.trim() && !imagePreview && !docPreview) || disabled || isProcessing) return
 
-    // 绘图模式：检查限额后调用绘图接口
     if (isDrawMode && content.trim()) {
       try {
-        // 检查生图限额
         const { allowed, message } = await userService.checkImageLimit()
         if (!allowed) {
           setFileError(message || t('chat.usage.imageExhausted'))
           setTimeout(() => setFileError(null), 5000)
           return
         }
-        onGenerateImage?.(content.trim())
-        setContent('')
-      } catch (error) {
-        console.error('检查生图限额失败:', error)
-        // 出错时仍然允许发送，让后端做最终检查
-        onGenerateImage?.(content.trim())
-        setContent('')
+      } catch (err) {
+        console.error('检查生图限额失败:', err)
       }
+      onGenerateImage?.(content.trim())
+      setContent('')
       return
     }
 
-    // PPT 模式：直接调用 PPT 生成接口
     if (isPPTMode && content.trim()) {
       onGeneratePPT?.(content.trim())
       setContent('')
       return
     }
 
-    let imageUrl: string | undefined
-    let docInfo: { key: string; url: string; filename: string } | undefined
-
-    // 如果有图片，通过 uppic 服务上传
-    if (imagePreview) {
-      const result = await uploadImage(imagePreview.file)
-      if (result) {
-        imageUrl = result.url
-      } else {
-        return // 上传失败，不发送消息
-      }
-    }
-
-    // 如果有文档，通过 upword 服务上传并解析
-    // 注意：这里只获取文档的 key 和 url，不获取 markdown 内容
-    // markdown 内容会由后端在发送给 AI 时从 R2 获取
-    if (docPreview) {
-      const result = await uploadAndParse(docPreview.file)
-      if (result) {
-        // 只保存元数据，不保存 markdown 内容
-        docInfo = {
-          key: result.key,
-          url: result.url,
-          filename: docPreview.file.name,
-        }
-      } else {
-        return // 上传/解析失败，不发送消息
-      }
-    }
-
-    // 构建消息内容 - 只包含元数据，不包含文档实际内容
-    let messageContent = content.trim()
-    
-    // 添加图片
-    if (imageUrl) {
-      const imageMarkdown = `![图片](${imageUrl})`
-      messageContent = messageContent 
-        ? `${messageContent}\n\n${imageMarkdown}` 
-        : imageMarkdown
-    }
-
-    // 添加文档元数据（只包含文件名和 key，不包含内容）
-    // 格式: <!-- DOC:filename.docx:key --><!-- /DOC -->
-    // 后端会根据 key 从 R2 获取文档内容
-    if (docInfo) {
-      const docTag = `<!-- DOC:${docInfo.filename}:${docInfo.key} --><!-- /DOC -->`
-      messageContent = messageContent
-        ? `${messageContent}\n\n${docTag}`
-        : docTag
-    }
-
-    onSend(messageContent, displayModelId)
-    setContent('')
-    removeImage()
-    removeDoc()
-    closeMobileMenus()
+    const message = await buildMessageContent()
+    if (message === null) return
+    onSend(message || '', displayModelId)
+    resetComposer()
   }
 
-  // 点击外部关闭模型选择器与移动端更多菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (modelPickerRef.current && !modelPickerRef.current.contains(target)) {
-        setShowModelPicker(false)
-      }
-      if (mobileActionsRef.current && !mobileActionsRef.current.contains(target)) {
-        closeMobileMenus()
-      }
-    }
-    
-    if (showModelPicker || showMobileActions) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showModelPicker, showMobileActions])
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSubmit()
+      void handleSubmit()
     }
   }
 
-  const triggerImageInput = () => {
-    imageInputRef.current?.click()
-    closeMobileMenus()
-  }
+  const triggerImageInput = () => imageInputRef.current?.click()
+  const triggerDocInput = () => docInputRef.current?.click()
 
-  const triggerDocInput = () => {
-    docInputRef.current?.click()
-    closeMobileMenus()
-  }
-
-  const canSend = (content.trim() || imagePreview || docPreview) && !disabled && !isProcessing
-
-  // 获取拖拽提示文本和图标
-  const getDragHint = () => {
-    switch (dragFileType) {
-      case 'image':
-        return { icon: ImagePlus, text: t('input.dropImage'), isError: false }
-      case 'doc':
-        return { icon: FileText, text: t('input.dropDoc'), isError: false }
-      default:
-        return { icon: AlertCircle, text: t('input.unknownFormat'), isError: true }
-    }
-  }
-
-  const dragHint = getDragHint()
-  const DragIcon = dragHint.icon
+  const canSend = Boolean(content.trim() || imagePreview || docPreview) && !disabled && !isProcessing
+  const dragHintText = dragFileType === 'image' ? t('input.dropImage') : dragFileType === 'doc' ? t('input.dropDoc') : t('input.unknownFormat')
 
   return (
     <motion.div
       className={`
-        border-t border-paper-aged bg-paper-white/80 backdrop-blur-sm p-4
-        relative transition-all duration-200 flex-shrink-0
-        ${isDragging ? 'ring-2 ring-ink-medium ring-inset bg-paper-cream/50' : ''}
+        relative border-t border-line-soft bg-paper-white/80 p-3 backdrop-blur-sm md:p-4
+        ${isDragging ? 'ring-2 ring-ink-medium ring-inset bg-paper-cream/60' : ''}
       `}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -463,218 +314,117 @@ export default function InputArea({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* 拖拽提示覆盖层 */}
       <AnimatePresence>
         {isDragging && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className={`
-              absolute inset-0 flex items-center justify-center z-10 border-2 border-dashed rounded-sm pointer-events-none
-              ${dragHint.isError 
-                ? 'bg-red-50/95 border-vermilion' 
-                : 'bg-paper-cream/95 border-ink-medium'
-              }
-            `}
+            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-md border-2 border-dashed border-ink-medium bg-paper-cream/90"
           >
-            <div className={`flex flex-col items-center gap-2 ${dragHint.isError ? 'text-vermilion' : 'text-ink-medium'}`}>
-              <DragIcon size={32} className={dragHint.isError ? 'animate-pulse' : 'animate-bounce'} />
-              <span className="text-lg font-body">{dragHint.text}</span>
+            <div className="flex items-center gap-2 text-ink-medium">
+              <AlertCircle size={20} />
+              <span className="font-ui text-sm">{dragHintText}</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="max-w-4xl mx-auto">
-        {/* 图片预览区域 */}
-        <AnimatePresence>
-          {imagePreview && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="mb-3"
-            >
-              <div className="relative inline-block">
-                <img
-                  src={imagePreview.previewUrl}
-                  alt={t('input.preview')}
-                  className="max-h-32 rounded-sm border-2 border-paper-aged shadow-sm"
-                />
-                <motion.button
-                  onClick={removeImage}
-                  className="absolute -top-2 -right-2 p-1 bg-ink-black text-paper-white rounded-full shadow-md hover:bg-vermilion transition-colors"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X size={14} />
-                </motion.button>
-                {isUploadingImage && (
-                  <div className="absolute inset-0 bg-ink-black/50 rounded-sm flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-paper-white animate-spin" />
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div className="mx-auto max-w-4xl">
+        <ComposerAttachment
+          imagePreview={imagePreview}
+          docPreview={docPreview}
+          isUploadingImage={isUploadingImage}
+          isProcessingDoc={isProcessingDoc}
+          docProgress={docProgress}
+          onRemoveImage={removeImage}
+          onRemoveDoc={removeDoc}
+          onOpenDoc={openDoc}
+        />
 
-        {/* Word 文档预览区域 */}
-        <AnimatePresence>
-          {docPreview && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="mb-3"
-            >
-              <div className="inline-flex items-center gap-2 px-3 py-2 bg-paper-cream border-2 border-paper-aged rounded-sm">
-                {/* Word 图标 */}
-                <FileText size={18} className="text-cyan-ink shrink-0" />
-                
-                {/* 文件名链接 - 点击下载本地文件 */}
-                <button
-                  onClick={openDoc}
-                  className="text-sm text-cyan-ink hover:text-ink-black hover:underline flex items-center gap-1 transition-colors"
-                  title={t('input.clickToDownload')}
-                >
-                  <span className="max-w-[200px] truncate">{docPreview.file.name}</span>
-                  <ExternalLink size={12} />
-                </button>
-
-                {/* 处理状态 */}
-                {isProcessingDoc && (
-                  <span className="text-xs text-ink-faint ml-2">
-                    {docProgress === 'uploading' ? t('input.uploading') : t('input.parsing')}
-                  </span>
-                )}
-
-                {/* 删除按钮 */}
-                <motion.button
-                  onClick={removeDoc}
-                  disabled={isProcessingDoc}
-                  className="p-1 text-ink-faint hover:text-vermilion transition-colors disabled:opacity-50"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X size={14} />
-                </motion.button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 错误提示 */}
         <AnimatePresence>
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mb-2 text-sm text-vermilion"
+              exit={{ opacity: 0, y: -6 }}
+              className="mb-2 flex items-center gap-1 text-sm font-ui text-vermilion"
             >
-              {error}
+              <AlertCircle size={14} />
+              <span>{error}</span>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* 隐藏的图片文件输入 */}
         <input
           ref={imageInputRef}
           type="file"
           accept="image/jpeg,image/png,image/gif,image/webp"
-          onChange={handleImageSelect}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) processImageFile(file)
+            if (imageInputRef.current) imageInputRef.current.value = ''
+          }}
           className="hidden"
         />
 
-        {/* 隐藏的文档文件输入 */}
         <input
           ref={docInputRef}
           type="file"
           accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          onChange={handleDocSelect}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) processDocFile(file)
+            if (docInputRef.current) docInputRef.current.value = ''
+          }}
           className="hidden"
         />
 
-        {/* 移动端：主行 + 更多菜单 */}
-        <div className="sm:hidden" ref={mobileActionsRef}>
-          <div className="relative flex items-end gap-2">
-            <motion.button
-              onClick={() => {
-                setShowMobileActions((prev) => {
-                  const next = !prev
-                  if (!next) {
-                    setShowMobileModelPicker(false)
-                  }
-                  return next
-                })
+        <div className="flex flex-col gap-2 md:gap-3">
+          <div className="flex items-end gap-2 md:gap-3">
+            <ComposerToolbar
+              disabled={disabled}
+              isProcessing={isProcessing}
+              isDrawMode={isDrawMode}
+              isPPTMode={isPPTMode}
+              onImageUpload={triggerImageInput}
+              onDocUpload={triggerDocInput}
+              onToggleDraw={() => {
+                onDrawModeChange?.(!isDrawMode)
+                if (!isDrawMode) onPPTModeChange?.(false)
               }}
-              disabled={disabled || isProcessing}
-              className={`
-                p-3 rounded-sm shrink-0
-                ${!disabled && !isProcessing
-                  ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
-                  : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
-                }
-                transition-colors duration-300
-              `}
-              whileHover={!disabled && !isProcessing ? { scale: 1.05 } : {}}
-              whileTap={!disabled && !isProcessing ? { scale: 0.95 } : {}}
-              title="更多操作"
-            >
-              <MoreHorizontal size={20} />
-            </motion.button>
+              onTogglePPT={() => {
+                onPPTModeChange?.(!isPPTMode)
+                if (!isPPTMode) onDrawModeChange?.(false)
+              }}
+              className="hidden sm:flex"
+            />
 
-            <div className="min-w-0 flex-1 relative">
-              <textarea
-                ref={mobileTextareaRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isDrawMode
-                  ? t('input.drawModePlaceholder')
-                  : isPPTMode
-                    ? t('input.pptModePlaceholder')
-                    : t('input.placeholder')
-                }
-                disabled={disabled || isProcessing}
-                rows={1}
-                className={`
-                  w-full px-4 py-3 pr-10
-                  bg-paper-white border-2
-                  ${isDrawMode ? 'border-cyan-ink/50' : isPPTMode ? 'border-vermilion/50' : 'border-paper-aged'}
-                  rounded-sm resize-none
-                  text-ink-black placeholder-ink-faint
-                  focus:outline-none focus:border-ink-medium
-                  transition-colors duration-300
-                  disabled:opacity-50 disabled:cursor-not-allowed
-                  font-body
-                `}
-                style={{ minHeight: '52px', maxHeight: '200px' }}
-              />
-              <span className="absolute right-3 bottom-3 text-xs text-ink-faint">
-                {content.length}
-              </span>
-            </div>
+            <ComposerTextArea
+              value={content}
+              onChange={setContent}
+              onKeyDown={handleKeyDown}
+              textareaRef={textareaRef}
+              disabled={disabled || isProcessing}
+              mode={mode}
+            />
 
             <motion.button
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit()}
               disabled={!canSend}
               className={`
-                p-3 rounded-sm shrink-0
+                mb-0.5 rounded-md p-3 transition-colors duration-200
                 ${canSend
                   ? isDrawMode
-                    ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/80'
+                    ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/85'
                     : isPPTMode
-                      ? 'bg-vermilion text-paper-white hover:bg-vermilion/80'
+                      ? 'bg-vermilion text-paper-white hover:bg-vermilion/85'
                       : 'bg-ink-black text-paper-white hover:bg-ink-dark'
-                  : 'bg-paper-aged text-ink-faint cursor-not-allowed'
+                  : 'cursor-not-allowed bg-paper-aged text-ink-faint'
                 }
-                transition-colors duration-300
               `}
-              whileHover={canSend ? { scale: 1.05 } : {}}
-              whileTap={canSend ? { scale: 0.95 } : {}}
+              whileHover={canSend ? { scale: 1.04 } : {}}
+              whileTap={canSend ? { scale: 0.96 } : {}}
               title={isDrawMode ? t('input.generateImage') : isPPTMode ? t('input.generatePpt') : t('input.sendMessage')}
             >
               {isProcessing ? (
@@ -687,373 +437,45 @@ export default function InputArea({
                 <Send size={20} />
               )}
             </motion.button>
-
-            <AnimatePresence>
-              {showMobileActions && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                  className="absolute bottom-full left-0 mb-2 w-[calc(100vw-2rem)] max-w-[22rem]
-                    rounded-sm border-2 border-paper-aged bg-paper-white shadow-lg z-50 p-2"
-                >
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={triggerImageInput}
-                      disabled={disabled || isProcessing || isDrawMode || isPPTMode}
-                      className={`
-                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
-                        ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
-                          ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
-                          : 'bg-paper-aged text-ink-faint cursor-not-allowed'
-                        }
-                      `}
-                    >
-                      <ImagePlus size={16} className="shrink-0" />
-                      <span className="truncate">{t('input.uploadImage')}</span>
-                    </button>
-
-                    <button
-                      onClick={triggerDocInput}
-                      disabled={disabled || isProcessing || isDrawMode || isPPTMode}
-                      className={`
-                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
-                        ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
-                          ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
-                          : 'bg-paper-aged text-ink-faint cursor-not-allowed'
-                        }
-                      `}
-                    >
-                      <FileText size={16} className="shrink-0" />
-                      <span className="truncate">{t('input.uploadDoc')}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        onDrawModeChange?.(!isDrawMode)
-                        if (!isDrawMode) onPPTModeChange?.(false)
-                        closeMobileMenus()
-                      }}
-                      disabled={disabled || isProcessing || isPPTMode}
-                      className={`
-                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
-                        ${isDrawMode
-                          ? 'bg-cyan-ink text-paper-white'
-                          : !disabled && !isProcessing && !isPPTMode
-                            ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
-                            : 'bg-paper-aged text-ink-faint cursor-not-allowed'
-                        }
-                      `}
-                    >
-                      <Palette size={16} className="shrink-0" />
-                      <span className="truncate">{isDrawMode ? t('input.exitDrawMode') : t('input.drawMode')}</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        onPPTModeChange?.(!isPPTMode)
-                        if (!isPPTMode) onDrawModeChange?.(false)
-                        closeMobileMenus()
-                      }}
-                      disabled={disabled || isProcessing || isDrawMode}
-                      className={`
-                        px-3 py-2 rounded-sm text-sm flex items-center gap-2
-                        ${isPPTMode
-                          ? 'bg-vermilion text-paper-white'
-                          : !disabled && !isProcessing && !isDrawMode
-                            ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
-                            : 'bg-paper-aged text-ink-faint cursor-not-allowed'
-                        }
-                      `}
-                    >
-                      <Presentation size={16} className="shrink-0" />
-                      <span className="truncate">{isPPTMode ? t('input.exitPptMode') : t('input.pptMode')}</span>
-                    </button>
-                  </div>
-
-                  {models.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-paper-aged/70">
-                      <button
-                        onClick={() => setShowMobileModelPicker(!showMobileModelPicker)}
-                        disabled={disabled || isProcessing}
-                        className={`
-                          w-full px-3 py-2 rounded-sm text-sm flex items-center justify-between gap-2
-                          ${!disabled && !isProcessing
-                            ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged'
-                            : 'bg-paper-aged text-ink-faint cursor-not-allowed'
-                          }
-                        `}
-                      >
-                        <span className="flex items-center gap-2 min-w-0">
-                          <Cpu size={14} className="shrink-0" />
-                          <span className="truncate">
-                            {displayModelObj ? getModelDisplayName(displayModelObj) : t('input.selectModel')}
-                          </span>
-                        </span>
-                        <ChevronUp
-                          size={14}
-                          className={`shrink-0 transition-transform ${showMobileModelPicker ? 'rotate-180' : ''}`}
-                        />
-                      </button>
-
-                      <AnimatePresence>
-                        {showMobileModelPicker && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 6 }}
-                            className="mt-2 max-h-48 overflow-y-auto rounded-sm border border-paper-aged"
-                          >
-                            {models.map((model) => (
-                              <button
-                                key={model.id}
-                                onClick={() => {
-                                  onModelChange?.(model.id)
-                                  closeMobileMenus()
-                                }}
-                                className={`
-                                  w-full px-3 py-2 text-left text-sm
-                                  hover:bg-paper-cream transition-colors
-                                  ${model.id === displayModelId ? 'bg-paper-cream text-ink-black font-medium' : 'text-ink-medium'}
-                                  border-b border-paper-aged/50 last:border-b-0
-                                `}
-                              >
-                                <div className="truncate" title={model.id}>{getModelDisplayName(model)}</div>
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
-        </div>
 
-        {/* 桌面端：保留原布局 */}
-        <div className="hidden sm:flex relative items-end gap-3">
-          {/* 图片上传按钮 */}
-          <motion.button
-            onClick={triggerImageInput}
-            disabled={disabled || isProcessing || isDrawMode || isPPTMode}
-            className={`
-              p-3 rounded-sm shrink-0 mb-2
-              ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
-                ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
-                : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
-              }
-              transition-colors duration-300
-            `}
-            whileHover={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 0.95 } : {}}
-            title={t('input.uploadImage')}
-          >
-            <ImagePlus size={20} />
-          </motion.button>
-
-          {/* Word 文档上传按钮 */}
-          <motion.button
-            onClick={triggerDocInput}
-            disabled={disabled || isProcessing || isDrawMode || isPPTMode}
-            className={`
-              p-3 rounded-sm shrink-0 mb-2
-              ${!disabled && !isProcessing && !isDrawMode && !isPPTMode
-                ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
-                : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
-              }
-              transition-colors duration-300
-            `}
-            whileHover={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing && !isDrawMode && !isPPTMode ? { scale: 0.95 } : {}}
-            title={t('input.uploadDoc')}
-          >
-            <FileText size={20} />
-          </motion.button>
-
-          {/* 绘图模式按钮 */}
-          <motion.button
-            onClick={() => {
-              onDrawModeChange?.(!isDrawMode)
-              if (!isDrawMode) onPPTModeChange?.(false)
-            }}
-            disabled={disabled || isProcessing || isPPTMode}
-            className={`
-              p-3 rounded-sm shrink-0 mb-2
-              ${isDrawMode
-                ? 'bg-cyan-ink text-paper-white border-2 border-cyan-ink'
-                : !disabled && !isProcessing && !isPPTMode
-                  ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
-                  : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
-              }
-              transition-colors duration-300
-            `}
-            whileHover={!disabled && !isProcessing && !isPPTMode ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing && !isPPTMode ? { scale: 0.95 } : {}}
-            title={isDrawMode ? t('input.exitDrawMode') : t('input.drawMode')}
-          >
-            <Palette size={20} />
-          </motion.button>
-
-          {/* PPT 模式按钮 */}
-          <motion.button
-            onClick={() => {
-              onPPTModeChange?.(!isPPTMode)
-              if (!isPPTMode) onDrawModeChange?.(false)
-            }}
-            disabled={disabled || isProcessing || isDrawMode}
-            className={`
-              p-3 rounded-sm shrink-0 mb-2
-              ${isPPTMode
-                ? 'bg-vermilion text-paper-white border-2 border-vermilion'
-                : !disabled && !isProcessing && !isDrawMode
-                  ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged hover:text-ink-black border-2 border-paper-aged'
-                  : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
-              }
-              transition-colors duration-300
-            `}
-            whileHover={!disabled && !isProcessing && !isDrawMode ? { scale: 1.05 } : {}}
-            whileTap={!disabled && !isProcessing && !isDrawMode ? { scale: 0.95 } : {}}
-            title={isPPTMode ? t('input.exitPptMode') : t('input.pptMode')}
-          >
-            <Presentation size={20} />
-          </motion.button>
-
-          {/* 输入框 */}
-          <div className="min-w-0 flex-1 relative">
-            <textarea
-              ref={desktopTextareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={isDrawMode
-                ? t('input.drawModePlaceholder')
-                : isPPTMode
-                  ? t('input.pptModePlaceholder')
-                  : t('input.placeholder')
-              }
-              disabled={disabled || isProcessing}
-              rows={1}
-              className={`
-                w-full px-4 py-3 pr-12
-                bg-paper-white border-2
-                ${isDrawMode ? 'border-cyan-ink/50' : isPPTMode ? 'border-vermilion/50' : 'border-paper-aged'}
-                rounded-sm resize-none
-                text-ink-black placeholder-ink-faint
-                focus:outline-none focus:border-ink-medium
-                transition-colors duration-300
-                disabled:opacity-50 disabled:cursor-not-allowed
-                font-body
-              `}
-              style={{ minHeight: '52px', maxHeight: '200px' }}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <ComposerToolbar
+              disabled={disabled}
+              isProcessing={isProcessing}
+              isDrawMode={isDrawMode}
+              isPPTMode={isPPTMode}
+              onImageUpload={triggerImageInput}
+              onDocUpload={triggerDocInput}
+              onToggleDraw={() => {
+                onDrawModeChange?.(!isDrawMode)
+                if (!isDrawMode) onPPTModeChange?.(false)
+              }}
+              onTogglePPT={() => {
+                onPPTModeChange?.(!isPPTMode)
+                if (!isPPTMode) onDrawModeChange?.(false)
+              }}
+              className="sm:hidden"
             />
-            <span className="absolute right-3 bottom-3 text-xs text-ink-faint">
-              {content.length}
-            </span>
-          </div>
 
-          {/* 发送按钮 */}
-          <motion.button
-            onClick={handleSubmit}
-            disabled={!canSend}
-            className={`
-              p-3 rounded-sm shrink-0 mb-2
-              ${canSend
-                ? isDrawMode
-                  ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/80'
-                  : isPPTMode
-                    ? 'bg-vermilion text-paper-white hover:bg-vermilion/80'
-                    : 'bg-ink-black text-paper-white hover:bg-ink-dark'
-                : 'bg-paper-aged text-ink-faint cursor-not-allowed'
-              }
-              transition-colors duration-300
-            `}
-            whileHover={canSend ? { scale: 1.05 } : {}}
-            whileTap={canSend ? { scale: 0.95 } : {}}
-            title={isDrawMode ? t('input.generateImage') : isPPTMode ? t('input.generatePpt') : t('input.sendMessage')}
-          >
-            {isProcessing ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : isDrawMode ? (
-              <Palette size={20} />
-            ) : isPPTMode ? (
-              <Presentation size={20} />
-            ) : (
-              <Send size={20} />
-            )}
-          </motion.button>
-
-          {/* 模型选择器 */}
-          {models.length > 0 && (
-            <div className="relative shrink-0 mb-2" ref={modelPickerRef}>
-              <motion.button
-                onClick={() => setShowModelPicker(!showModelPicker)}
+            <div className="ml-auto">
+              <ModelPicker
+                models={models}
+                currentModel={currentModel}
+                defaultModel={defaultModel}
                 disabled={disabled || isProcessing}
-                className={`
-                  px-3 py-2 rounded-sm flex items-center gap-1.5
-                  ${!disabled && !isProcessing
-                    ? 'bg-paper-cream text-ink-medium hover:bg-paper-aged border-2 border-paper-aged'
-                    : 'bg-paper-aged text-ink-faint cursor-not-allowed border-2 border-paper-aged'
-                  }
-                  transition-colors duration-300 text-sm
-                `}
-                whileHover={!disabled && !isProcessing ? { scale: 1.02 } : {}}
-                whileTap={!disabled && !isProcessing ? { scale: 0.98 } : {}}
-                title={t('input.selectModel')}
-              >
-                <Cpu size={14} />
-                <span className="max-w-[100px] truncate">
-                  {displayModelObj ? getModelDisplayName(displayModelObj) : t('input.selectModel')}
-                </span>
-                <ChevronUp
-                  size={14}
-                  className={`transition-transform ${showModelPicker ? 'rotate-180' : ''}`}
-                />
-              </motion.button>
-
-              <AnimatePresence>
-                {showModelPicker && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute bottom-full mb-2 right-0 w-64 max-h-60 overflow-y-auto
-                      bg-paper-white border-2 border-paper-aged rounded-sm shadow-lg z-50"
-                  >
-                    {models.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          onModelChange?.(model.id)
-                          setShowModelPicker(false)
-                        }}
-                        className={`
-                          w-full px-3 py-2 text-left text-sm
-                          hover:bg-paper-cream transition-colors
-                          ${model.id === displayModelId ? 'bg-paper-cream text-ink-black font-medium' : 'text-ink-medium'}
-                          border-b border-paper-aged/50 last:border-b-0
-                        `}
-                      >
-                        <div className="truncate" title={model.id}>{getModelDisplayName(model)}</div>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                onModelChange={onModelChange}
+              />
             </div>
-          )}
+          </div>
         </div>
 
-        {/* 提示文字 */}
-        <p className="text-xs text-ink-faint mt-2 text-center">
-          {isDrawMode 
+        <p className="mt-2 text-center text-xs font-ui text-ink-faint">
+          {isDrawMode
             ? t('input.drawModeHint')
             : isPPTMode
               ? t('input.pptModeHint')
-              : t('input.disclaimer')
-          }
+              : t('input.disclaimer')}
         </p>
       </div>
     </motion.div>

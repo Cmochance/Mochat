@@ -369,7 +369,7 @@ export default function MessageItem({
         {(displayContent || !isUser || isStreaming) && (
           <div
             className={`
-              p-4 rounded-sm max-h-[400px] overflow-y-auto custom-scrollbar
+              rounded-sm p-4
               ${isUser
                 ? 'bg-ink-black text-paper-white'
                 : 'bg-paper-white border border-paper-aged text-ink-black'
@@ -439,7 +439,7 @@ export default function MessageItem({
 
         {/* 时间戳 */}
         <p className={`text-xs text-ink-faint mt-1 ${isUser ? 'text-right' : ''}`}>
-          {new Date(message.created_at).toLocaleTimeString('zh-CN', {
+          {new Date(message.created_at).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
           })}

@@ -32,7 +32,13 @@ export default {
   welcome: {
     brand: '墨语',
     slogan: 'Mochat',
+    heroBadge: '新一代水墨 SaaS AI 平台',
+    heroTitle: '让每一次对话，都像落墨成章',
     description: '水墨之间，智慧流淌。在传统与现代的交融中，开启与AI的对话之旅。',
+    previewHeader: '对话预览',
+    previewUser: '帮我总结这份实验报告的关键发现。',
+    previewAssistant: '我已提炼出 3 个核心结论，并附上可行动建议。',
+    previewThinking: '思考过程可见，便于审阅与复核。',
     getStarted: '立即体验',
     startChat: '开始对话',
     learnMore: '了解更多',
@@ -55,6 +61,55 @@ export default {
         title: '墨文',
         description: '科研专家，输入您的数据，一键生成高质量论文',
       },
+    },
+    integrations: ['OpenAI Compatible API', 'R2 Storage', 'FastAPI', 'React', 'Markdown', 'DOCX/PPT'],
+    trustPoints: [
+      '流式响应与思考过程展示，便于过程追踪',
+      '支持文档上传解析与多模态输入',
+      '管理员可配置模型、额度与内容策略',
+    ],
+    sections: {
+      featuresTitle: '核心能力',
+      featuresSubtitle: '在统一工作流中完成对话、创作、分析与协作。',
+      trustTitle: '可信与可控',
+      trustSubtitle: '从访问控制到使用量审计，为生产场景提供稳定支撑。',
+      integrationTitle: '生态集成',
+      integrationSubtitle: '与现有研发与内容系统快速衔接。',
+      pricingTitle: '套餐建议',
+      pricingSubtitle: '按团队阶段选择配置，后续可平滑升级。',
+      faqTitle: '常见问题',
+      faqSubtitle: '关于部署、模型与数据处理的关键说明。',
+      ctaTitle: '准备好开始了吗？',
+      ctaSubtitle: '即刻进入墨语，体验一体化 AI 工作区。',
+    },
+    pricing: {
+      recommended: '推荐',
+      plans: [
+        {
+          name: '基础版',
+          price: '免费',
+          points: ['每日对话额度', '基础模型接入', '会话历史管理'],
+        },
+        {
+          name: '专业版',
+          price: '¥99 / 月',
+          highlight: true,
+          points: ['更高额度', '绘图与 PPT 模式', '优先响应与管理能力'],
+        },
+        {
+          name: '团队版',
+          price: '联系我们',
+          points: ['多成员协作', '策略与审计增强', '定制化模型与部署支持'],
+        },
+      ],
+    },
+    faq: {
+      items: [
+        { q: '可以接入自定义模型吗？', a: '可以，管理员页面支持维护可用模型列表和默认模型。' },
+        { q: '上传文档会怎样处理？', a: '文档仅用于当前对话上下文解析，支持权限与存储策略控制。' },
+        { q: '是否支持移动端使用？', a: '支持。页面在手机与桌面均进行了交互优化。' },
+        { q: '如何管理用户配额？', a: '管理员可在后台查看统计、导出事件并执行对账。' },
+      ],
     },
     // 装饰文字
     decorativeChars: ['诗', '书', '画', '印'],
@@ -143,6 +198,15 @@ export default {
     adminPanel: '管理后台',
     clickToLogout: '点击登出',
     manage: '管理',
+    quick: {
+      chat: '对话',
+      draw: '绘图',
+      ppt: 'PPT',
+    },
+    empty: {
+      title: '开始你的第一段对话',
+      description: '选择对话模式后输入内容，即可开始生成结果。',
+    },
     // 用户等级
     tier: {
       free: '普通用户',

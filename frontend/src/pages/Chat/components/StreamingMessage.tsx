@@ -54,7 +54,7 @@ export default function StreamingMessage({ content, thinking }: StreamingMessage
         )}
 
         {/* 消息气泡 */}
-        <div className="p-4 rounded-sm max-h-[400px] overflow-y-auto custom-scrollbar bg-paper-white border border-paper-aged text-ink-black">
+        <div className="rounded-sm bg-paper-white border border-paper-aged p-4 text-ink-black">
           <div className="whitespace-pre-wrap break-words">
             <span ref={contentRef}>{content}</span>
             <span className="inline-block w-2 h-4 bg-ink-medium animate-pulse ml-0.5 align-middle" />
@@ -63,7 +63,7 @@ export default function StreamingMessage({ content, thinking }: StreamingMessage
 
         {/* 时间戳 */}
         <p className="text-xs text-ink-faint mt-1">
-          {new Date().toLocaleTimeString('zh-CN', {
+          {new Date().toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
           })}

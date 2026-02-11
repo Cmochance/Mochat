@@ -27,18 +27,16 @@ export default function Modal({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* 背景遮罩 */}
           <motion.div
-            className="fixed inset-0 bg-ink-black/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 z-40 bg-[var(--bg-overlay)] backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
           
-          {/* 模态框 */}
           <motion.div
-            className="fixed inset-0 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -46,30 +44,31 @@ export default function Modal({
             <motion.div
               className={`
                 w-full ${sizes[size]}
-                bg-paper-white rounded-sm shadow-ink-lg
-                border border-paper-aged
+                rounded-lg border shadow-ink-lg
                 overflow-hidden
               `}
+              style={{
+                background: 'linear-gradient(180deg, var(--bg-elevated) 0%, #f8f2e7 100%)',
+                borderColor: 'var(--line-soft)',
+              }}
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* 标题栏 */}
               {title && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-paper-aged">
+                <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: 'var(--line-soft)' }}>
                   <h3 className="text-lg font-title text-ink-black">{title}</h3>
                   <button
                     onClick={onClose}
-                    className="p-1 text-ink-light hover:text-ink-black transition-colors"
+                    className="rounded-sm p-1 text-ink-light transition-colors hover:bg-paper-cream hover:text-ink-black"
                   >
                     <X size={20} />
                   </button>
                 </div>
               )}
               
-              {/* 内容 */}
               <div className="p-6">
                 {children}
               </div>

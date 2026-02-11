@@ -7,11 +7,10 @@ interface LoadingProps {
 
 export default function Loading({ fullScreen = false, text = '墨染中...' }: LoadingProps) {
   const content = (
-    <div className="flex flex-col items-center justify-center gap-4">
-      {/* 墨滴动画 */}
+    <div className="flex flex-col items-center justify-center gap-4 text-center">
       <div className="relative w-16 h-16">
         <motion.div
-          className="absolute inset-0 rounded-full bg-ink-black"
+          className="absolute inset-0 rounded-full bg-ink-black/90"
           initial={{ scale: 0, opacity: 0.8 }}
           animate={{ scale: [0, 1.5], opacity: [0.8, 0] }}
           transition={{
@@ -44,9 +43,8 @@ export default function Loading({ fullScreen = false, text = '墨染中...' }: L
         />
       </div>
       
-      {/* 加载文字 */}
       <motion.p
-        className="text-ink-medium font-body text-sm"
+        className="font-ui text-sm text-ink-medium"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -58,7 +56,7 @@ export default function Loading({ fullScreen = false, text = '墨染中...' }: L
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-paper-gradient flex items-center justify-center z-50">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas-gradient">
         {content}
       </div>
     )

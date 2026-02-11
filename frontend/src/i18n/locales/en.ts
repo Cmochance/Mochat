@@ -302,7 +302,7 @@ export default {
     parsing: 'Parsing...',
     drawModeHint: '🎨 Draw mode enabled · AI will generate image from your description',
     pptModeHint: '📊 PPT mode enabled · AI will generate slides from your topic',
-    disclaimer: 'Mochat AI may produce inaccurate information, please verify important content · Drag & drop to upload images or Word documents',
+    disclaimer: 'Mochat AI may produce inaccurate information, please verify important content',
     clickToDownload: 'Click to download document',
   },
 

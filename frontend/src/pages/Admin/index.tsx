@@ -84,6 +84,7 @@ export default function Admin() {
               {t('admin.adminLabel')}
               {user?.username}
             </span>
+            <LanguageSwitcher position="inline" />
             <button
               className="flex items-center gap-2 rounded-md border border-vermilion/40 bg-vermilion/10 px-3 py-1.5 text-sm font-ui text-vermilion transition-colors hover:bg-vermilion/20"
               onClick={handleLogout}
@@ -150,8 +151,6 @@ export default function Admin() {
           </motion.div>
         </main>
       </div>
-
-      <LanguageSwitcher className="right-4 top-4" />
     </div>
   )
 }

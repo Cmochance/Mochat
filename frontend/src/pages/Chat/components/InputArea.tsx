@@ -390,35 +390,6 @@ export default function InputArea({
               disabled={disabled || isProcessing}
               mode={mode}
             />
-
-            <motion.button
-              onClick={() => void handleSubmit()}
-              disabled={!canSend}
-              className={`
-                mb-0.5 rounded-md p-3 transition-colors duration-200
-                ${canSend
-                  ? isDrawMode
-                    ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/85'
-                    : isPPTMode
-                      ? 'bg-vermilion text-paper-white hover:bg-vermilion/85'
-                      : 'bg-ink-black text-paper-white hover:bg-ink-dark'
-                  : 'cursor-not-allowed bg-paper-aged text-ink-faint'
-                }
-              `}
-              whileHover={canSend ? { scale: 1.04 } : {}}
-              whileTap={canSend ? { scale: 0.96 } : {}}
-              title={isDrawMode ? t('input.generateImage') : isPPTMode ? t('input.generatePpt') : t('input.sendMessage')}
-            >
-              {isProcessing ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : isDrawMode ? (
-                <Palette size={20} />
-              ) : isPPTMode ? (
-                <Presentation size={20} />
-              ) : (
-                <Send size={20} />
-              )}
-            </motion.button>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -447,6 +418,35 @@ export default function InputArea({
               }}
               className="ml-0"
             />
+
+            <motion.button
+              onClick={() => void handleSubmit()}
+              disabled={!canSend}
+              className={`
+                rounded-md p-2.5 transition-colors duration-200
+                ${canSend
+                  ? isDrawMode
+                    ? 'bg-cyan-ink text-paper-white hover:bg-cyan-ink/85'
+                    : isPPTMode
+                      ? 'bg-vermilion text-paper-white hover:bg-vermilion/85'
+                      : 'bg-ink-black text-paper-white hover:bg-ink-dark'
+                  : 'cursor-not-allowed bg-paper-aged text-ink-faint'
+                }
+              `}
+              whileHover={canSend ? { scale: 1.04 } : {}}
+              whileTap={canSend ? { scale: 0.96 } : {}}
+              title={isDrawMode ? t('input.generateImage') : isPPTMode ? t('input.generatePpt') : t('input.sendMessage')}
+            >
+              {isProcessing ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : isDrawMode ? (
+                <Palette size={20} />
+              ) : isPPTMode ? (
+                <Presentation size={20} />
+              ) : (
+                <Send size={20} />
+              )}
+            </motion.button>
           </div>
         </div>
 

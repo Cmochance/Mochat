@@ -302,7 +302,7 @@ export default {
     parsing: '解析中...',
     drawModeHint: '🎨 绘图模式已开启 · 输入描述后 AI 将生成图像',
     pptModeHint: '📊 PPT 模式已开启 · 输入主题后 AI 将生成演示文稿',
-    disclaimer: '墨语AI可能会产生错误信息，请核实重要内容 · 支持拖拽上传图片或Word文档',
+    disclaimer: '墨语AI可能会产生错误信息，请核实重要内容',
     clickToDownload: '点击下载文档',
   },
 

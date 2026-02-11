@@ -26,8 +26,9 @@ interface WelcomeViewTab {
 export default function Welcome() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [activeView, setActiveView] = useState<WelcomeView>('overview')
+  const isEnglish = (i18n.resolvedLanguage ?? i18n.language).startsWith('en')
 
   const features = [
     {
@@ -86,6 +87,7 @@ export default function Welcome() {
         <SectionHeader
           title={t('welcome.heroTitle')}
           subtitle={t('welcome.description')}
+          className={isEnglish ? '[&_h2]:text-[clamp(1.8rem,3vw,2.2rem)] [&_h2]:md:whitespace-nowrap' : ''}
         />
         <div className="mt-5 space-y-2">
           {trustPoints.map((item) => (
@@ -293,7 +295,14 @@ export default function Welcome() {
             <p className="mb-4 inline-flex items-center rounded-full border border-line-soft bg-paper-white/70 px-3 py-1 text-xs font-ui text-text-secondary">
               {t('welcome.heroBadge')}
             </p>
-            <h1 className="font-title text-5xl leading-tight text-ink-black md:text-6xl lg:text-7xl">
+            <h1
+              className={[
+                'font-title leading-tight text-ink-black',
+                isEnglish
+                  ? 'text-[clamp(1.8rem,3vw,2.2rem)] md:whitespace-nowrap'
+                  : 'text-5xl md:text-6xl lg:text-7xl',
+              ].join(' ')}
+            >
               {t('welcome.heroTitle')}
             </h1>
             <p className="mt-4 max-w-2xl text-base font-ui leading-relaxed text-text-secondary md:text-lg">

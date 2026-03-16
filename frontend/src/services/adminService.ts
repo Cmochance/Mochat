@@ -22,6 +22,45 @@ export interface UsageEventsQuery extends UsageStatsQuery {
   user_id?: number
 }
 
+export interface MCPServerConfig {
+  id: number
+  name: string
+  transport: 'remote' | 'stdio' | string
+  is_active: boolean
+  base_url?: string | null
+  command?: string | null
+  args_json?: string | null
+  env_json?: string | null
+  headers_json?: string | null
+  timeout_ms?: number
+  retry_count?: number
+  tool_count?: number
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface MCPToolConfig {
+  tool_name: string
+  description: string
+  input_schema?: Record<string, unknown>
+  is_enabled: boolean
+  requires_approval: boolean
+  updated_at?: string | null
+}
+
+export interface MCPResourceInfo {
+  uri: string
+  name: string
+  description?: string
+  mimeType?: string
+}
+
+export interface MCPPromptInfo {
+  name: string
+  description?: string
+  arguments?: Array<Record<string, unknown>>
+}
+
 export const adminService = {
   // 获取系统统计
   async getStats(): Promise<SystemStats> {
@@ -200,6 +239,114 @@ export const adminService = {
     const response = await api.get('/admin/usage/reconcile', {
       params: userId ? { user_id: userId } : undefined,
     })
+    return response.data
+  },
+
+  // ============ MCP 管理 ============
+  async getMcpServers(): Promise<MCPServerConfig[]> {
+    const response = await api.get<MCPServerConfig[]>('/admin/mcp/servers')
+    return response.data
+  },
+
+  async createMcpServer(payload: {
+    name: string
+    transport: 'remote' | 'stdio'
+    is_active?: boolean
+    base_url?: string
+    command?: string
+    args_json?: string
+    env_json?: string
+    headers_json?: string
+    timeout_ms?: number
+    retry_count?: number
+    bearer_token?: string
+  }): Promise<void> {
+    await api.post('/admin/mcp/servers', payload)
+  },
+
+  async updateMcpServer(serverId: number, payload: Partial<{
+    name: string
+    transport: 'remote' | 'stdio'
+    is_active: boolean
+    base_url: string
+    command: string
+    args_json: string
+    env_json: string
+    headers_json: string
+    timeout_ms: number
+    retry_count: number
+    bearer_token: string
+    clear_bearer_token: boolean
+  }>): Promise<void> {
+    await api.put(`/admin/mcp/servers/${serverId}`, payload)
+  },
+
+  async deleteMcpServer(serverId: number): Promise<void> {
+    await api.delete(`/admin/mcp/servers/${serverId}`)
+  },
+
+  async testMcpServer(serverId: number): Promise<{ success: boolean; latency_ms: number; tools: number }> {
+    const response = await api.post(`/admin/mcp/servers/${serverId}/test`)
+    return response.data
+  },
+
+  async refreshMcpTools(serverId: number): Promise<{ count: number; tools: Array<Record<string, unknown>> }> {
+    const response = await api.post(`/admin/mcp/servers/${serverId}/refresh-tools`)
+    return response.data
+  },
+
+  async getMcpTools(serverId: number): Promise<MCPToolConfig[]> {
+    const response = await api.get<MCPToolConfig[]>(`/admin/mcp/servers/${serverId}/tools`)
+    return response.data
+  },
+
+  async updateMcpToolFlags(
+    serverId: number,
+    toolName: string,
+    payload: { is_enabled?: boolean; requires_approval?: boolean }
+  ): Promise<void> {
+    await api.put(`/admin/mcp/servers/${serverId}/tools/${encodeURIComponent(toolName)}`, payload)
+  },
+
+  async getMcpResources(serverId: number): Promise<MCPResourceInfo[]> {
+    const response = await api.get<MCPResourceInfo[]>(`/admin/mcp/servers/${serverId}/resources`)
+    return response.data
+  },
+
+  async readMcpResource(serverId: number, uri: string): Promise<Record<string, unknown>> {
+    const response = await api.post(`/admin/mcp/servers/${serverId}/resources/read`, { uri })
+    return response.data
+  },
+
+  async getMcpPrompts(serverId: number): Promise<MCPPromptInfo[]> {
+    const response = await api.get<MCPPromptInfo[]>(`/admin/mcp/servers/${serverId}/prompts`)
+    return response.data
+  },
+
+  async getMcpPrompt(
+    serverId: number,
+    name: string,
+    argumentsPayload: Record<string, unknown> = {}
+  ): Promise<Record<string, unknown>> {
+    const response = await api.post(`/admin/mcp/servers/${serverId}/prompts/get`, {
+      name,
+      arguments: argumentsPayload,
+    })
+    return response.data
+  },
+
+  async getMcpRuns(query: {
+    request_id?: string
+    user_id?: number
+    page?: number
+    page_size?: number
+  } = {}): Promise<{
+    total: number
+    page: number
+    page_size: number
+    items: Array<Record<string, unknown>>
+  }> {
+    const response = await api.get('/admin/mcp/runs', { params: query })
     return response.data
   },
 }

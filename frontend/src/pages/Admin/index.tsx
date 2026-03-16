@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   BarChart3,
   LogOut,
+  PlugZap,
   Settings,
   ShieldAlert,
   Users,
@@ -20,8 +21,9 @@ import ModelConfig from './components/ModelConfig'
 import SystemStats from './components/SystemStats'
 import UsageStats from './components/UsageStats'
 import UserManagement from './components/UserManagement'
+import MCPConfig from './components/MCPConfig'
 
-type TabType = 'stats' | 'users' | 'usage' | 'config' | 'keywords'
+type TabType = 'stats' | 'users' | 'usage' | 'config' | 'keywords' | 'mcp'
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -43,6 +45,7 @@ export default function Admin() {
     { id: 'usage', label: t('admin.tabs.usage'), icon: Activity },
     { id: 'config', label: t('admin.tabs.config'), icon: Settings },
     { id: 'keywords', label: t('admin.tabs.keywords'), icon: ShieldAlert },
+    { id: 'mcp', label: 'MCP', icon: PlugZap },
   ]
 
   const loadData = async () => {
@@ -148,6 +151,7 @@ export default function Admin() {
             {activeTab === 'usage' && <UsageStats />}
             {activeTab === 'config' && <ModelConfig />}
             {activeTab === 'keywords' && <KeywordManagement />}
+            {activeTab === 'mcp' && <MCPConfig />}
           </motion.div>
         </main>
       </div>

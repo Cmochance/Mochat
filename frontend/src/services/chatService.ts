@@ -1,5 +1,5 @@
 import api from './api'
-import type { ChatSession, Message, StreamChunk } from '../types'
+import type { ChatSession, Message, StreamChunk, MCPChatServer, MCPApprovalRequired, MCPUserConnectionStatus } from '../types'
 
 const generateRequestId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -94,6 +94,20 @@ interface ModelsResponse {
   default_model: string
 }
 
+export interface MCPOptions {
+  enable_mcp?: boolean
+  mcp_server_ids?: number[]
+  mcp_mode?: 'off' | 'auto' | 'manual'
+}
+
+export interface MCPApprovalResponse {
+  status: string
+  tool_result?: Record<string, unknown>
+  message?: Message
+  next_approval?: MCPApprovalRequired
+  events?: Array<{ type: string; data: unknown }>
+}
+
 export const chatService = {
   // 获取可用模型列表
   async getModels(): Promise<ModelsResponse> {
@@ -145,7 +159,8 @@ export const chatService = {
     sessionId: number,
     content: string,
     onChunk: (chunk: StreamChunk) => void,
-    model?: string
+    model?: string,
+    mcpOptions?: MCPOptions
   ): Promise<void> {
     const response = await fetchWithAuthRetry('/api/chat/completions', {
       method: 'POST',
@@ -157,6 +172,9 @@ export const chatService = {
         session_id: sessionId,
         content,
         model: model || undefined,
+        enable_mcp: Boolean(mcpOptions?.enable_mcp),
+        mcp_server_ids: mcpOptions?.mcp_server_ids?.length ? mcpOptions.mcp_server_ids : undefined,
+        mcp_mode: mcpOptions?.mcp_mode || 'auto',
       }),
     })
 
@@ -216,6 +234,40 @@ export const chatService = {
         // 忽略
       }
     }
+  },
+
+  async getMcpServers(): Promise<MCPChatServer[]> {
+    const response = await api.get<MCPChatServer[]>('/chat/mcp/servers')
+    return response.data
+  },
+
+  async getMcpConnections(): Promise<MCPUserConnectionStatus[]> {
+    const response = await api.get<MCPUserConnectionStatus[]>('/chat/mcp/connections')
+    return response.data
+  },
+
+  async upsertMcpConnection(serverId: number, bearerToken: string): Promise<MCPUserConnectionStatus> {
+    const response = await api.put<MCPUserConnectionStatus>(`/chat/mcp/connections/${serverId}`, {
+      bearer_token: bearerToken,
+    })
+    return response.data
+  },
+
+  async deleteMcpConnection(serverId: number): Promise<void> {
+    await api.delete(`/chat/mcp/connections/${serverId}`)
+  },
+
+  async approveMcpCall(approvalId: number): Promise<MCPApprovalResponse> {
+    const response = await api.post('/chat/mcp/approve', { approval_id: approvalId })
+    return response.data
+  },
+
+  async rejectMcpCall(approvalId: number): Promise<{
+    status: string
+    message?: Message
+  }> {
+    const response = await api.post('/chat/mcp/reject', { approval_id: approvalId })
+    return response.data
   },
 
   // 重新生成响应

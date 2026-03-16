@@ -131,8 +131,8 @@ export interface Message {
 
 // 流式响应块
 export interface StreamChunk {
-  type: 'thinking' | 'content' | 'done' | 'error'
-  data: string
+  type: 'thinking' | 'content' | 'done' | 'error' | 'plan' | 'tool_call' | 'tool_result' | 'approval_required'
+  data: unknown
 }
 
 // 聊天输入模式
@@ -150,6 +150,31 @@ export interface SystemStats {
   session_count: number
   message_count: number
   keyword_count: number
+}
+
+export interface MCPChatServer {
+  id: number
+  name: string
+  transport: 'remote' | 'stdio' | string
+  tool_count: number
+  connected?: boolean
+}
+
+export interface MCPUserConnectionStatus {
+  server_id: number
+  server_name: string
+  transport: 'remote' | 'stdio' | string
+  connected: boolean
+  updated_at?: string | null
+}
+
+export interface MCPApprovalRequired {
+  approval_id: number
+  server_name: string
+  tool_name: string
+  arguments: Record<string, unknown>
+  reason?: string
+  expires_at?: string
 }
 
 // 限制词

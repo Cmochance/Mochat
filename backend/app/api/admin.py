@@ -3,8 +3,10 @@
 """
 import csv
 import io
+import json
 from datetime import datetime
 from typing import List, Dict, Any
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,7 @@ from ..services.admin_service import admin_service
 from ..services.content_filter import content_filter
 from ..services.usage_service import usage_service, TIER_LIMITS
 from ..services.usage_reconcile_service import usage_reconcile_service
+from ..mcp.service import mcp_service
 from ..core.dependencies import get_admin_user
 from ..db.models import User
 
@@ -572,3 +575,314 @@ async def reconcile_usage(
 ) -> Dict[str, Any]:
     """执行 usage_events / aggregates / user_usages 对账"""
     return await usage_reconcile_service.reconcile(db, user_id=user_id)
+
+
+# ============ MCP 管理 ============
+
+class MCPServerCreate(BaseModel):
+    name: str
+    transport: str  # remote | stdio
+    is_active: bool = True
+    base_url: str | None = None
+    command: str | None = None
+    args_json: str | None = None
+    env_json: str | None = None
+    headers_json: str | None = None
+    timeout_ms: int = 15000
+    retry_count: int = 1
+    bearer_token: str | None = None
+
+
+class MCPServerUpdate(BaseModel):
+    name: str | None = None
+    transport: str | None = None
+    is_active: bool | None = None
+    base_url: str | None = None
+    command: str | None = None
+    args_json: str | None = None
+    env_json: str | None = None
+    headers_json: str | None = None
+    timeout_ms: int | None = None
+    retry_count: int | None = None
+    bearer_token: str | None = None
+    clear_bearer_token: bool | None = None
+
+
+class MCPToolFlagUpdate(BaseModel):
+    is_enabled: bool | None = None
+    requires_approval: bool | None = None
+
+
+class MCPResourceReadRequest(BaseModel):
+    uri: str
+
+
+class MCPPromptGetRequest(BaseModel):
+    name: str
+    arguments: dict[str, Any] | None = None
+
+
+def _validate_http_url(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="base_url must be a valid http/https URL")
+    return url.strip()
+
+
+def _normalize_json_input(
+    *,
+    field_name: str,
+    raw: str | None,
+    expected: str,
+) -> str | None:
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail=f"{field_name} must be valid JSON")
+
+    if expected == "array" and not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a JSON array")
+    if expected == "object" and not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a JSON object")
+    return json.dumps(parsed, ensure_ascii=False)
+
+
+@router.get("/mcp/servers")
+async def get_mcp_servers(
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    return await mcp_service.list_admin_servers(db)
+
+
+@router.post("/mcp/servers")
+async def create_mcp_server(
+    data: MCPServerCreate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    transport = data.transport.strip().lower()
+    if transport not in {"remote", "stdio"}:
+        raise HTTPException(status_code=400, detail="transport must be remote or stdio")
+    if transport == "remote" and not data.base_url:
+        raise HTTPException(status_code=400, detail="base_url is required for remote transport")
+    if transport == "stdio" and not data.command:
+        raise HTTPException(status_code=400, detail="command is required for stdio transport")
+
+    base_url = _validate_http_url(data.base_url) if transport == "remote" and data.base_url else None
+    args_json = _normalize_json_input(field_name="args_json", raw=data.args_json, expected="array")
+    env_json = _normalize_json_input(field_name="env_json", raw=data.env_json, expected="object")
+    headers_json = _normalize_json_input(field_name="headers_json", raw=data.headers_json, expected="object")
+
+    server = await mcp_service.create_server(
+        db,
+        name=data.name.strip(),
+        transport=transport,
+        is_active=data.is_active,
+        base_url=base_url,
+        command=data.command.strip() if data.command else None,
+        args_json=args_json,
+        env_json=env_json,
+        headers_json=headers_json,
+        timeout_ms=data.timeout_ms,
+        retry_count=data.retry_count,
+        bearer_token=data.bearer_token,
+    )
+    if not server:
+        raise HTTPException(status_code=400, detail="MCP server name already exists")
+    await db.commit()
+    return {"id": server.id, "message": "created"}
+
+
+@router.put("/mcp/servers/{server_id}")
+async def update_mcp_server(
+    server_id: int,
+    data: MCPServerUpdate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    update_data = data.model_dump(exclude_unset=True)
+    if "transport" in update_data:
+        transport = str(update_data["transport"]).strip().lower()
+        if transport not in {"remote", "stdio"}:
+            raise HTTPException(status_code=400, detail="transport must be remote or stdio")
+        update_data["transport"] = transport
+
+    target_transport = str(update_data.get("transport") or "").strip().lower()
+    if not target_transport:
+        current = await crud.get_mcp_server_by_id(db, server_id)
+        if not current:
+            raise HTTPException(status_code=404, detail="MCP server not found")
+        target_transport = current.transport
+
+    if "base_url" in update_data and update_data.get("base_url"):
+        update_data["base_url"] = _validate_http_url(str(update_data["base_url"]))
+    elif target_transport == "remote" and "transport" in update_data and not update_data.get("base_url"):
+        # 切换到 remote 时，保留旧值或报错
+        current = await crud.get_mcp_server_by_id(db, server_id)
+        if not current or not current.base_url:
+            raise HTTPException(status_code=400, detail="base_url is required for remote transport")
+    if target_transport == "stdio" and "transport" in update_data and not update_data.get("command"):
+        current = await crud.get_mcp_server_by_id(db, server_id)
+        if not current or not current.command:
+            raise HTTPException(status_code=400, detail="command is required for stdio transport")
+
+    if "args_json" in update_data:
+        update_data["args_json"] = _normalize_json_input(field_name="args_json", raw=update_data.get("args_json"), expected="array")
+    if "env_json" in update_data:
+        update_data["env_json"] = _normalize_json_input(field_name="env_json", raw=update_data.get("env_json"), expected="object")
+    if "headers_json" in update_data:
+        update_data["headers_json"] = _normalize_json_input(field_name="headers_json", raw=update_data.get("headers_json"), expected="object")
+
+    server = await mcp_service.update_server(db, server_id, **update_data)
+    if not server:
+        raise HTTPException(status_code=404, detail="MCP server not found")
+    await db.commit()
+    return {"message": "updated"}
+
+
+@router.delete("/mcp/servers/{server_id}")
+async def delete_mcp_server(
+    server_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    success = await crud.delete_mcp_server(db, server_id)
+    await db.commit()
+    if not success:
+        raise HTTPException(status_code=404, detail="MCP server not found")
+    return {"message": "deleted"}
+
+
+@router.post("/mcp/servers/{server_id}/test")
+async def test_mcp_server(
+    server_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        return await mcp_service.test_server(db, server_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"MCP server test failed: {exc}")
+
+
+@router.post("/mcp/servers/{server_id}/refresh-tools")
+async def refresh_mcp_server_tools(
+    server_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        tools = await mcp_service.refresh_server_tools(db, server_id)
+        await db.commit()
+        return {"count": len(tools), "tools": tools}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"refresh tools failed: {exc}")
+
+
+@router.get("/mcp/servers/{server_id}/tools")
+async def get_mcp_server_tools(
+    server_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    return await mcp_service.list_server_tools(db, server_id)
+
+
+@router.put("/mcp/servers/{server_id}/tools/{tool_name}")
+async def update_mcp_tool_flags(
+    server_id: int,
+    tool_name: str,
+    data: MCPToolFlagUpdate,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    updated = await mcp_service.update_tool_flags(
+        db,
+        server_id,
+        tool_name,
+        is_enabled=data.is_enabled,
+        requires_approval=data.requires_approval,
+    )
+    await db.commit()
+    if not updated:
+        raise HTTPException(status_code=404, detail="MCP tool not found")
+    return {"message": "updated"}
+
+
+@router.get("/mcp/servers/{server_id}/resources")
+async def get_mcp_server_resources(
+    server_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    try:
+        return await mcp_service.list_server_resources(db, server_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"list resources failed: {exc}")
+
+
+@router.post("/mcp/servers/{server_id}/resources/read")
+async def read_mcp_server_resource(
+    server_id: int,
+    data: MCPResourceReadRequest,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        return await mcp_service.read_server_resource(db, server_id, data.uri.strip())
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"read resource failed: {exc}")
+
+
+@router.get("/mcp/servers/{server_id}/prompts")
+async def get_mcp_server_prompts(
+    server_id: int,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    try:
+        return await mcp_service.list_server_prompts(db, server_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"list prompts failed: {exc}")
+
+
+@router.post("/mcp/servers/{server_id}/prompts/get")
+async def get_mcp_server_prompt(
+    server_id: int,
+    data: MCPPromptGetRequest,
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    try:
+        return await mcp_service.get_server_prompt(
+            db,
+            server_id,
+            data.name.strip(),
+            data.arguments if isinstance(data.arguments, dict) else {},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"get prompt failed: {exc}")
+
+
+@router.get("/mcp/runs")
+async def get_mcp_run_logs(
+    request_id: str | None = Query(default=None),
+    user_id: int | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=500),
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    return await mcp_service.get_run_logs(
+        db,
+        user_id=user_id,
+        request_id=request_id,
+        page=page,
+        page_size=page_size,
+    )

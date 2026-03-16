@@ -1,6 +1,7 @@
 """
 对话业务服务 - 处理对话相关的业务逻辑
 """
+import json
 import re
 import httpx
 from typing import List, Optional, AsyncGenerator
@@ -11,6 +12,7 @@ from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
 from .content_filter import content_filter, RESTRICTED_MESSAGE
 from ..core.config import settings
+from ..mcp.service import mcp_service
 
 # Upword 服务地址（Docker 内部网络）
 UPWORD_SERVICE_URL = "http://upword:3901"
@@ -157,13 +159,21 @@ class ChatService:
         session_id: int,
         user: User,
         content: str,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        request_id: Optional[str] = None,
+        enable_mcp: bool = False,
+        mcp_server_ids: Optional[List[int]] = None,
+        mcp_mode: str = "auto",
     ) -> AsyncGenerator[dict, None]:
         """
         发送消息并获取AI流式响应
         
         Args:
             model: 可选的模型名称，不传则使用默认模型
+            request_id: 请求ID，用于MCP轨迹日志
+            enable_mcp: 是否启用 MCP
+            mcp_server_ids: 可选，限定可用 MCP 服务器 ID
+            mcp_mode: off | auto | manual
         
         Yields:
             dict: {"type": "thinking" | "content" | "done" | "error", "data": str}
@@ -206,6 +216,37 @@ class ChatService:
         max_tokens = settings.AI_MAX_TOKENS
         temperature = settings.AI_TEMPERATURE
         
+        # MCP 预处理（规划 + 工具调用 + 审批）
+        if enable_mcp and mcp_mode != "off":
+            try:
+                mcp_result = await mcp_service.run_before_answer(
+                    db,
+                    request_id=request_id or "",
+                    session_id=session_id,
+                    user=user,
+                    history_messages=messages,
+                    model=model,
+                    enable_mcp=enable_mcp,
+                    selected_server_ids=mcp_server_ids,
+                    mcp_mode=mcp_mode,
+                )
+                for event in mcp_result.get("events", []):
+                    yield event
+
+                approval = mcp_result.get("approval")
+                if approval:
+                    # 审批模式下本轮先结束流，等待 /chat/mcp/approve 或 /chat/mcp/reject
+                    yield {
+                        "type": "done",
+                        "data": json.dumps({"status": "waiting_approval"}, ensure_ascii=False),
+                    }
+                    await db.commit()
+                    return
+
+                messages.extend(mcp_result.get("tool_messages", []))
+            except Exception as exc:
+                yield {"type": "tool_result", "data": {"error": f"MCP pipeline failed: {str(exc)}"}}
+
         # 调用AI服务获取流式响应
         thinking_full = ""
         content_full = ""
@@ -266,6 +307,23 @@ class ChatService:
         else:
             # 明确无内容返回为失败路径，便于上层准确计数
             yield {"type": "error", "data": "AI 未返回有效内容"}
+
+    @staticmethod
+    async def resolve_mcp_approval(
+        db: AsyncSession,
+        approval_id: int,
+        user: User,
+        approved: bool,
+    ) -> dict:
+        """处理 MCP 审批请求"""
+        result = await mcp_service.resolve_approval(
+            db,
+            approval_id=approval_id,
+            user=user,
+            approved=approved,
+        )
+        await db.commit()
+        return result
     
     @staticmethod
     async def regenerate_response(

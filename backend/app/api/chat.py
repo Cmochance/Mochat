@@ -29,6 +29,7 @@ from ..schemas.chat import (
 from ..services.chat_service import chat_service
 from ..services.ai_service import ai_service
 from ..services.usage_service import usage_service
+from ..mcp.service import mcp_service
 from ..db import crud
 from ..core.dependencies import get_current_active_user
 from ..core.config import settings
@@ -52,6 +53,14 @@ class PPTGenerateRequest(BaseModel):
     """PPT 生成网关请求"""
     prompt: str
     user_id: str | None = None  # 仅兼容旧参数，网关会忽略
+
+
+class MCPApprovalRequest(BaseModel):
+    approval_id: int
+
+
+class MCPUserConnectionRequest(BaseModel):
+    bearer_token: str
 
 
 def _resolve_request_id(x_request_id: str | None) -> str:
@@ -258,7 +267,15 @@ async def chat_completions(
         started_at = datetime.utcnow()
         try:
             async for chunk in chat_service.send_message_stream(
-                db, request.session_id, current_user, request.content, request.model
+                db,
+                request.session_id,
+                current_user,
+                request.content,
+                request.model,
+                request_id=request_id,
+                enable_mcp=request.enable_mcp,
+                mcp_server_ids=request.mcp_server_ids,
+                mcp_mode=request.mcp_mode,
             ):
                 if chunk.get("type") == "error":
                     stream_success = False
@@ -300,6 +317,92 @@ async def chat_completions(
             "X-Request-ID": request_id,
         }
     )
+
+
+@router.get("/mcp/servers")
+async def get_mcp_servers(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取聊天可用 MCP 服务器列表"""
+    return await mcp_service.list_chat_servers(db, current_user)
+
+
+@router.get("/mcp/connections")
+async def get_mcp_connections(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取当前用户的 MCP 连接状态"""
+    return await mcp_service.list_user_connections(db, current_user)
+
+
+@router.put("/mcp/connections/{server_id}")
+async def upsert_mcp_connection(
+    server_id: int,
+    data: MCPUserConnectionRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """绑定/更新当前用户的 MCP 连接凭证"""
+    try:
+        result = await mcp_service.upsert_user_connection(db, current_user, server_id, data.bearer_token)
+        await db.commit()
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.delete("/mcp/connections/{server_id}")
+async def delete_mcp_connection(
+    server_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除当前用户 MCP 连接凭证"""
+    removed = await mcp_service.delete_user_connection(db, current_user, server_id)
+    await db.commit()
+    if not removed:
+        raise HTTPException(status_code=404, detail="connection not found")
+    return {"message": "deleted"}
+
+
+@router.post("/mcp/approve")
+async def approve_mcp_call(
+    request: MCPApprovalRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """审批通过 MCP 工具调用并继续生成回复"""
+    try:
+        result = await chat_service.resolve_mcp_approval(
+            db,
+            approval_id=request.approval_id,
+            user=current_user,
+            approved=True,
+        )
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/mcp/reject")
+async def reject_mcp_call(
+    request: MCPApprovalRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """拒绝 MCP 工具调用"""
+    try:
+        result = await chat_service.resolve_mcp_approval(
+            db,
+            approval_id=request.approval_id,
+            user=current_user,
+            approved=False,
+        )
+        return result
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.post("/image/generate/stream")

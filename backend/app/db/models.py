@@ -167,6 +167,114 @@ class AllowedModel(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class MCPServer(Base):
+    """MCP 服务器配置"""
+    __tablename__ = "mcp_servers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), unique=True, nullable=False, index=True)
+    transport = Column(String(20), nullable=False, default="remote")  # remote | stdio
+    is_active = Column(Boolean, default=True)
+    base_url = Column(String(500), nullable=True)  # remote 使用
+    command = Column(String(400), nullable=True)  # stdio 使用
+    args_json = Column(Text, nullable=True)  # JSON array
+    env_json = Column(Text, nullable=True)  # JSON object
+    headers_json = Column(Text, nullable=True)  # JSON object
+    timeout_ms = Column(Integer, default=15000)
+    retry_count = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MCPServerSecret(Base):
+    """MCP 服务器密钥（加密存储）"""
+    __tablename__ = "mcp_server_secrets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    server_id = Column(Integer, ForeignKey("mcp_servers.id"), unique=True, nullable=False, index=True)
+    secret_ciphertext = Column(Text, nullable=False)
+    key_version = Column(String(20), nullable=False, default="v1")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MCPUserConnection(Base):
+    """用户级 MCP 凭证（用于连接个人账号）"""
+    __tablename__ = "mcp_user_connections"
+    __table_args__ = (
+        UniqueConstraint("user_id", "server_id", name="uq_mcp_user_server"),
+        Index("idx_mcp_user_connection_user", "user_id", "updated_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    server_id = Column(Integer, ForeignKey("mcp_servers.id"), nullable=False, index=True)
+    auth_type = Column(String(20), nullable=False, default="bearer")
+    secret_ciphertext = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MCPToolCache(Base):
+    """MCP 工具缓存与策略开关"""
+    __tablename__ = "mcp_tools_cache"
+    __table_args__ = (
+        UniqueConstraint("server_id", "tool_name", name="uq_mcp_tool_server_name"),
+        Index("idx_mcp_tool_server_enabled", "server_id", "is_enabled"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    server_id = Column(Integer, ForeignKey("mcp_servers.id"), nullable=False, index=True)
+    tool_name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    input_schema_json = Column(Text, nullable=True)  # JSON object
+    is_enabled = Column(Boolean, default=True)
+    requires_approval = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MCPRunLog(Base):
+    """MCP 执行轨迹日志"""
+    __tablename__ = "mcp_run_logs"
+    __table_args__ = (
+        Index("idx_mcp_run_request_time", "request_id", "created_at"),
+        Index("idx_mcp_run_user_time", "user_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(String(64), nullable=False, index=True)
+    session_id = Column(Integer, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    step_type = Column(String(40), nullable=False)  # plan/tool_call/tool_result/error/approval
+    server_id = Column(Integer, ForeignKey("mcp_servers.id"), nullable=True)
+    tool_name = Column(String(200), nullable=True)
+    input_json = Column(Text, nullable=True)
+    output_json = Column(Text, nullable=True)
+    status = Column(String(20), nullable=False, default="success")
+    error_code = Column(String(120), nullable=True)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MCPApproval(Base):
+    """MCP 审批记录"""
+    __tablename__ = "mcp_approvals"
+    __table_args__ = (
+        Index("idx_mcp_approval_user_status", "user_id", "status"),
+        Index("idx_mcp_approval_request", "request_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(String(64), nullable=False, index=True)
+    session_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    tool_name = Column(String(200), nullable=False)
+    input_json = Column(Text, nullable=False)  # JSON object
+    status = Column(String(20), nullable=False, default="pending")  # pending/approved/rejected/expired
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    expired_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class VerificationCode(Base):
     """验证码持久化表"""
     __tablename__ = "verification_codes"

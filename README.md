@@ -7,6 +7,7 @@
 - 🖌️ **水墨风格UI** - 传统中国美学设计
 - 💬 **流式对话** - 实时流式输出AI回复
 - 🧠 **思考展示** - Thinking内容独立显示，默认折叠
+- 🔌 **MCP 连接** - 支持接入 stdio / 远程 MCP Server 并在对话中调用工具
 - 🔐 **用户系统** - 完整的登录注册功能
 - 📊 **后台管理** - 用户管理和系统配置
 
@@ -96,6 +97,9 @@ AI_API_KEY=your-openai-api-key
 AI_BASE_URL=https://api.openai.com/v1
 AI_MODEL=gpt-4
 CORS_ORIGINS=http://localhost:3721
+MCP_DEFAULT_TIMEOUT_MS=15000
+MCP_MAX_TOOL_CALLS=3
+MCP_APPROVAL_TTL_SECONDS=600
 ```
 
 ### Supabase 迁移脚本

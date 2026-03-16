@@ -1,12 +1,27 @@
 """
 CRUD操作封装
 """
+import json
+from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
-from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel
+from .models import (
+    User,
+    ChatSession,
+    Message,
+    SystemConfig,
+    RestrictedKeyword,
+    AllowedModel,
+    MCPServer,
+    MCPServerSecret,
+    MCPUserConnection,
+    MCPToolCache,
+    MCPRunLog,
+    MCPApproval,
+)
 from ..core.config import settings
 from ..core.security import get_password_hash, verify_password, encrypt_password
 
@@ -471,3 +486,369 @@ async def get_allowed_model_count(db: AsyncSession) -> int:
     """获取允许的模型总数"""
     result = await db.execute(select(func.count(AllowedModel.id)))
     return result.scalar()
+
+
+# ============ MCP 管理相关 CRUD ============
+
+async def get_mcp_server_by_id(db: AsyncSession, server_id: int) -> Optional[MCPServer]:
+    result = await db.execute(select(MCPServer).where(MCPServer.id == server_id))
+    return result.scalar_one_or_none()
+
+
+async def get_mcp_servers(db: AsyncSession, active_only: bool = False) -> List[MCPServer]:
+    query = select(MCPServer).order_by(MCPServer.created_at.asc())
+    if active_only:
+        query = query.where(MCPServer.is_active == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def create_mcp_server(
+    db: AsyncSession,
+    name: str,
+    transport: str,
+    is_active: bool = True,
+    base_url: Optional[str] = None,
+    command: Optional[str] = None,
+    args_json: Optional[str] = None,
+    env_json: Optional[str] = None,
+    headers_json: Optional[str] = None,
+    timeout_ms: int = 15000,
+    retry_count: int = 1,
+) -> Optional[MCPServer]:
+    existing = await db.execute(select(MCPServer).where(MCPServer.name == name))
+    if existing.scalar_one_or_none():
+        return None
+
+    server = MCPServer(
+        name=name,
+        transport=transport,
+        is_active=is_active,
+        base_url=base_url,
+        command=command,
+        args_json=args_json,
+        env_json=env_json,
+        headers_json=headers_json,
+        timeout_ms=timeout_ms,
+        retry_count=retry_count,
+    )
+    db.add(server)
+    await db.flush()
+    await db.refresh(server)
+    return server
+
+
+async def update_mcp_server(
+    db: AsyncSession,
+    server_id: int,
+    **kwargs,
+) -> Optional[MCPServer]:
+    server = await get_mcp_server_by_id(db, server_id)
+    if not server:
+        return None
+    for key, value in kwargs.items():
+        if hasattr(server, key) and value is not None:
+            setattr(server, key, value)
+    await db.flush()
+    await db.refresh(server)
+    return server
+
+
+async def delete_mcp_server(db: AsyncSession, server_id: int) -> bool:
+    await db.execute(delete(MCPToolCache).where(MCPToolCache.server_id == server_id))
+    await db.execute(delete(MCPServerSecret).where(MCPServerSecret.server_id == server_id))
+    result = await db.execute(delete(MCPServer).where(MCPServer.id == server_id))
+    return result.rowcount > 0
+
+
+async def get_mcp_server_secret(db: AsyncSession, server_id: int) -> Optional[MCPServerSecret]:
+    result = await db.execute(select(MCPServerSecret).where(MCPServerSecret.server_id == server_id))
+    return result.scalar_one_or_none()
+
+
+async def set_mcp_server_secret(
+    db: AsyncSession,
+    server_id: int,
+    secret_ciphertext: str,
+    key_version: str = "v1",
+) -> MCPServerSecret:
+    secret = await get_mcp_server_secret(db, server_id)
+    if secret:
+        secret.secret_ciphertext = secret_ciphertext
+        secret.key_version = key_version
+        secret.updated_at = datetime.utcnow()
+    else:
+        secret = MCPServerSecret(
+            server_id=server_id,
+            secret_ciphertext=secret_ciphertext,
+            key_version=key_version,
+        )
+        db.add(secret)
+    await db.flush()
+    await db.refresh(secret)
+    return secret
+
+
+async def delete_mcp_server_secret(db: AsyncSession, server_id: int) -> bool:
+    result = await db.execute(delete(MCPServerSecret).where(MCPServerSecret.server_id == server_id))
+    return result.rowcount > 0
+
+
+async def get_mcp_tools(db: AsyncSession, server_id: int, enabled_only: bool = False) -> List[MCPToolCache]:
+    query = select(MCPToolCache).where(MCPToolCache.server_id == server_id).order_by(MCPToolCache.tool_name.asc())
+    if enabled_only:
+        query = query.where(MCPToolCache.is_enabled == True)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def get_mcp_tool(db: AsyncSession, server_id: int, tool_name: str) -> Optional[MCPToolCache]:
+    result = await db.execute(
+        select(MCPToolCache).where(
+            MCPToolCache.server_id == server_id,
+            MCPToolCache.tool_name == tool_name,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def upsert_mcp_tool_cache(
+    db: AsyncSession,
+    server_id: int,
+    tool_name: str,
+    description: Optional[str],
+    input_schema_json: Optional[str],
+) -> MCPToolCache:
+    result = await db.execute(
+        select(MCPToolCache).where(
+            MCPToolCache.server_id == server_id,
+            MCPToolCache.tool_name == tool_name,
+        )
+    )
+    tool = result.scalar_one_or_none()
+    if tool:
+        tool.description = description
+        tool.input_schema_json = input_schema_json
+    else:
+        tool = MCPToolCache(
+            server_id=server_id,
+            tool_name=tool_name,
+            description=description,
+            input_schema_json=input_schema_json,
+            is_enabled=True,
+            requires_approval=False,
+        )
+        db.add(tool)
+    await db.flush()
+    await db.refresh(tool)
+    return tool
+
+
+async def delete_mcp_tools_not_in(db: AsyncSession, server_id: int, tool_names: List[str]) -> int:
+    if tool_names:
+        result = await db.execute(
+            delete(MCPToolCache).where(
+                MCPToolCache.server_id == server_id,
+                MCPToolCache.tool_name.notin_(tool_names),
+            )
+        )
+    else:
+        result = await db.execute(delete(MCPToolCache).where(MCPToolCache.server_id == server_id))
+    return result.rowcount or 0
+
+
+async def update_mcp_tool_flags(
+    db: AsyncSession,
+    server_id: int,
+    tool_name: str,
+    is_enabled: Optional[bool] = None,
+    requires_approval: Optional[bool] = None,
+) -> Optional[MCPToolCache]:
+    result = await db.execute(
+        select(MCPToolCache).where(
+            MCPToolCache.server_id == server_id,
+            MCPToolCache.tool_name == tool_name,
+        )
+    )
+    tool = result.scalar_one_or_none()
+    if not tool:
+        return None
+    if is_enabled is not None:
+        tool.is_enabled = is_enabled
+    if requires_approval is not None:
+        tool.requires_approval = requires_approval
+    await db.flush()
+    await db.refresh(tool)
+    return tool
+
+
+async def create_mcp_run_log(
+    db: AsyncSession,
+    request_id: str,
+    user_id: int,
+    step_type: str,
+    session_id: Optional[int] = None,
+    server_id: Optional[int] = None,
+    tool_name: Optional[str] = None,
+    input_data: Optional[dict] = None,
+    output_data: Optional[dict] = None,
+    status: str = "success",
+    error_code: Optional[str] = None,
+    latency_ms: Optional[int] = None,
+) -> MCPRunLog:
+    log = MCPRunLog(
+        request_id=request_id,
+        session_id=session_id,
+        user_id=user_id,
+        step_type=step_type,
+        server_id=server_id,
+        tool_name=tool_name,
+        input_json=json.dumps(input_data, ensure_ascii=False) if input_data is not None else None,
+        output_json=json.dumps(output_data, ensure_ascii=False) if output_data is not None else None,
+        status=status,
+        error_code=error_code,
+        latency_ms=latency_ms,
+    )
+    db.add(log)
+    await db.flush()
+    await db.refresh(log)
+    return log
+
+
+async def get_mcp_run_logs(
+    db: AsyncSession,
+    user_id: Optional[int] = None,
+    request_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> tuple[int, List[MCPRunLog]]:
+    query = select(MCPRunLog)
+    count_query = select(func.count(MCPRunLog.id))
+
+    if user_id is not None:
+        query = query.where(MCPRunLog.user_id == user_id)
+        count_query = count_query.where(MCPRunLog.user_id == user_id)
+    if request_id:
+        query = query.where(MCPRunLog.request_id == request_id)
+        count_query = count_query.where(MCPRunLog.request_id == request_id)
+
+    query = query.order_by(MCPRunLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    total = (await db.execute(count_query)).scalar() or 0
+    items = (await db.execute(query)).scalars().all()
+    return total, items
+
+
+async def get_mcp_run_logs_by_request(db: AsyncSession, request_id: str) -> List[MCPRunLog]:
+    query = (
+        select(MCPRunLog)
+        .where(MCPRunLog.request_id == request_id)
+        .order_by(MCPRunLog.created_at.asc(), MCPRunLog.id.asc())
+    )
+    return (await db.execute(query)).scalars().all()
+
+
+async def create_mcp_approval(
+    db: AsyncSession,
+    request_id: str,
+    session_id: int,
+    user_id: int,
+    tool_name: str,
+    input_data: dict,
+    expired_at: Optional[datetime] = None,
+) -> MCPApproval:
+    approval = MCPApproval(
+        request_id=request_id,
+        session_id=session_id,
+        user_id=user_id,
+        tool_name=tool_name,
+        input_json=json.dumps(input_data, ensure_ascii=False),
+        status="pending",
+        expired_at=expired_at,
+    )
+    db.add(approval)
+    await db.flush()
+    await db.refresh(approval)
+    return approval
+
+
+async def get_mcp_approval_by_id(db: AsyncSession, approval_id: int) -> Optional[MCPApproval]:
+    result = await db.execute(select(MCPApproval).where(MCPApproval.id == approval_id))
+    return result.scalar_one_or_none()
+
+
+async def update_mcp_approval_status(
+    db: AsyncSession,
+    approval_id: int,
+    status: str,
+    approved_by: Optional[int] = None,
+) -> Optional[MCPApproval]:
+    approval = await get_mcp_approval_by_id(db, approval_id)
+    if not approval:
+        return None
+    approval.status = status
+    if status in {"approved", "rejected", "expired"}:
+        approval.approved_at = datetime.utcnow()
+    if approved_by is not None:
+        approval.approved_by = approved_by
+    await db.flush()
+    await db.refresh(approval)
+    return approval
+
+
+async def get_mcp_user_connection(
+    db: AsyncSession,
+    user_id: int,
+    server_id: int,
+) -> Optional[MCPUserConnection]:
+    result = await db.execute(
+        select(MCPUserConnection).where(
+            MCPUserConnection.user_id == user_id,
+            MCPUserConnection.server_id == server_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def set_mcp_user_connection_secret(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    server_id: int,
+    secret_ciphertext: str,
+    auth_type: str = "bearer",
+) -> MCPUserConnection:
+    record = await get_mcp_user_connection(db, user_id, server_id)
+    if record:
+        record.secret_ciphertext = secret_ciphertext
+        record.auth_type = auth_type
+        record.updated_at = datetime.utcnow()
+    else:
+        record = MCPUserConnection(
+            user_id=user_id,
+            server_id=server_id,
+            auth_type=auth_type,
+            secret_ciphertext=secret_ciphertext,
+        )
+        db.add(record)
+    await db.flush()
+    await db.refresh(record)
+    return record
+
+
+async def delete_mcp_user_connection(db: AsyncSession, user_id: int, server_id: int) -> bool:
+    result = await db.execute(
+        delete(MCPUserConnection).where(
+            MCPUserConnection.user_id == user_id,
+            MCPUserConnection.server_id == server_id,
+        )
+    )
+    return result.rowcount > 0
+
+
+async def list_mcp_user_connections(db: AsyncSession, user_id: int) -> List[MCPUserConnection]:
+    result = await db.execute(
+        select(MCPUserConnection)
+        .where(MCPUserConnection.user_id == user_id)
+        .order_by(MCPUserConnection.updated_at.desc())
+    )
+    return result.scalars().all()

@@ -12,10 +12,10 @@ import Modal from '../../components/common/Modal'
 import { useVersion, VersionModal } from '@upgrade'
 import { useImageGenerate } from '@picgenerate'
 import { usePPTGenerate } from '@pptgen'
-import { chatService } from '../../services/chatService'
+import { chatService, type MCPOptions } from '../../services/chatService'
 import { useChatStore } from '../../stores/chatStore'
 import { useAuthStore } from '../../stores/authStore'
-import type { StreamChunk } from '../../types'
+import type { StreamChunk, MCPChatServer, MCPApprovalRequired, MCPUserConnectionStatus } from '../../types'
 
 export default function Chat() {
   const navigate = useNavigate()
@@ -61,6 +61,17 @@ export default function Chat() {
   // PPT 模式状态
   const [isPPTMode, setIsPPTMode] = useState(false)
   const [showAuthModal, setShowAuthModal] = useState(false)
+  const [enableMcp, setEnableMcp] = useState(false)
+  const [mcpMode, setMcpMode] = useState<'off' | 'auto' | 'manual'>('auto')
+  const [mcpServers, setMcpServers] = useState<MCPChatServer[]>([])
+  const [mcpConnections, setMcpConnections] = useState<MCPUserConnectionStatus[]>([])
+  const [selectedMcpServerIds, setSelectedMcpServerIds] = useState<number[]>([])
+  const [mcpTimeline, setMcpTimeline] = useState<Array<{ type: string; data: unknown; at: string }>>([])
+  const [pendingApproval, setPendingApproval] = useState<MCPApprovalRequired | null>(null)
+  const [showMcpConnectionsModal, setShowMcpConnectionsModal] = useState(false)
+  const [connectionTokenDrafts, setConnectionTokenDrafts] = useState<Record<number, string>>({})
+  const [savingConnectionIds, setSavingConnectionIds] = useState<number[]>([])
+  const [approving, setApproving] = useState(false)
   // 是否还有更多历史消息
   const [hasMoreMessages, setHasMoreMessages] = useState(false)
   // 是否正在加载更多消息
@@ -109,6 +120,20 @@ export default function Chat() {
     loadModels()
   }, [isAuthenticated])
 
+  // 加载可用 MCP 服务器
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMcpServers([])
+      setMcpConnections([])
+      setSelectedMcpServerIds([])
+      setEnableMcp(false)
+      setPendingApproval(null)
+      return
+    }
+    loadMcpServers()
+    loadMcpConnections()
+  }, [isAuthenticated])
+
   const loadModels = async () => {
     if (!isAuthenticated) return
     try {
@@ -124,6 +149,35 @@ export default function Chat() {
       }
     } catch (error) {
       console.error('加载模型列表失败:', error)
+    }
+  }
+
+  const loadMcpServers = async () => {
+    try {
+      const servers = await chatService.getMcpServers()
+      setMcpServers(servers)
+      if (!servers.length) {
+        setEnableMcp(false)
+        setSelectedMcpServerIds([])
+        return
+      }
+      setSelectedMcpServerIds((prev) => {
+        const prevSet = new Set(prev)
+        const valid = servers.map((item) => item.id).filter((id) => prevSet.has(id))
+        return valid.length ? valid : [servers[0].id]
+      })
+    } catch (error) {
+      console.error('加载 MCP 服务器失败:', error)
+    }
+  }
+
+  const loadMcpConnections = async () => {
+    try {
+      const data = await chatService.getMcpConnections()
+      setMcpConnections(data)
+    } catch (error) {
+      console.error('加载 MCP 连接状态失败:', error)
+      setMcpConnections([])
     }
   }
 
@@ -283,32 +337,66 @@ export default function Chat() {
 
     setStreaming(true)
     clearStreaming()
+    setPendingApproval(null)
+    setMcpTimeline([])
+
+    const mcpOptions: MCPOptions = {
+      enable_mcp: enableMcp && isAuthenticated,
+      mcp_server_ids: selectedMcpServerIds,
+      mcp_mode: enableMcp ? mcpMode : 'off',
+    }
 
     try {
       await chatService.sendMessage(sessionId, content, (chunk: StreamChunk) => {
         // 使用 flushSync 强制同步渲染，解决 React 18 批处理导致的流式输出延迟
         flushSync(() => {
           if (chunk.type === 'thinking') {
-            appendStreamingThinking(chunk.data)
+            appendStreamingThinking(String(chunk.data ?? ''))
           } else if (chunk.type === 'content') {
-            appendStreamingContent(chunk.data)
+            appendStreamingContent(String(chunk.data ?? ''))
+          } else if (chunk.type === 'plan' || chunk.type === 'tool_call' || chunk.type === 'tool_result') {
+            setMcpTimeline((prev) => [
+              ...prev,
+              {
+                type: chunk.type,
+                data: chunk.data,
+                at: new Date().toISOString(),
+              },
+            ])
+          } else if (chunk.type === 'approval_required') {
+            const payload = (typeof chunk.data === 'object' && chunk.data !== null
+              ? chunk.data
+              : null) as MCPApprovalRequired | null
+            if (payload) {
+              setPendingApproval(payload)
+              setMcpTimeline((prev) => [
+                ...prev,
+                {
+                  type: chunk.type,
+                  data: payload,
+                  at: new Date().toISOString(),
+                },
+              ])
+            }
           } else if (chunk.type === 'done') {
             // 完成时，将流式内容转为正式消息
             const state = useChatStore.getState()
-            addMessage({
-              id: Date.now(),
-              role: 'assistant',
-              content: state.streamingContent,
-              thinking: state.streamingThinking || undefined,
-              created_at: new Date().toISOString(),
-            })
+            if (state.streamingContent || state.streamingThinking) {
+              addMessage({
+                id: Date.now(),
+                role: 'assistant',
+                content: state.streamingContent,
+                thinking: state.streamingThinking || undefined,
+                created_at: new Date().toISOString(),
+              })
+            }
             endStreaming()  // 使用 endStreaming 完全结束流式状态
           } else if (chunk.type === 'error') {
             console.error('AI响应错误:', chunk.data)
             endStreaming()  // 使用 endStreaming 完全结束流式状态
           }
         })
-      }, model)
+      }, model, mcpOptions)
     } catch (error) {
       console.error('发送消息失败:', error)
       endStreaming()  // 使用 endStreaming 完全结束流式状态
@@ -528,9 +616,9 @@ export default function Chat() {
         // 使用 flushSync 强制同步渲染
         flushSync(() => {
           if (chunk.type === 'thinking') {
-            appendStreamingThinking(chunk.data)
+            appendStreamingThinking(String(chunk.data ?? ''))
           } else if (chunk.type === 'content') {
-            appendStreamingContent(chunk.data)
+            appendStreamingContent(String(chunk.data ?? ''))
           } else if (chunk.type === 'done') {
             const state = useChatStore.getState()
             addMessage({
@@ -552,6 +640,100 @@ export default function Chat() {
       endStreaming()  // 使用 endStreaming 完全结束流式状态
     }
   }
+
+  const handleApproveMcp = async () => {
+    if (!pendingApproval) return
+    setApproving(true)
+    try {
+      const result = await chatService.approveMcpCall(pendingApproval.approval_id)
+      const approvalEvents = Array.isArray(result.events) ? result.events : []
+      if (approvalEvents.length) {
+        setMcpTimeline((prev) => [
+          ...prev,
+          ...approvalEvents.map((event) => ({ type: event.type, data: event.data, at: new Date().toISOString() })),
+        ])
+      }
+      if (result.message) {
+        addMessage({
+          ...result.message,
+          created_at: result.message.created_at || new Date().toISOString(),
+        })
+      }
+      setMcpTimeline((prev) => [
+        ...prev,
+        {
+          type: 'approval_result',
+          data: { status: result.status, tool_result: result.tool_result, next_approval: result.next_approval },
+          at: new Date().toISOString(),
+        },
+      ])
+      if (result.status === 'pending_approval' && result.next_approval) {
+        setPendingApproval(result.next_approval)
+      } else {
+        setPendingApproval(null)
+      }
+      loadSessions()
+    } catch (error) {
+      console.error('审批通过失败:', error)
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  const handleRejectMcp = async () => {
+    if (!pendingApproval) return
+    setApproving(true)
+    try {
+      const result = await chatService.rejectMcpCall(pendingApproval.approval_id)
+      if (result.message) {
+        addMessage({
+          ...result.message,
+          created_at: result.message.created_at || new Date().toISOString(),
+        })
+      }
+      setMcpTimeline((prev) => [
+        ...prev,
+        { type: 'approval_result', data: { status: result.status }, at: new Date().toISOString() },
+      ])
+      setPendingApproval(null)
+      loadSessions()
+    } catch (error) {
+      console.error('审批拒绝失败:', error)
+    } finally {
+      setApproving(false)
+    }
+  }
+
+  const handleSaveConnection = async (serverId: number) => {
+    const token = (connectionTokenDrafts[serverId] || '').trim()
+    if (!token) return
+    setSavingConnectionIds((prev) => [...prev, serverId])
+    try {
+      await chatService.upsertMcpConnection(serverId, token)
+      setConnectionTokenDrafts((prev) => ({ ...prev, [serverId]: '' }))
+      await Promise.all([loadMcpConnections(), loadMcpServers()])
+    } catch (error) {
+      console.error('保存 MCP 连接失败:', error)
+    } finally {
+      setSavingConnectionIds((prev) => prev.filter((id) => id !== serverId))
+    }
+  }
+
+  const handleDeleteConnection = async (serverId: number) => {
+    setSavingConnectionIds((prev) => [...prev, serverId])
+    try {
+      await chatService.deleteMcpConnection(serverId)
+      await Promise.all([loadMcpConnections(), loadMcpServers()])
+    } catch (error) {
+      console.error('删除 MCP 连接失败:', error)
+    } finally {
+      setSavingConnectionIds((prev) => prev.filter((id) => id !== serverId))
+    }
+  }
+
+  const connectedServerIds = new Set(
+    mcpConnections.filter((item) => item.connected).map((item) => item.server_id)
+  )
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex overflow-hidden bg-canvas-gradient">
@@ -593,6 +775,84 @@ export default function Chat() {
         </div>
       </Modal>
 
+      <Modal
+        isOpen={Boolean(pendingApproval)}
+        onClose={() => setPendingApproval(null)}
+        title="MCP Approval Required"
+        size="md"
+      >
+        {pendingApproval && (
+          <div className="space-y-3 text-sm text-text-secondary">
+            <p>
+              Tool: <span className="font-medium text-ink-black">{pendingApproval.server_name}/{pendingApproval.tool_name}</span>
+            </p>
+            <pre className="max-h-40 overflow-auto rounded bg-paper-cream p-2 text-xs text-ink-medium">
+{JSON.stringify(pendingApproval.arguments || {}, null, 2)}
+            </pre>
+            <p className="text-xs text-ink-light">Reason: {pendingApproval.reason || 'N/A'}</p>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => void handleRejectMcp()} loading={approving}>
+                Reject
+              </Button>
+              <Button onClick={() => void handleApproveMcp()} loading={approving}>
+                Approve
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={showMcpConnectionsModal}
+        onClose={() => setShowMcpConnectionsModal(false)}
+        title="MCP Connections"
+        size="md"
+      >
+        <div className="space-y-3 text-sm text-text-secondary">
+          {mcpServers.map((server) => {
+            const connected = connectedServerIds.has(server.id)
+            const saving = savingConnectionIds.includes(server.id)
+            const isRemote = server.transport === 'remote'
+            return (
+              <div key={server.id} className="rounded border border-paper-aged p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="font-medium text-ink-black">{server.name}</p>
+                  <span className={`text-xs ${connected ? 'text-emerald-600' : 'text-ink-light'}`}>
+                    {connected ? 'Connected' : 'Not Connected'}
+                  </span>
+                </div>
+                {isRemote ? (
+                  <>
+                    <input
+                      type="password"
+                      value={connectionTokenDrafts[server.id] || ''}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setConnectionTokenDrafts((prev) => ({ ...prev, [server.id]: value }))
+                      }}
+                      placeholder="Paste bearer token"
+                      className="h-9 w-full rounded border border-paper-aged bg-paper-white px-2 text-xs text-ink-black"
+                    />
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      {connected && (
+                        <Button variant="outline" loading={saving} onClick={() => void handleDeleteConnection(server.id)}>
+                          Disconnect
+                        </Button>
+                      )}
+                      <Button loading={saving} onClick={() => void handleSaveConnection(server.id)}>
+                        Save
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-ink-light">`stdio` server does not require per-user token.</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </Modal>
+
       {/* 侧边栏 */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -627,6 +887,71 @@ export default function Chat() {
             </h1>
           </div>
         </motion.header>
+
+        <div className="border-b border-line-soft bg-paper-white/60 px-4 py-2 md:px-6">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-ui text-ink-medium">
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={enableMcp}
+                onChange={(e) => setEnableMcp(e.target.checked)}
+                disabled={!mcpServers.length}
+              />
+              <span>MCP</span>
+            </label>
+            <select
+              className="rounded border border-paper-aged bg-paper-white px-2 py-1 text-xs"
+              value={mcpMode}
+              onChange={(e) => setMcpMode(e.target.value as 'off' | 'auto' | 'manual')}
+              disabled={!enableMcp}
+            >
+              <option value="auto">auto</option>
+              <option value="manual">manual</option>
+              <option value="off">off</option>
+            </select>
+            <select
+              multiple
+              value={selectedMcpServerIds.map(String)}
+              onChange={(e) => {
+                const values = Array.from(e.target.selectedOptions).map((item) => Number(item.value))
+                setSelectedMcpServerIds(values)
+              }}
+              className="min-w-[180px] rounded border border-paper-aged bg-paper-white px-2 py-1 text-xs"
+              disabled={!enableMcp || !mcpServers.length}
+            >
+              {mcpServers.map((server) => (
+                <option key={server.id} value={server.id}>
+                  {server.name} ({server.tool_count}) {connectedServerIds.has(server.id) ? '●' : '○'}
+                </option>
+              ))}
+            </select>
+            <button
+              className="rounded border border-paper-aged px-2 py-1 hover:bg-paper-cream"
+              onClick={() => {
+                void loadMcpServers()
+                void loadMcpConnections()
+              }}
+            >
+              Refresh MCP
+            </button>
+            <button
+              className="rounded border border-paper-aged px-2 py-1 hover:bg-paper-cream"
+              onClick={() => setShowMcpConnectionsModal(true)}
+            >
+              Connections
+            </button>
+          </div>
+          {mcpTimeline.length > 0 && (
+            <div className="mt-2 max-h-28 overflow-auto rounded border border-paper-aged bg-paper-cream/70 p-2 text-xs text-ink-medium">
+              {mcpTimeline.map((item, idx) => (
+                <div key={`${item.at}-${idx}`} className="mb-1 last:mb-0">
+                  <span className="font-medium text-ink-black">[{item.type}]</span>{' '}
+                  <span>{typeof item.data === 'string' ? item.data : JSON.stringify(item.data)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* 消息区域 */}
         <MessageList

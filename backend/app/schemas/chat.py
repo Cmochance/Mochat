@@ -52,6 +52,9 @@ class ChatRequest(BaseModel):
     session_id: int
     content: str = Field(..., min_length=1)
     model: Optional[str] = None  # 可选模型，不传则使用默认
+    enable_mcp: bool = False
+    mcp_server_ids: Optional[List[int]] = None
+    mcp_mode: str = Field(default="auto", pattern=r"^(off|auto|manual)$")
 
 
 class ModelInfo(BaseModel):
@@ -69,8 +72,8 @@ class ModelsResponse(BaseModel):
 
 class ChatStreamChunk(BaseModel):
     """流式对话块模型"""
-    type: str  # thinking, content, done, error
-    data: str
+    type: str  # thinking, content, done, error, plan, tool_call, tool_result, approval_required
+    data: object
 
 
 class SessionWithMessages(SessionResponse):

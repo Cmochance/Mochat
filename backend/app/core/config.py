@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     # 微服务内部地址（网关转发）
     PICGEN_INTERNAL_URL: str = "http://picgenerate:3903"
     PPTGEN_INTERNAL_URL: str = "http://pptgen:3904"
+
+    # MCP 配置
+    MCP_DEFAULT_TIMEOUT_MS: int = 15000
+    MCP_MAX_TOOL_CALLS: int = 3
+    MCP_APPROVAL_TTL_SECONDS: int = 600
+    MCP_MAX_ARGUMENT_BYTES: int = 16384
+    MCP_MAX_RESULT_TEXT_CHARS: int = 6000
+    MCP_MAX_LOG_STRING_CHARS: int = 400
+    MCP_MAX_LOG_ITEMS: int = 40
+    MCP_RETRY_BACKOFF_MS: int = 200
+    MCP_CIRCUIT_BREAKER_THRESHOLD: int = 3
+    MCP_CIRCUIT_BREAKER_COOLDOWN_SECONDS: int = 30
+    MCP_ASYNC_MAX_POLLS: int = 8
+    MCP_ASYNC_POLL_INTERVAL_MS: int = 1200
     
     @property
     def cors_origins_list(self) -> List[str]:

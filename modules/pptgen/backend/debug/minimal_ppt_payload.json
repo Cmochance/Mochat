@@ -1,0 +1,39 @@
+{
+  "user_id": "debug-user",
+  "filename": "debug-minimal",
+  "ppt_data": {
+    "title": "Debug PPT",
+    "theme": {
+      "primaryColor": "#1a73e8",
+      "backgroundColor": "#ffffff",
+      "textColor": "#202124",
+      "fontFamily": "Microsoft YaHei"
+    },
+    "slides": [
+      {
+        "type": "title",
+        "title": "Cloud Run Debug",
+        "subtitle": "Connectivity Test"
+      },
+      {
+        "type": "content",
+        "title": "Status",
+        "content": [
+          {
+            "type": "bullet",
+            "items": [
+              "Cloud Run endpoint reachable",
+              "Auth header accepted",
+              "R2 upload path works"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "thank-you",
+        "title": "Done",
+        "subtitle": "debug"
+      }
+    ]
+  }
+}

@@ -9,13 +9,14 @@ PPT 生成微服务
 
 全过程以 thinking 形式流式输出给主项目
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, AsyncGenerator
 import json
 import asyncio
+import uuid
 
 from config import settings
 from ai_generator import get_ai_generator, AIGeneratorError
@@ -64,8 +65,42 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """健康检查"""
-    return {"status": "healthy"}
+    """健康检查（含依赖就绪状态）"""
+    missing_configs = []
+    if not settings.AI_API_KEY:
+        missing_configs.append("PPTGEN_AI_API_KEY")
+    if not settings.AI_API_BASE:
+        missing_configs.append("PPTGEN_AI_API_BASE")
+    if not settings.CLOUDRUN_URL:
+        missing_configs.append("PPTGEN_CLOUDRUN_URL")
+
+    cloudrun_ok = False
+    cloudrun_detail = "not_checked"
+    if settings.CLOUDRUN_URL:
+        try:
+            cloudrun_client = get_cloudrun_client()
+            cloudrun_ok, cloudrun_detail = await cloudrun_client.healthcheck(
+                request_id=f"health-{uuid.uuid4()}"
+            )
+        except CloudRunError as e:
+            cloudrun_detail = str(e)
+
+    ready = (len(missing_configs) == 0) and cloudrun_ok
+    return {
+        "status": "healthy" if ready else "degraded",
+        "ready": ready,
+        "checks": {
+            "ai_configured": bool(settings.AI_API_KEY and settings.AI_API_BASE),
+            "cloudrun_configured": bool(settings.CLOUDRUN_URL),
+            "cloudrun_reachable": cloudrun_ok,
+            "cloudrun_detail": cloudrun_detail,
+        },
+        "missing_configs": missing_configs,
+    }
+
+
+def resolve_request_id(x_request_id: str | None) -> str:
+    return (x_request_id or "").strip() or str(uuid.uuid4())
 
 
 def make_sse(data_type: str, data: str) -> str:
@@ -73,7 +108,7 @@ def make_sse(data_type: str, data: str) -> str:
     return f"data: {json.dumps({'type': data_type, 'data': data}, ensure_ascii=False)}\n\n"
 
 
-async def generate_stream(request: GenerateRequest) -> AsyncGenerator[str, None]:
+async def generate_stream(request: GenerateRequest, request_id: str) -> AsyncGenerator[str, None]:
     """
     流式生成 PPT，输出 thinking 过程
     
@@ -153,7 +188,11 @@ async def generate_stream(request: GenerateRequest) -> AsyncGenerator[str, None]
         await asyncio.sleep(0)
         
         cloudrun_client = get_cloudrun_client()
-        result = await cloudrun_client.generate_pptx(ppt_data, request.user_id)
+        result = await cloudrun_client.generate_pptx(
+            ppt_data,
+            request.user_id,
+            request_id=request_id,
+        )
         
         yield make_sse('thinking', f'{NL}✅ PPT 文件生成成功！')
         await asyncio.sleep(0)
@@ -203,30 +242,39 @@ async def generate_stream(request: GenerateRequest) -> AsyncGenerator[str, None]
 
 
 @app.post("/api/generate/stream")
-async def generate_ppt_stream(request: GenerateRequest):
+async def generate_ppt_stream(
+    request: GenerateRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
     """
     流式生成 PPT（推荐）
     
     返回 SSE 流，包含完整的处理过程（thinking）和最终结果
     """
+    request_id = resolve_request_id(x_request_id)
     return StreamingResponse(
-        generate_stream(request),
+        generate_stream(request, request_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Request-ID": request_id,
         }
     )
 
 
 @app.post("/api/generate", response_model=GenerateResponse)
-async def generate_ppt(request: GenerateRequest):
+async def generate_ppt(
+    request: GenerateRequest,
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+):
     """
     同步生成 PPT（简单模式）
     
     不返回 thinking 过程，直接等待完成后返回结果
     """
+    request_id = resolve_request_id(x_request_id)
     try:
         # 1. AI 生成 JSON
         ai_generator = get_ai_generator()
@@ -245,7 +293,11 @@ async def generate_ppt(request: GenerateRequest):
         
         # 2. 调用 Cloud Run 生成 PPTX 并上传 R2
         cloudrun_client = get_cloudrun_client()
-        result = await cloudrun_client.generate_pptx(ppt_data, request.user_id)
+        result = await cloudrun_client.generate_pptx(
+            ppt_data,
+            request.user_id,
+            request_id=request_id,
+        )
         
         return GenerateResponse(
             success=True,

@@ -1,23 +1,18 @@
-# Cloud Run PPT 生成服务
-FROM node:20-slim
+# Cloud Run PPT 生成服务 (Python Functions Framework)
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# 复制 package.json
-COPY package*.json ./
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PORT=8080
 
-# 安装依赖
-RUN npm install --production=false
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 复制源代码
 COPY . .
 
-# 构建 TypeScript
-RUN npm run build
-
-# 暴露端口（Cloud Run 使用 PORT 环境变量）
-ENV PORT=8080
 EXPOSE 8080
 
-# 启动服务
-CMD ["npm", "start"]
+# Cloud Run 会将 HTTP 请求转发到 functions-framework
+CMD ["functions-framework", "--target=pptgen", "--source=main.py", "--host=0.0.0.0", "--port=8080"]

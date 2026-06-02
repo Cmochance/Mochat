@@ -450,6 +450,13 @@ def generate_ppt(ppt_data):
 @functions_framework.http
 def pptgen(request):
     """Cloud Run PPT 生成服务入口"""
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    base_headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+        'X-Request-ID': request_id,
+    }
+
     # 调试端点
     if request.args.get('debug') == 'template':
         info = {
@@ -458,9 +465,10 @@ def pptgen(request):
             "template_size": os.path.getsize(TEMPLATE_PATH) if os.path.exists(TEMPLATE_PATH) else 0,
             "cwd": os.getcwd(),
             "dirname": os.path.dirname(__file__),
-            "files_in_templates": os.listdir(os.path.join(os.path.dirname(__file__), 'templates')) if os.path.exists(os.path.join(os.path.dirname(__file__), 'templates')) else []
+            "files_in_templates": os.listdir(os.path.join(os.path.dirname(__file__), 'templates')) if os.path.exists(os.path.join(os.path.dirname(__file__), 'templates')) else [],
+            "request_id": request_id,
         }
-        return (json.dumps(info), 200, {'Content-Type': 'application/json'})
+        return (json.dumps(info), 200, base_headers)
     
     if request.args.get('debug') == 'versions':
         import pptx
@@ -468,46 +476,52 @@ def pptgen(request):
         info = {
             "python_pptx": pptx.__version__,
             "lxml": lxml.__version__,
-            "boto3": boto3.__version__
+            "boto3": boto3.__version__,
+            "request_id": request_id,
         }
-        return (json.dumps(info), 200, {'Content-Type': 'application/json'})
+        return (json.dumps(info), 200, base_headers)
     
     # 1. CORS
     if request.method == 'OPTIONS':
         headers = {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Secret',
-            'Access-Control-Max-Age': '3600'
+            'Access-Control-Allow-Methods': 'GET,POST',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Secret, X-Request-ID',
+            'Access-Control-Max-Age': '3600',
+            'X-Request-ID': request_id,
         }
         return ('', 204, headers)
 
-    headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-    }
+    headers = dict(base_headers)
 
     # 2. 鉴权
-    auth_secret = request.headers.get("X-Auth-Secret") or request.headers.get("Authorization")
+    auth_secret = request.headers.get("X-Auth-Secret")
+    if not auth_secret:
+        authorization = request.headers.get("Authorization", "")
+        if authorization.lower().startswith("bearer "):
+            auth_secret = authorization[7:].strip()
+        else:
+            auth_secret = authorization
+
     env_token = os.environ.get("AUTH_TOKEN") or os.environ.get("PPTGEN_CLOUDRUN_SECRET", "")
     if env_token and auth_secret != env_token:
-        return (json.dumps({"error": "Unauthorized"}), 401, headers)
+        return (json.dumps({"error": "Unauthorized", "request_id": request_id}), 401, headers)
 
     # 3. 解析请求
     try:
         request_json = request.get_json(silent=True)
         if not request_json:
-            return (json.dumps({"error": "Invalid JSON"}), 400, headers)
+            return (json.dumps({"error": "Invalid JSON", "request_id": request_id}), 400, headers)
         
         ppt_data = request_json.get("ppt_data", request_json)
         filename = request_json.get("filename", ppt_data.get("title", "presentation"))
         user_id = request_json.get("user_id", "anonymous")
         
         if not ppt_data or 'slides' not in ppt_data:
-            return (json.dumps({"error": "Missing slides data"}), 400, headers)
+            return (json.dumps({"error": "Missing slides data", "request_id": request_id}), 400, headers)
             
     except Exception as e:
-        return (json.dumps({"error": str(e)}), 400, headers)
+        return (json.dumps({"error": str(e), "request_id": request_id}), 400, headers)
 
     # 4. 生成 PPT
     try:
@@ -529,7 +543,15 @@ def pptgen(request):
         
     except Exception as e:
         import traceback
-        return (json.dumps({"error": f"PPT Generation Error: {str(e)}", "trace": traceback.format_exc()}), 500, headers)
+        return (
+            json.dumps({
+                "error": f"PPT Generation Error: {str(e)}",
+                "trace": traceback.format_exc(),
+                "request_id": request_id,
+            }),
+            500,
+            headers,
+        )
 
     # 5. 上传到 R2
     try:
@@ -574,8 +596,9 @@ def pptgen(request):
         return (json.dumps({
             "status": "success",
             "url": presigned_url,
-            "title": ppt_data.get('title', '演示文稿')
+            "title": ppt_data.get('title', '演示文稿'),
+            "request_id": request_id,
         }), 200, headers)
 
     except Exception as e:
-        return (json.dumps({"error": f"Upload R2 Error: {str(e)}"}), 500, headers)
+        return (json.dumps({"error": f"Upload R2 Error: {str(e)}", "request_id": request_id}), 500, headers)

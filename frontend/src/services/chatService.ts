@@ -131,108 +131,75 @@ export const chatService = {
     return response.data
   },
 
-  // 发送消息（流式）
+  // 发送消息（流式）—— POST 请求不做重试
+  // 原因：后端在首个 SSE chunk 到达前就已提交 user message，
+  // 重试会导致重复消息。断线重连应由调用方或后端幂等层处理。
   async sendMessage(
     sessionId: number,
     content: string,
     onChunk: (chunk: StreamChunk) => void,
     model?: string
   ): Promise<void> {
-    const MAX_RETRIES = 3
-    const RETRY_DELAY = 2000
-    // 一次请求 ID 贯穿所有重试，保证幂等
-    const requestId = generateRequestId()
-    const body = JSON.stringify({
-      session_id: sessionId,
-      content,
-      model: model || undefined,
+    const response = await fetchWithAuthRetry('/api/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Request-ID': generateRequestId(),
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        content,
+        model: model || undefined,
+      }),
     })
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      let chunksReceived = 0
+    if (!response.ok) {
+      throw new Error('发送消息失败')
+    }
 
-      try {
-        const response = await fetchWithAuthRetry('/api/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
-          body,
-        })
+    const reader = response.body?.getReader()
+    if (!reader) return
 
-        // 4xx（鉴权、配额等）不应重试
-        if (response.status >= 400 && response.status < 500) {
-          throw new Error('发送消息失败')
-        }
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let chunkCount = 0
 
-        if (!response.ok) {
-          throw new Error('发送消息失败')
-        }
+    console.log('[Stream] 开始接收流式数据...')
 
-        const reader = response.body?.getReader()
-        if (!reader) return
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) {
+        console.log(`[Stream] 流式传输完成，共收到 ${chunkCount} 个数据块`)
+        break
+      }
 
-        const decoder = new TextDecoder()
-        let buffer = ''
+      chunkCount++
 
-        console.log(`[Stream] 开始接收流式数据 (attempt ${attempt + 1}/${MAX_RETRIES})...`)
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
 
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) {
-            console.log(`[Stream] 流式传输完成，共收到 ${chunksReceived} 个数据块`)
-            break
-          }
-
-          chunksReceived++
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6)) as StreamChunk
-                onChunk(data)
-              } catch {
-                // 忽略解析错误
-              }
-            }
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 0))
-        }
-
-        // 处理剩余的 buffer
-        if (buffer.startsWith('data: ')) {
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
           try {
-            const data = JSON.parse(buffer.slice(6)) as StreamChunk
+            const data = JSON.parse(line.slice(6)) as StreamChunk
             onChunk(data)
           } catch {
-            // 忽略
+            // 忽略解析错误
           }
         }
+      }
 
-        // 流正常结束，无需重试
-        return
-      } catch (err) {
-        // 已收到数据块 → 后端可能已创建消息，重试会产生重复
-        if (chunksReceived > 0) {
-          throw err
-        }
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
 
-        console.warn(`[Stream] 连接失败 (attempt ${attempt + 1}/${MAX_RETRIES}):`, err)
-
-        // 最后一次尝试也失败了，抛出错误
-        if (attempt >= MAX_RETRIES - 1) {
-          throw err
-        }
-
-        // 纯连接失败才重试，通知调用方
-        onChunk({ type: 'status', data: `reconnect_${attempt + 1}` })
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+    // 处理剩余的 buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const data = JSON.parse(buffer.slice(6)) as StreamChunk
+        onChunk(data)
+      } catch {
+        // 忽略
       }
     }
   },
@@ -269,15 +236,11 @@ export const chatService = {
         break
       }
 
-      // 调试日志
       chunkCount++
       console.log(`[Stream/Regenerate] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
 
-      // 使用 stream: true 处理多字节字符
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
-      
-      // 保留最后一个可能不完整的行
       buffer = lines.pop() || ''
 
       for (const line of lines) {
@@ -290,8 +253,7 @@ export const chatService = {
           }
         }
       }
-      
-      // 给浏览器一个渲染的机会
+
       await new Promise(resolve => setTimeout(resolve, 0))
     }
 

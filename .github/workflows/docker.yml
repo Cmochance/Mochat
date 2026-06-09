@@ -1,0 +1,66 @@
+name: Docker Build
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "modules/**"
+      - "docker-compose.yml"
+      - "**/Dockerfile"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "modules/**"
+      - "docker-compose.yml"
+      - "**/Dockerfile"
+
+jobs:
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: false
+          tags: mochat/frontend:ci
+
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: false
+          tags: mochat/backend:ci
+
+  build-modules:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - upword
+          - uppic
+          - upgrade
+          - picgenerate
+          - pptgen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.module }}
+        uses: docker/build-push-action@v6
+        with:
+          context: modules/${{ matrix.module }}/backend
+          file: modules/${{ matrix.module }}/backend/Dockerfile
+          push: false
+          tags: mochat/${{ matrix.module }}:ci

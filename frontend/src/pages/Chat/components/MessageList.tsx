@@ -20,7 +20,7 @@ interface MessageListProps {
   onRegenerate?: () => void  // 重新生成最后一条AI消息
 }
 
-// 获取滚动位置存储的 key（localStorage - 持久保存）
+// 获取滚动位置存储的 key（sessionStorage - 标签页关闭后自动清理）
 const getScrollKey = (sessionId: number) => `mochat_scroll_${sessionId}`
 // 获取"已访问过"标记的 key（sessionStorage - 标签页关闭后清除）
 const getVisitedKey = (sessionId: number) => `mochat_visited_${sessionId}`
@@ -48,7 +48,7 @@ export default function MessageList({
   const saveScrollPosition = useCallback(() => {
     if (containerRef.current && sessionId) {
       const scrollTop = containerRef.current.scrollTop
-      localStorage.setItem(getScrollKey(sessionId), String(scrollTop))
+      sessionStorage.setItem(getScrollKey(sessionId), String(scrollTop))
     }
   }, [sessionId])
 
@@ -64,7 +64,7 @@ export default function MessageList({
         const visitedKey = getVisitedKey(sessionId)
         const scrollKey = getScrollKey(sessionId)
         const hasVisited = sessionStorage.getItem(visitedKey)
-        const savedPosition = localStorage.getItem(scrollKey)
+        const savedPosition = sessionStorage.getItem(scrollKey)
         
         if (!hasVisited) {
           // 首次打开此标签页：滚动到底部

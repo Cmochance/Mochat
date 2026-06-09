@@ -1,21 +1,12 @@
 import api from './api'
 import type { ChatSession, Message, StreamChunk } from '../types'
+import { clearAuthAndRedirect } from '../utils/auth'
 
 const generateRequestId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
   return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-const clearAuthAndRedirect = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('user')
-  localStorage.removeItem('auth-storage')
-  if (window.location.pathname !== '/auth/login') {
-    window.location.href = '/auth/login'
-  }
 }
 
 const refreshAccessToken = async (): Promise<string | null> => {

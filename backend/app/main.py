@@ -36,6 +36,13 @@ async def lifespan(app: FastAPI):
             " 当前 JWT 签名可被任意伪造，所有用户令牌均不安全。"
         )
 
+    # 检测 SQLite 用于非调试环境
+    if "sqlite" in settings.DATABASE_URL.lower() and not settings.DEBUG:
+        logger.warning(
+            "⚠️  当前使用 SQLite 作为数据库，不支持高并发写入。"
+            " 生产环境建议切换到 PostgreSQL，参见 docker-compose.postgres.yml 示例。"
+        )
+
     # 启动时初始化数据库
     await init_db()
     

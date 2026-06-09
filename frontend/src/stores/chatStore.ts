@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import type { ChatSession, Message } from '../types'
 
+// 临时消息 ID 计数器（避免 Date.now() 同毫秒冲突）
+let _tempIdCounter = 0
+
 interface ChatState {
   sessions: ChatSession[]
   currentSession: ChatSession | null
@@ -87,7 +90,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   finalizeStreaming: (thinking, content) => {
     const state = get()
     const newMessage: Message = {
-      id: Date.now(),
+      id: --_tempIdCounter,  // 负数避免与服务端 ID 冲突
       role: 'assistant',
       content: content || state.streamingContent,
       thinking: thinking || state.streamingThinking || undefined,

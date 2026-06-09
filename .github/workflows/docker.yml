@@ -2,12 +2,7 @@ name: Docker Build
 
 on:
   pull_request:
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "modules/**"
-      - "docker-compose.yml"
-      - "**/Dockerfile"
+    # 不限 paths，确保 build-modules required check 始终报告状态
   push:
     branches: [main]
     paths:
@@ -44,7 +39,7 @@ jobs:
           push: false
           tags: mochat/backend:ci
 
-  build-modules:
+  build-module:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -64,3 +59,17 @@ jobs:
           file: modules/${{ matrix.module }}/backend/Dockerfile
           push: false
           tags: mochat/${{ matrix.module }}:ci
+
+  # 聚合 job，确保 required check "build-modules" 始终报告
+  build-modules:
+    if: always()
+    needs: [build-module]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check matrix result
+        run: |
+          if [ "${{ needs.build-module.result }}" = "failure" ]; then
+            echo "Module builds failed"
+            exit 1
+          fi
+          echo "All module builds passed (or skipped)"

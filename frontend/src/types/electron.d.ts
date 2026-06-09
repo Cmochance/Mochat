@@ -21,6 +21,12 @@ interface ElectronAPI {
   /** 系统级安全存储（macOS Keychain / Windows Credential Manager） */
   secureStore: ElectronSecureStore
 
+  /** 检测是否需要首次设置 */
+  needsSetup(): boolean
+
+  /** 保存首次设置配置 */
+  saveSetup(config: { aiApiKey: string; aiBaseUrl: string; aiModel: string }): Promise<void>
+
   /** 最小化到系统托盘 */
   minimizeToTray(): void
 

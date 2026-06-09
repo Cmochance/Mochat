@@ -79,6 +79,10 @@ function startFrontendServer(): Promise<number> {
   })
 }
 
+function getEnvPath(): string {
+  return path.join(app.getPath('userData'), '.env')
+}
+
 function getSecureStorePath(): string {
   return path.join(app.getPath('userData'), 'secure-storage.json')
 }
@@ -132,6 +136,41 @@ function registerIpcHandlers(): void {
       event.returnValue = `http://127.0.0.1:${info.ports[module as keyof SidecarPorts]}`
     } else {
       event.returnValue = `/${module}`
+    }
+  })
+
+  // 首次设置检测
+  ipcMain.on('needs-setup', (event) => {
+    const envFile = getEnvPath()
+    if (!fs.existsSync(envFile)) {
+      event.returnValue = true
+      return
+    }
+    const content = fs.readFileSync(envFile, 'utf-8')
+    // 检查是否还是占位符值
+    const hasPlaceholder = content.includes('your-api-key-here') || !content.includes('AI_API_KEY=')
+    event.returnValue = hasPlaceholder
+  })
+
+  // 保存设置
+  ipcMain.handle('save-setup', async (_event, config: { aiApiKey: string; aiBaseUrl: string; aiModel: string }) => {
+    const envFile = getEnvPath()
+    const envContent = [
+      '# Mochat 桌面端配置',
+      `AI_API_KEY=${config.aiApiKey}`,
+      `AI_BASE_URL=${config.aiBaseUrl}`,
+      `AI_MODEL=${config.aiModel}`,
+      '',
+      '# 其他配置使用默认值',
+      'DEBUG=false',
+    ].join('\n')
+    fs.writeFileSync(envFile, envContent, 'utf-8')
+
+    // 重启 sidecar 以加载新配置
+    stopSidecar()
+    const info = await startSidecar()
+    if (mainWindow) {
+      mainWindow.webContents.send('setup-complete', info)
     }
   })
 
@@ -206,14 +245,19 @@ async function createWindow(): Promise<BrowserWindow> {
   })
 
   // 加载页面
+  // 检测是否需要首次设置
+  const envFile = getEnvPath()
+  const needsSetup = !fs.existsSync(envFile) ||
+    fs.readFileSync(envFile, "utf-8").includes("your-api-key-here")
+  const setupPath = needsSetup ? "/setup" : ""
   if (isDev) {
     // 开发模式：连接 Vite dev server
-    mainWindow.loadURL('http://localhost:3721')
+    mainWindow.loadURL(`http://localhost:3721${setupPath}`)
     mainWindow.webContents.openDevTools()
   } else {
     // 生产模式：通过本地 HTTP 服务器加载前端（避免 file:// 的 CORS 限制）
     const port = await startFrontendServer()
-    mainWindow.loadURL(`http://127.0.0.1:${port}`)
+    mainWindow.loadURL(`http://127.0.0.1:${port}${setupPath}`)
   }
 
   return mainWindow

@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuthStore } from './stores/authStore'
+import { isDesktop } from './utils/env'
 import Welcome from './pages/Welcome'
 import Auth from './pages/Auth'
 import Chat from './pages/Chat'
 import Admin from './pages/Admin'
+import Setup from './pages/Setup'
 
 // 使用静态导入，避免部分环境下路由懒加载 chunk 导入失败导致空白页
 
@@ -32,6 +34,13 @@ function App() {
         {/* 欢迎页 */}
         <Route path="/" element={<Welcome />} />
         
+        {/* 桌面端首次设置 */}
+        {isDesktop() && (
+          <Route path="/setup" element={<Setup onComplete={async (config) => {
+            await (window as any).electronAPI?.saveSetup(config)
+          }} />} />
+        )}
+
         {/* 认证页面 */}
         <Route path="/auth/*" element={<Auth />} />
         

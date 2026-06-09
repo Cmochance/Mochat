@@ -22,6 +22,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('secure-store:delete', key),
   },
 
+  // ---- 首次设置 ----
+  needsSetup: (): boolean => ipcRenderer.sendSync('needs-setup'),
+  saveSetup: (config: { aiApiKey: string; aiBaseUrl: string; aiModel: string }): Promise<void> =>
+    ipcRenderer.invoke('save-setup', config),
+
   // ---- 窗口控制 ----
   minimizeToTray: () => ipcRenderer.invoke('minimize-to-tray'),
 

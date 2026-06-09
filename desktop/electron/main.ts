@@ -19,6 +19,7 @@ import { initUpdater, installUpdate } from './updater'
 // ---------------------------------------------------------------------------
 let mainWindow: BrowserWindow | null = null
 const isDev = !app.isPackaged
+let isQuitting = false
 
 // 安全存储文件路径
 function getSecureStorePath(): string {
@@ -137,7 +138,7 @@ async function createWindow(): Promise<BrowserWindow> {
 
   // 关闭时最小化到托盘而不是退出
   mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
+    if (!isQuitting) {
       event.preventDefault()
       mainWindow?.hide()
     }
@@ -166,7 +167,7 @@ async function createWindow(): Promise<BrowserWindow> {
 
 // 标记是否正在退出（用于区分关闭窗口和退出应用）
 app.on('before-quit', () => {
-  ;(app as any).isQuitting = true
+  isQuitting = true
 })
 
 app.whenReady().then(async () => {

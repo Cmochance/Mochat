@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,7 +58,7 @@ class VerificationService:
 
     @classmethod
     async def _check_ip_limit(cls, db: AsyncSession, ip: str) -> tuple[bool, int]:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         result = await db.execute(select(VerificationIPLimit).where(VerificationIPLimit.ip == ip))
         record = result.scalar_one_or_none()
         if not record:
@@ -75,7 +75,7 @@ class VerificationService:
 
     @classmethod
     async def _increment_ip_count(cls, db: AsyncSession, ip: str) -> None:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         result = await db.execute(select(VerificationIPLimit).where(VerificationIPLimit.ip == ip))
         record = result.scalar_one_or_none()
         if not record:
@@ -104,7 +104,7 @@ class VerificationService:
             (success, message, cooldown_seconds)
         """
         normalized_email = cls._normalize_email(email)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # 验证用途
         if purpose not in config.VALID_PURPOSES:
@@ -156,7 +156,7 @@ class VerificationService:
     @classmethod
     async def can_send(cls, db: AsyncSession, email: str, purpose: str) -> tuple[bool, int]:
         """检查是否可以发送验证码（冷却或锁定）"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         record = await cls._get_code_record(db, email, purpose)
         if not record:
             return True, 0
@@ -187,7 +187,7 @@ class VerificationService:
         """
         normalized_email = cls._normalize_email(email)
         input_code = (code or "").strip()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if purpose not in config.VALID_PURPOSES:
             return False, "无效的验证用途", 0

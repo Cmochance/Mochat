@@ -41,9 +41,8 @@ class UserResponse(UserBase):
 
 
 class UserAdminResponse(UserResponse):
-    """管理员用户响应模型（包含密码哈希用于调试）"""
-    password_hash: str
-    
+    """管理员用户响应模型"""
+
     class Config:
         from_attributes = True
 

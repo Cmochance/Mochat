@@ -3,7 +3,7 @@
 """
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
@@ -556,7 +556,7 @@ async def export_usage_events(
         ])
 
     csv_data = output.getvalue()
-    filename = f"usage_events_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"usage_events_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
     return Response(
         content=csv_data,
         media_type="text/csv; charset=utf-8",

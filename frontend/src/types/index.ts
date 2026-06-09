@@ -8,7 +8,6 @@ export interface User {
   is_active: boolean
   created_at: string
   updated_at: string
-  password_hash?: string  // 管理员接口返回，用于调试
 }
 
 // 用户使用量

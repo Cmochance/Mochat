@@ -6,7 +6,7 @@ import os
 import tempfile
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -255,7 +255,7 @@ async def chat_completions(
     async def generate():
         stream_success = True
         error_code = None
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
         try:
             async for chunk in chat_service.send_message_stream(
                 db, request.session_id, current_user, request.content, request.model
@@ -329,7 +329,7 @@ async def generate_image_stream(
     async def generate():
         stream_success = False
         error_code = None
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
 
         try:
             async with httpx.AsyncClient(timeout=300.0) as client:
@@ -430,7 +430,7 @@ async def generate_image(
         await db.commit()
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=error_msg)
 
-    started_at = datetime.utcnow()
+    started_at = datetime.now(timezone.utc)
     stream_success = False
     error_code = None
     response_data = {}
@@ -487,7 +487,7 @@ async def generate_ppt_stream(
     async def generate():
         stream_success = False
         error_code = None
-        started_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
 
         try:
             async with httpx.AsyncClient(timeout=360.0) as client:
@@ -571,7 +571,7 @@ async def generate_ppt(
 ):
     """PPT 生成同步网关（兼容旧调用）"""
     request_id = _resolve_request_id(x_request_id)
-    started_at = datetime.utcnow()
+    started_at = datetime.now(timezone.utc)
     stream_success = False
     error_code = None
 

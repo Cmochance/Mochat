@@ -1,7 +1,7 @@
 """
 数据库模型定义
 """
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from sqlalchemy import (
     Column,
     Integer,
@@ -18,6 +18,11 @@ from sqlalchemy.orm import relationship
 from .database import Base
 
 
+def _utcnow() -> datetime:
+    """返回当前 UTC 时间（timezone-aware），替代已弃用的 datetime.utcnow()"""
+    return datetime.now(timezone.utc)
+
+
 class User(Base):
     """用户模型"""
     __tablename__ = "users"
@@ -32,8 +37,8 @@ class User(Base):
     tier = Column(String(20), default="free")  # free, pro, plus (用户等级)
     is_active = Column(Boolean, default=True)
     last_seen_version = Column(String(20), nullable=True)  # 用户已阅读的最新版本号
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
     
     # 关联
     sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
@@ -70,8 +75,8 @@ class ChatSession(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(200), default="新对话")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
     
     # 关联
     user = relationship("User", back_populates="sessions")
@@ -96,8 +101,8 @@ class UsageEvent(Base):
     amount = Column(Integer, nullable=False, default=1)
     error_code = Column(String(100), nullable=True)
     source = Column(String(50), nullable=False, default="backend")
-    occurred_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    occurred_at = Column(DateTime, nullable=False, default=_utcnow, index=True)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
 
     user = relationship("User", back_populates="usage_events")
 
@@ -114,7 +119,7 @@ class UsageDailyAggregate(Base):
     action = Column(String(20), primary_key=True)  # chat/image/ppt
     status = Column(String(20), primary_key=True)  # success/failed
     count = Column(Integer, nullable=False, default=0)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
     user = relationship("User", back_populates="usage_daily_aggregates")
 
@@ -128,7 +133,7 @@ class Message(Base):
     role = Column(String(20), nullable=False)  # user, assistant
     content = Column(Text, nullable=False)
     thinking = Column(Text, nullable=True)  # AI思考过程
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
     
     # 关联
     session = relationship("ChatSession", back_populates="messages")
@@ -140,7 +145,7 @@ class SystemConfig(Base):
     
     key = Column(String(50), primary_key=True)
     value = Column(Text, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class RestrictedKeyword(Base):
@@ -150,7 +155,7 @@ class RestrictedKeyword(Base):
     id = Column(Integer, primary_key=True, index=True)
     keyword = Column(String(100), unique=True, nullable=False, index=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 
@@ -163,8 +168,8 @@ class AllowedModel(Base):
     display_name = Column(String(200), nullable=True)  # 自定义显示名称（可选）
     is_active = Column(Boolean, default=True)  # 是否启用
     sort_order = Column(Integer, default=0)  # 排序顺序
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class VerificationCode(Base):
@@ -180,7 +185,7 @@ class VerificationCode(Base):
     purpose = Column(String(50), nullable=False, index=True)
     code = Column(String(20), nullable=False)
     attempts = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=_utcnow)
     verified = Column(Boolean, nullable=False, default=False)
     expires_at = Column(DateTime, nullable=False)
 

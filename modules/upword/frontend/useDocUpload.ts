@@ -164,6 +164,7 @@ export function useDocUpload(config: UpwordConfig) {
       isUploading: true,
       isParsing: false,
       progress: 'uploading',
+      uploadPercent: 0,
       error: null,
     })
 
@@ -196,6 +197,7 @@ export function useDocUpload(config: UpwordConfig) {
         isUploading: false,
         isParsing: false,
         progress: 'done',
+        uploadPercent: 100,
         error: null,
       })
 
@@ -211,6 +213,7 @@ export function useDocUpload(config: UpwordConfig) {
         isUploading: false,
         isParsing: false,
         progress: 'error',
+        uploadPercent: 0,
         error: errorMsg,
       })
       return null

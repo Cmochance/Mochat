@@ -123,7 +123,7 @@ export default function Chat() {
             setModels(data.models)
             setDefaultModel(data.default_model)
             const savedModel = localStorage.getItem('mochat_current_model')
-            if (savedModel && data.models.some(m => m.id === savedModel)) {
+            if (savedModel && data.models.some((m: ModelInfo) => m.id === savedModel)) {
               setCurrentModel(savedModel)
             } else {
               setCurrentModel(data.default_model)

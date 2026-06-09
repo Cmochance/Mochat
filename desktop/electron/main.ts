@@ -7,7 +7,7 @@
  * - 注册 IPC handler（安全存储、端口查询、窗口控制）
  * - 系统托盘、全局快捷键、自动更新
  */
-import { app, BrowserWindow, ipcMain, globalShortcut, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut, safeStorage, Notification, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as http from 'http'
@@ -199,6 +199,20 @@ function registerIpcHandlers(): void {
     }
   })
 
+  // 原生通知
+  ipcMain.handle('notify', (_event, title: string, body: string) => {
+    if (Notification.isSupported()) {
+      const notification = new Notification({ title, body })
+      notification.on('click', () => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore()
+          mainWindow.focus()
+        }
+      })
+      notification.show()
+    }
+  })
+
   // 更新
   ipcMain.handle('install-update', () => {
     installUpdate()
@@ -272,6 +286,50 @@ app.on('before-quit', () => {
   isQuitting = true
 })
 
+// ---------------------------------------------------------------------------
+// 深度链接 (mochat://)
+// ---------------------------------------------------------------------------
+if (process.defaultApp) {
+  // 开发模式：注册协议用于调试
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('mochat', process.execPath, [process.argv[1]])
+  }
+} else {
+  app.setAsDefaultProtocolClient('mochat')
+}
+
+let deepLinkUrl: string | null = null
+
+// macOS: 通过 open-url 事件接收
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  deepLinkUrl = url
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+    mainWindow.webContents.send('deep-link', url)
+  }
+})
+
+// Windows/Linux: 通过 second-instance 事件接收
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, commandLine) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+    // 从命令行参数提取 URL
+    const url = commandLine.find((arg) => arg.startsWith('mochat://'))
+    if (url) {
+      deepLinkUrl = url
+      mainWindow?.webContents.send('deep-link', url)
+    }
+  })
+}
+
 app.whenReady().then(async () => {
   // 1. 注册 IPC handlers
   registerIpcHandlers()
@@ -304,6 +362,12 @@ app.whenReady().then(async () => {
   // 6. 自动更新（仅生产模式）
   if (!isDev) {
     initUpdater(win)
+  }
+
+  // 7. 发送待处理的深度链接
+  if (deepLinkUrl) {
+    win.webContents.send('deep-link', deepLinkUrl)
+    deepLinkUrl = null
   }
 })
 

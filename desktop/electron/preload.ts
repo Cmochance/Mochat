@@ -41,4 +41,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-ready', (_event, info) => callback(info))
   },
   installUpdate: () => ipcRenderer.invoke('install-update'),
+
+  // ---- 原生通知 ----
+  notify: (title: string, body: string) => ipcRenderer.invoke('notify', title, body),
+
+  // ---- 深度链接 ----
+  onDeepLink: (callback: (url: string) => void) => {
+    ipcRenderer.on('deep-link', (_event, url) => callback(url))
+  },
 })

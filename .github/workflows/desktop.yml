@@ -29,7 +29,7 @@ jobs:
           - os: macos-14
             arch: arm64
             platform: mac
-          - os: macos-13
+          - os: macos-15
             arch: x64
             platform: mac
           - os: windows-latest
@@ -89,7 +89,7 @@ jobs:
           - os: macos-14
             arch: arm64
             platform: mac
-          - os: macos-13
+          - os: macos-15
             arch: x64
             platform: mac
           - os: windows-latest

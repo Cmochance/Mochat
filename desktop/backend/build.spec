@@ -13,7 +13,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(SPECPATH).parent.parent  # mochat/
 BACKEND_DIR = PROJECT_ROOT / "backend"
 MODULES_DIR = PROJECT_ROOT / "modules"
-DESKTOP_BACKEND = Path(SPECPATH) / "backend"
+DESKTOP_BACKEND = Path(SPECPATH)
 
 # 收集所有 Python 源码路径
 datas = []

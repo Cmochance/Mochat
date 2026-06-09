@@ -4,10 +4,19 @@ import { clearAuthAndRedirect } from '../utils/auth'
 import { getApiBaseUrl } from '../utils/env'
 
 // 桌面模式下将相对路径转为绝对 URL
+// 桌面模式下将相对路径转为绝对 URL；Web 模式原样返回
 const apiUrl = (path: string): string => {
   const base = getApiBaseUrl()
-  // base 为 '/api' 时直接拼接；为 'http://...' 时也拼接
-  return `${base}${path}`
+  if (base.startsWith('http')) {
+    // 桌面模式：base = 'http://127.0.0.1:19527/api'，path = '/api/chat/completions'
+    // 需要拼接为 'http://127.0.0.1:19527/api/api/chat/completions'？
+    // 不对——chatService 的路径已经是完整路径（含 /api/），base 也含 /api
+    // 正确做法：用 base 的 origin 部分 + path
+    const origin = new URL(base).origin
+    return `${origin}${path}`
+  }
+  // Web 模式：返回原路径（由浏览器通过相对路径解析）
+  return path
 }
 
 const generateRequestId = () => {

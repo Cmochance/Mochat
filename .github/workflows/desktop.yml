@@ -121,7 +121,7 @@ jobs:
       - name: Install desktop dependencies
         run: |
           cd desktop
-          npm ci
+          npm install
 
       - name: Build Electron main process
         run: |

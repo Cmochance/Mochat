@@ -54,10 +54,15 @@ function isPortAvailable(port: number): Promise<boolean> {
 /**
  * 查找可用的 base port
  */
+const PORT_RANGE = 6  // 6 个服务占用 6 个连续端口
+
 async function findAvailablePort(): Promise<number> {
   for (let i = 0; i < MAX_PORT_ATTEMPTS; i++) {
     const port = DEFAULT_BASE_PORT + i * 10  // 每次递增 10，留出 6 个服务的余量
-    if (await isPortAvailable(port)) {
+    // 检查整个端口范围（6 个连续端口）是否都可用
+    const ports = Array.from({ length: PORT_RANGE }, (_, j) => port + j)
+    const results = await Promise.all(ports.map(isPortAvailable))
+    if (results.every(Boolean)) {
       return port
     }
   }
@@ -110,9 +115,9 @@ function getSidecarPath(): string {
     return path.join(__dirname, '..', 'backend', 'launcher.py')
   }
 
-  // 生产模式：可执行文件在 resources 目录
+  // 生产模式：可执行文件在 extraResources 中
   const ext = process.platform === 'win32' ? '.exe' : ''
-  return path.join(process.resourcesPath, `mochat-server${ext}`)
+  return path.join(process.resourcesPath, 'mochat-server', `mochat-server${ext}`)
 }
 
 /**

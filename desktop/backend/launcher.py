@@ -50,12 +50,17 @@ def _import_main_backend():
 def _import_module_app(module_name: str):
     """导入模块 app（各模块互相隔离，不修改原代码）"""
     mod_dir = MODULES_DIR / module_name / "backend"
-    # 每个模块有自己的 config.py 等，需要把模块目录加入 sys.path 前端
+    # 用唯一模块名避免各模块的 main.py 互相覆盖
     mod_dir_str = str(mod_dir)
     if mod_dir_str not in sys.path:
         sys.path.insert(0, mod_dir_str)
-    import importlib
-    mod = importlib.import_module("main")
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        f"mochat_mod_{module_name}", str(mod_dir / "main.py")
+    )
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[f"mochat_mod_{module_name}"] = mod
+    spec.loader.exec_module(mod)
     return mod.app
 
 
@@ -80,11 +85,11 @@ def setup_environment(base_port: int, db_path: str, env_file: str):
     # 数据库
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
 
-    # CORS：桌面端允许 localhost 和 file://
-    os.environ["CORS_ORIGINS"] = "http://localhost:*,file://*"
-    os.environ["PICGEN_CORS_ORIGINS"] = "http://localhost:*,file://*"
-    os.environ["PPTGEN_CORS_ORIGINS"] = "http://localhost:*,file://*"
-    os.environ["UPGRADE_CORS_ORIGINS"] = "http://localhost:*,file://*"
+    # CORS：桌面端只在本地运行，允许所有来源（JWT 通过 header 传递，不依赖 cookie）
+    os.environ["CORS_ORIGINS"] = "*"
+    os.environ["PICGEN_CORS_ORIGINS"] = "*"
+    os.environ["PPTGEN_CORS_ORIGINS"] = "*"
+    os.environ["UPGRADE_CORS_ORIGINS"] = "*"
 
     # 内部服务地址（主后端转发用）
     os.environ["PICGEN_INTERNAL_URL"] = f"http://127.0.0.1:{ports['picgenerate']}"

@@ -154,7 +154,7 @@ async function createWindow(): Promise<BrowserWindow> {
     mainWindow.webContents.openDevTools()
   } else {
     // 生产模式：加载打包后的前端文件
-    mainWindow.loadFile(path.join(__dirname, '..', 'frontend', 'dist', 'index.html'))
+    mainWindow.loadFile(path.join(process.resourcesPath, 'frontend', 'dist', 'index.html'))
   }
 
   return mainWindow

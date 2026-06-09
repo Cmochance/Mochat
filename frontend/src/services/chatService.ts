@@ -140,23 +140,31 @@ export const chatService = {
   ): Promise<void> {
     const MAX_RETRIES = 3
     const RETRY_DELAY = 2000
+    // 一次请求 ID 贯穿所有重试，保证幂等
+    const requestId = generateRequestId()
+    const body = JSON.stringify({
+      session_id: sessionId,
+      content,
+      model: model || undefined,
+    })
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      let receivedDone = false
+      let chunksReceived = 0
 
       try {
         const response = await fetchWithAuthRetry('/api/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Request-ID': generateRequestId(),
+            'X-Request-ID': requestId,
           },
-          body: JSON.stringify({
-            session_id: sessionId,
-            content,
-            model: model || undefined,
-          }),
+          body,
         })
+
+        // 4xx（鉴权、配额等）不应重试
+        if (response.status >= 400 && response.status < 500) {
+          throw new Error('发送消息失败')
+        }
 
         if (!response.ok) {
           throw new Error('发送消息失败')
@@ -167,18 +175,17 @@ export const chatService = {
 
         const decoder = new TextDecoder()
         let buffer = ''
-        let chunkCount = 0
 
         console.log(`[Stream] 开始接收流式数据 (attempt ${attempt + 1}/${MAX_RETRIES})...`)
 
         while (true) {
           const { done, value } = await reader.read()
           if (done) {
-            console.log(`[Stream] 流式传输完成，共收到 ${chunkCount} 个数据块`)
+            console.log(`[Stream] 流式传输完成，共收到 ${chunksReceived} 个数据块`)
             break
           }
 
-          chunkCount++
+          chunksReceived++
 
           buffer += decoder.decode(value, { stream: true })
           const lines = buffer.split('\n')
@@ -188,7 +195,6 @@ export const chatService = {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6)) as StreamChunk
-                if (data.type === 'done') receivedDone = true
                 onChunk(data)
               } catch {
                 // 忽略解析错误
@@ -203,7 +209,6 @@ export const chatService = {
         if (buffer.startsWith('data: ')) {
           try {
             const data = JSON.parse(buffer.slice(6)) as StreamChunk
-            if (data.type === 'done') receivedDone = true
             onChunk(data)
           } catch {
             // 忽略
@@ -213,20 +218,21 @@ export const chatService = {
         // 流正常结束，无需重试
         return
       } catch (err) {
-        // 如果已收到 done，说明后端已完成，不需要重试
-        if (receivedDone) return
+        // 已收到数据块 → 后端可能已创建消息，重试会产生重复
+        if (chunksReceived > 0) {
+          throw err
+        }
 
-        console.warn(`[Stream] 连接中断 (attempt ${attempt + 1}/${MAX_RETRIES}):`, err)
+        console.warn(`[Stream] 连接失败 (attempt ${attempt + 1}/${MAX_RETRIES}):`, err)
 
         // 最后一次尝试也失败了，抛出错误
         if (attempt >= MAX_RETRIES - 1) {
           throw err
         }
 
-        // 等待后重试
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
-        // 通知调用方正在重试
+        // 纯连接失败才重试，通知调用方
         onChunk({ type: 'status', data: `reconnect_${attempt + 1}` })
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
       }
     }
   },

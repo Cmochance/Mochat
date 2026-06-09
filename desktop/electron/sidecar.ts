@@ -251,21 +251,33 @@ export async function startSidecar(): Promise<SidecarReadyInfo> {
 /**
  * 停止 sidecar
  */
-export function stopSidecar(): void {
-  if (sidecarProcess) {
+export function stopSidecar(): Promise<void> {
+  return new Promise((resolve) => {
+    if (!sidecarProcess) {
+      resolve()
+      return
+    }
+
     console.log('[sidecar] Stopping...')
+
+    // 监听退出事件
+    const proc = sidecarProcess
+    proc.on('exit', () => {
+      sidecarProcess = null
+      resolve()
+    })
+
     // 先尝试 SIGTERM 让 Python 优雅关闭
-    sidecarProcess.kill('SIGTERM')
+    proc.kill('SIGTERM')
 
     // 如果 5 秒后还没退出，强制 kill
     setTimeout(() => {
       if (sidecarProcess) {
         console.log('[sidecar] Force killing...')
         sidecarProcess.kill('SIGKILL')
-        sidecarProcess = null
       }
     }, 5000)
-  }
+  })
 }
 
 /**

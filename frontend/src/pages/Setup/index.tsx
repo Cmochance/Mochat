@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Key, Globe, Cpu, CheckCircle, Loader2 } from 'lucide-react'
 
 interface SetupConfig {
@@ -15,6 +16,14 @@ export default function Setup({ onComplete }: { onComplete: (config: SetupConfig
     aiModel: 'gpt-4',
   })
   const [saving, setSaving] = useState(false)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (step === 'done') {
+      const timer = setTimeout(() => navigate('/'), 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [step, navigate])
   const [step, setStep] = useState<'form' | 'saving' | 'done'>('form')
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -167,7 +167,7 @@ function registerIpcHandlers(): void {
     fs.writeFileSync(envFile, envContent, 'utf-8')
 
     // 重启 sidecar 以加载新配置
-    stopSidecar()
+    await stopSidecar()
     const info = await startSidecar()
     if (mainWindow) {
       mainWindow.webContents.send('setup-complete', info)
@@ -327,7 +327,7 @@ app.on('will-quit', () => {
   // 注销全局快捷键
   globalShortcut.unregisterAll()
   // 停止 sidecar
-  stopSidecar()
+  stopSidecar().catch(() => {})
   // 销毁托盘
   destroyTray()
   // 关闭前端静态服务器

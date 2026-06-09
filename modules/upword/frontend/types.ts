@@ -55,5 +55,6 @@ export interface UploadState {
   isUploading: boolean
   isParsing: boolean
   progress: 'idle' | 'uploading' | 'parsing' | 'done' | 'error'
+  uploadPercent: number
   error: string | null
 }

@@ -67,7 +67,7 @@ export default function InputArea({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
 
-  const { uploadImage, validateImage, isUploading: isUploadingImage, error: imageError, clearError: clearImageError } = useImageUpload({
+  const { uploadImage, validateImage, isUploading: isUploadingImage, progress: imageUploadProgress, error: imageError, clearError: clearImageError } = useImageUpload({
     apiBase: '/uppic',
     folder: 'chat-images',
     userId: user?.id?.toString() || 'anonymous',
@@ -78,6 +78,7 @@ export default function InputArea({
     validateDoc,
     isProcessing: isProcessingDoc,
     progress: docProgress,
+    uploadPercent: docUploadPercent,
     error: docError,
     clearError: clearDocError,
   } = useDocUpload({
@@ -343,8 +344,10 @@ export default function InputArea({
           imagePreview={imagePreview}
           docPreview={docPreview}
           isUploadingImage={isUploadingImage}
+          imageUploadProgress={imageUploadProgress}
           isProcessingDoc={isProcessingDoc}
           docProgress={docProgress}
+          docUploadPercent={docUploadPercent}
           onRemoveImage={removeImage}
           onRemoveDoc={removeDoc}
           onOpenDoc={openDoc}

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { ExternalLink, FileText, Loader2, X } from 'lucide-react'
+import { ExternalLink, FileText, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ImagePreview } from '@uppic'
 
@@ -12,8 +12,10 @@ interface ComposerAttachmentProps {
   imagePreview: ImagePreview | null
   docPreview: DocPreview | null
   isUploadingImage: boolean
+  imageUploadProgress?: number
   isProcessingDoc: boolean
   docProgress?: string
+  docUploadPercent?: number
   onRemoveImage: () => void
   onRemoveDoc: () => void
   onOpenDoc: () => void
@@ -23,8 +25,10 @@ export default function ComposerAttachment({
   imagePreview,
   docPreview,
   isUploadingImage,
+  imageUploadProgress = 0,
   isProcessingDoc,
   docProgress,
+  docUploadPercent = 0,
   onRemoveImage,
   onRemoveDoc,
   onOpenDoc,
@@ -56,8 +60,14 @@ export default function ComposerAttachment({
                 <X size={14} />
               </motion.button>
               {isUploadingImage && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-md bg-ink-black/50">
-                  <Loader2 className="h-6 w-6 animate-spin text-paper-white" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-md bg-ink-black/50 gap-1">
+                  <div className="w-4/5 h-1.5 rounded-full bg-paper-white/30 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-paper-white transition-all duration-300"
+                      style={{ width: `${imageUploadProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-paper-white font-ui">{imageUploadProgress}%</span>
                 </div>
               )}
             </div>
@@ -84,9 +94,20 @@ export default function ComposerAttachment({
                 <ExternalLink size={12} />
               </button>
               {isProcessingDoc && (
-                <span className="text-xs text-ink-faint">
-                  {docProgress === 'uploading' ? t('input.uploading') : t('input.parsing')}
-                </span>
+                docProgress === 'uploading' ? (
+                  <span className="flex items-center gap-1.5 text-xs text-ink-faint">
+                    <span>{t('input.uploading')}</span>
+                    <span className="inline-block w-16 h-1.5 rounded-full bg-ink-faint/20 overflow-hidden">
+                      <span
+                        className="block h-full rounded-full bg-cyan-ink transition-all duration-300"
+                        style={{ width: `${docUploadPercent}%` }}
+                      />
+                    </span>
+                    <span>{docUploadPercent}%</span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-ink-faint">{t('input.parsing')}</span>
+                )
               )}
               <motion.button
                 onClick={onRemoveDoc}

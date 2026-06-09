@@ -130,7 +130,7 @@ export interface Message {
 
 // 流式响应块
 export interface StreamChunk {
-  type: 'thinking' | 'content' | 'done' | 'error'
+  type: 'thinking' | 'content' | 'done' | 'error' | 'status'
   data: string
 }
 

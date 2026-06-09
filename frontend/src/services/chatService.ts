@@ -131,7 +131,9 @@ export const chatService = {
     return response.data
   },
 
-  // 发送消息（流式）
+  // 发送消息（流式）—— POST 请求不做重试
+  // 原因：后端在首个 SSE chunk 到达前就已提交 user message，
+  // 重试会导致重复消息。断线重连应由调用方或后端幂等层处理。
   async sendMessage(
     sessionId: number,
     content: string,
@@ -171,30 +173,23 @@ export const chatService = {
         break
       }
 
-      // 调试日志：确认收到数据
       chunkCount++
-      console.log(`[Stream] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
 
-      // 使用 stream: true 处理多字节字符
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
-      
-      // 保留最后一个可能不完整的行
       buffer = lines.pop() || ''
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6)) as StreamChunk
-            // 立即调用回调，让 React 处理更新
             onChunk(data)
           } catch {
             // 忽略解析错误
           }
         }
       }
-      
-      // 给浏览器一个渲染的机会
+
       await new Promise(resolve => setTimeout(resolve, 0))
     }
 
@@ -241,15 +236,11 @@ export const chatService = {
         break
       }
 
-      // 调试日志
       chunkCount++
       console.log(`[Stream/Regenerate] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
 
-      // 使用 stream: true 处理多字节字符
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
-      
-      // 保留最后一个可能不完整的行
       buffer = lines.pop() || ''
 
       for (const line of lines) {
@@ -262,8 +253,7 @@ export const chatService = {
           }
         }
       }
-      
-      // 给浏览器一个渲染的机会
+
       await new Promise(resolve => setTimeout(resolve, 0))
     }
 

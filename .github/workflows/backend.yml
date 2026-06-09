@@ -2,8 +2,7 @@ name: Backend CI
 
 on:
   pull_request:
-    paths:
-      - "backend/**"
+    # 不限 paths，确保 lint required check 始终报告状态
   push:
     branches: [main]
     paths:
@@ -17,16 +16,39 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for backend changes
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q '^backend/'; then
+              echo "run=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "run=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-python@v5
+        if: steps.changes.outputs.run == 'true'
         with:
           python-version: "3.12"
 
       - name: Install linter
+        if: steps.changes.outputs.run == 'true'
         run: pip install ruff
 
       - name: Ruff check
+        if: steps.changes.outputs.run == 'true'
         run: ruff check app/ --output-format=github
 
       - name: Ruff format check
+        if: steps.changes.outputs.run == 'true'
         run: ruff format app/ --check --diff
+
+      - name: No backend changes
+        if: steps.changes.outputs.run == 'false'
+        run: echo "No backend changes detected, lint skipped"

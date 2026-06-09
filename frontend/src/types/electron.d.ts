@@ -41,6 +41,12 @@ interface ElectronAPI {
 
   /** 安装更新并重启 */
   installUpdate(): void
+
+  /** 发送原生通知 */
+  notify(title: string, body: string): Promise<void>
+
+  /** 监听深度链接 */
+  onDeepLink(callback: (url: string) => void): void
 }
 
 declare global {

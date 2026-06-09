@@ -1,6 +1,7 @@
 """
 对话业务服务 - 处理对话相关的业务逻辑
 """
+import logging
 import re
 import httpx
 from typing import List, Optional, AsyncGenerator
@@ -12,8 +13,7 @@ from .ai_service import ai_service
 from .content_filter import content_filter, RESTRICTED_MESSAGE
 from ..core.config import settings
 
-# Upword 服务地址（Docker 内部网络）
-UPWORD_SERVICE_URL = "http://upword:3901"
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -43,7 +43,7 @@ class ChatService:
                 # 调用 upword 服务获取文档内容
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.post(
-                        f"{UPWORD_SERVICE_URL}/api/parse",
+                        f"{settings.UPWORD_INTERNAL_URL}/api/parse",
                         json={"objectKey": object_key}
                     )
                     
@@ -53,13 +53,13 @@ class ChatService:
                             # 替换为包含内容的格式
                             doc_content = f"<!-- DOC:{filename} -->\n以下是用户上传的文档内容:\n\n{data['markdown']}\n<!-- /DOC -->"
                             result = result.replace(match.group(0), doc_content)
-                            print(f"[ChatService] 成功获取文档内容: {filename}")
+                            logger.info("成功获取文档内容: %s", filename)
                         else:
-                            print(f"[ChatService] 文档解析失败: {data.get('error')}")
+                            logger.warning("文档解析失败: %s", data.get('error'))
                     else:
-                        print(f"[ChatService] upword 服务响应错误: {response.status_code}")
+                        logger.warning("upword 服务响应错误: %s", response.status_code)
             except Exception as e:
-                print(f"[ChatService] 获取文档内容失败: {e}")
+                logger.error("获取文档内容失败: %s", e)
         
         return result
     

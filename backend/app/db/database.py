@@ -1,10 +1,16 @@
 """
 数据库连接模块 - 管理数据库会话
 """
+import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import text, inspect
 from ..core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# 当前 schema 版本号，每次新增迁移时递增
+SCHEMA_VERSION = 2
 
 # 创建异步引擎
 engine = create_async_engine(
@@ -54,9 +60,9 @@ async def migrate_db(conn):
             columns = [col["name"] for col in inspector.get_columns(table_name)]
             if column_name in columns:
                 return
-            print(f"[Migration] Adding '{column_name}' column to {table_name} table...")
+            logger.info("Migration: Adding '%s' column to %s table...", column_name, table_name)
             connection.execute(text(alter_sql))
-            print(f"[Migration] Column '{column_name}' added successfully.")
+            logger.info("Migration: Column '%s' added successfully.", column_name)
 
         def add_index_if_missing(table_name: str, index_name: str, create_sql: str) -> None:
             if table_name not in table_names:
@@ -64,9 +70,9 @@ async def migrate_db(conn):
             indexes = [idx.get("name") for idx in inspector.get_indexes(table_name)]
             if index_name in indexes:
                 return
-            print(f"[Migration] Creating index '{index_name}' on {table_name} table...")
+            logger.info("Migration: Creating index '%s' on %s table...", index_name, table_name)
             connection.execute(text(create_sql))
-            print(f"[Migration] Index '{index_name}' created successfully.")
+            logger.info("Migration: Index '%s' created successfully.", index_name)
         
         # users 表历史迁移
         add_column_if_missing(
@@ -142,6 +148,26 @@ async def init_db():
         await migrate_db(conn)
         # 再创建新表（如果不存在）
         await conn.run_sync(Base.metadata.create_all)
+
+        # 更新 schema 版本
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS schema_version ("
+            "  id INTEGER PRIMARY KEY CHECK (id = 1),"
+            "  version INTEGER NOT NULL,"
+            "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ))
+        row = conn.execute(text("SELECT version FROM schema_version WHERE id = 1")).fetchone()
+        if row is None:
+            conn.execute(text(
+                "INSERT INTO schema_version (id, version) VALUES (1, :ver)"
+            ), {"ver": SCHEMA_VERSION})
+        elif row[0] < SCHEMA_VERSION:
+            conn.execute(text(
+                "UPDATE schema_version SET version = :ver, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+            ), {"ver": SCHEMA_VERSION})
+            logger.info("Schema upgraded: %s → %s", row[0], SCHEMA_VERSION)
+        logger.info("Database schema version: %s", SCHEMA_VERSION)
 
 
 async def close_db():

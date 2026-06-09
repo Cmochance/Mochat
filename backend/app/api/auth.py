@@ -18,10 +18,6 @@ from ..services.auth_service import AuthService
 from ..core.dependencies import get_current_active_user
 from ..db.models import User
 
-# 导入验证码服务
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from verify import VerificationService
 from verify.config import config as verify_config
 

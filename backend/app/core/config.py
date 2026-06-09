@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3721,http://localhost:3000"
 
     # 微服务内部地址（网关转发）
+    UPWORD_INTERNAL_URL: str = "http://upword:3901"
     PICGEN_INTERNAL_URL: str = "http://picgenerate:3903"
     PPTGEN_INTERNAL_URL: str = "http://pptgen:3904"
 

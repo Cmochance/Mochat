@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import httpx
+import os
 
 from config import settings
 from version_data import CURRENT_VERSION, VERSION_HISTORY
@@ -27,7 +28,7 @@ app.add_middleware(
 )
 
 # 主后端服务地址（用于获取和更新用户信息）
-MAIN_BACKEND_URL = "http://backend:9527"
+MAIN_BACKEND_URL = os.getenv("MAIN_BACKEND_URL", "http://backend:9527")
 
 
 # ============ 请求/响应模型 ============

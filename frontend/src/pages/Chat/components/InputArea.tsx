@@ -1,3 +1,4 @@
+import { getModuleBaseUrl } from '../../../utils/env'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertCircle, Loader2, Send, Palette, Presentation } from 'lucide-react'
@@ -68,7 +69,7 @@ export default function InputArea({
   const docInputRef = useRef<HTMLInputElement>(null)
 
   const { uploadImage, validateImage, isUploading: isUploadingImage, progress: imageUploadProgress, error: imageError, clearError: clearImageError } = useImageUpload({
-    apiBase: '/uppic',
+    apiBase: getModuleBaseUrl('uppic'),
     folder: 'chat-images',
     userId: user?.id?.toString() || 'anonymous',
   })
@@ -82,7 +83,7 @@ export default function InputArea({
     error: docError,
     clearError: clearDocError,
   } = useDocUpload({
-    apiBase: '/upword',
+    apiBase: getModuleBaseUrl('upword'),
     folder: 'chat-docs',
     userId: user?.id?.toString() || 'anonymous',
   })

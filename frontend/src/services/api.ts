@@ -1,9 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { clearAuthAndRedirect } from '../utils/auth'
+import { getApiBaseUrl } from '../utils/env'
+
+// 获取 API base URL（Web 模式为 '/api'，桌面模式为绝对地址）
+const apiBaseUrl = getApiBaseUrl()
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: apiBaseUrl,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -12,7 +16,7 @@ const api = axios.create({
 
 // 用于刷新 token 的独立客户端（避免拦截器递归）
 const refreshClient = axios.create({
-  baseURL: '/api',
+  baseURL: apiBaseUrl,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

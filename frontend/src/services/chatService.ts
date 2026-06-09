@@ -1,6 +1,14 @@
 import api from './api'
 import type { ChatSession, Message, StreamChunk } from '../types'
 import { clearAuthAndRedirect } from '../utils/auth'
+import { getApiBaseUrl } from '../utils/env'
+
+// 桌面模式下将相对路径转为绝对 URL
+const apiUrl = (path: string): string => {
+  const base = getApiBaseUrl()
+  // base 为 '/api' 时直接拼接；为 'http://...' 时也拼接
+  return `${base}${path}`
+}
 
 const generateRequestId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -13,7 +21,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
   const refreshToken = localStorage.getItem('refresh_token')
   if (!refreshToken) return null
 
-  const response = await fetch('/api/auth/refresh', {
+  const response = await fetch(apiUrl('/api/auth/refresh'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -140,7 +148,7 @@ export const chatService = {
     onChunk: (chunk: StreamChunk) => void,
     model?: string
   ): Promise<void> {
-    const response = await fetchWithAuthRetry('/api/chat/completions', {
+    const response = await fetchWithAuthRetry(apiUrl('/api/chat/completions'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -209,7 +217,7 @@ export const chatService = {
     sessionId: number,
     onChunk: (chunk: StreamChunk) => void
   ): Promise<void> {
-    const response = await fetchWithAuthRetry(`/api/chat/sessions/${sessionId}/regenerate`, {
+    const response = await fetchWithAuthRetry(apiUrl(`/api/chat/sessions/${sessionId}/regenerate`), {
       method: 'POST',
       headers: {
         'X-Request-ID': generateRequestId(),
@@ -285,7 +293,7 @@ export const chatService = {
 
   // 导出为 Word 文档
   async exportToDocx(content: string, filename: string = 'export'): Promise<void> {
-    const response = await fetchWithAuthRetry('/api/chat/export/docx', {
+    const response = await fetchWithAuthRetry(apiUrl('/api/chat/export/docx'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

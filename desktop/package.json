@@ -1,0 +1,97 @@
+{
+  "name": "mochat-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mochat - 水墨风格AI对话平台桌面端",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"cd ../frontend && npm run dev\" \"wait-on http://localhost:3721 && tsc && electron .\"",
+    "build:electron": "tsc",
+    "build:frontend": "cd ../frontend && npm run build",
+    "build": "npm run build:electron && npm run build:frontend",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "build:sidecar": "cd ../desktop/backend && pip install -r requirements.txt && pyinstaller build.spec"
+  },
+  "dependencies": {
+    "electron-log": "^5.2.0",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.2",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.3.3",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.mochat.desktop",
+    "productName": "Mochat",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "frontend/dist"
+      },
+      {
+        "from": "resources/mochat-server",
+        "to": "mochat-server",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "resources/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Cmochance",
+      "repo": "Mochat"
+    }
+  }
+}

@@ -15,6 +15,7 @@ const DEFAULT_CONFIG: Required<UppicConfig> = {
 
 export function useImageUpload(config: UppicConfig = {}) {
   const [isUploading, setIsUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
@@ -45,6 +46,7 @@ export function useImageUpload(config: UppicConfig = {}) {
     }
 
     setIsUploading(true)
+    setProgress(0)
     setError(null)
 
     try {
@@ -67,16 +69,32 @@ export function useImageUpload(config: UppicConfig = {}) {
 
       const { uploadUrl, key, publicUrl }: PresignResponse = await signResponse.json()
 
-      // 2. 直接上传到 R2
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      })
+      // 2. 使用 XMLHttpRequest 上传到 R2（支持进度回调）
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', uploadUrl)
+        xhr.setRequestHeader('Content-Type', file.type)
 
-      if (!uploadResponse.ok) {
-        throw new Error('上传到存储服务失败')
-      }
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setProgress(Math.round((e.loaded / e.total) * 100))
+          }
+        }
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setProgress(100)
+            resolve()
+          } else {
+            reject(new Error('上传到存储服务失败'))
+          }
+        }
+
+        xhr.onerror = () => reject(new Error('网络错误，上传失败'))
+        xhr.onabort = () => reject(new Error('上传已取消'))
+
+        xhr.send(file)
+      })
 
       return { url: publicUrl, key }
     } catch (err) {
@@ -93,12 +111,14 @@ export function useImageUpload(config: UppicConfig = {}) {
    */
   const clearError = useCallback(() => {
     setError(null)
+    setProgress(0)
   }, [])
 
   return {
     uploadImage,
     validateImage,
     isUploading,
+    progress,
     error,
     clearError,
   }

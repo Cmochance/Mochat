@@ -109,10 +109,32 @@ export default function Chat() {
     loadModels()
   }, [isAuthenticated])
 
-  const loadModels = async () => {
-    if (!isAuthenticated) return
-    try {
+ const loadModels = async () => {
+   if (!isAuthenticated) return
+   try {
+      // 优先从缓存读取（5 分钟 TTL）
+      const CACHE_KEY = 'mochat_models_cache'
+      const CACHE_TTL = 5 * 60 * 1000
+      const cached = localStorage.getItem(CACHE_KEY)
+      if (cached) {
+        try {
+          const { data, ts } = JSON.parse(cached)
+          if (Date.now() - ts < CACHE_TTL && data?.models?.length) {
+            setModels(data.models)
+            setDefaultModel(data.default_model)
+            const savedModel = localStorage.getItem('mochat_current_model')
+            if (savedModel && data.models.some(m => m.id === savedModel)) {
+              setCurrentModel(savedModel)
+            } else {
+              setCurrentModel(data.default_model)
+            }
+            return
+          }
+        } catch { /* 缓存损坏，继续请求 */ }
+      }
       const data = await chatService.getModels()
+      // 写入缓存
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
       setModels(data.models)
       setDefaultModel(data.default_model)
       // 从 localStorage 恢复上次选择的模型，否则使用默认模型
@@ -303,10 +325,13 @@ export default function Chat() {
               created_at: new Date().toISOString(),
             })
             endStreaming()  // 使用 endStreaming 完全结束流式状态
-          } else if (chunk.type === 'error') {
-            console.error('AI响应错误:', chunk.data)
-            endStreaming()  // 使用 endStreaming 完全结束流式状态
-          }
+         } else if (chunk.type === 'error') {
+           console.error('AI响应错误:', chunk.data)
+           endStreaming()  // 使用 endStreaming 完全结束流式状态
+          } else if (chunk.type === 'status') {
+            // 断线重连状态通知
+            console.info('[Stream] 重连中:', chunk.data)
+         }
         })
       }, model)
     } catch (error) {

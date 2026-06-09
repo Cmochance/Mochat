@@ -31,6 +31,7 @@ export function useDocUpload(config: UpwordConfig) {
     isUploading: false,
     isParsing: false,
     progress: 'idle',
+    uploadPercent: 0,
     error: null,
   })
 
@@ -97,29 +98,38 @@ export function useDocUpload(config: UpwordConfig) {
       uploadUrl: uploadUrl.substring(0, 100) + '...'
     })
     
-    try {
-      const response = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': contentType,
-        },
-      })
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', uploadUrl)
+      xhr.setRequestHeader('Content-Type', contentType)
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error')
-        console.error('[Upword] R2 上传失败:', response.status, errorText)
-        throw new Error(`文件上传失败: ${response.status} ${response.statusText}`)
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100)
+          setState(s => ({ ...s, uploadPercent: pct }))
+        }
       }
-      
-      console.log('[Upword] R2 上传成功')
-    } catch (error) {
-      console.error('[Upword] R2 上传异常:', error)
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('上传失败: 网络错误或 R2 CORS 未配置。请检查 R2 存储桶的 CORS 设置。')
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setState(s => ({ ...s, uploadPercent: 100 }))
+          console.log('[Upword] R2 上传成功')
+          resolve()
+        } else {
+          console.error('[Upword] R2 上传失败:', xhr.status, xhr.statusText)
+          reject(new Error(`文件上传失败: ${xhr.status} ${xhr.statusText}`))
+        }
       }
-      throw error
-    }
+
+      xhr.onerror = () => {
+        console.error('[Upword] R2 上传异常: 网络错误')
+        reject(new Error('上传失败: 网络错误或 R2 CORS 未配置。请检查 R2 存储桶的 CORS 设置。'))
+      }
+
+      xhr.onabort = () => reject(new Error('上传已取消'))
+
+      xhr.send(file)
+    })
   }
 
   /**
@@ -211,7 +221,7 @@ export function useDocUpload(config: UpwordConfig) {
    * 清除错误
    */
   const clearError = useCallback(() => {
-    setState((s: UploadState) => ({ ...s, error: null, progress: 'idle' }))
+    setState((s: UploadState) => ({ ...s, error: null, progress: 'idle', uploadPercent: 0 }))
   }, [])
 
   return {
@@ -222,6 +232,7 @@ export function useDocUpload(config: UpwordConfig) {
     isParsing: state.isParsing,
     isProcessing: state.isUploading || state.isParsing,
     progress: state.progress,
+    uploadPercent: state.uploadPercent,
     error: state.error,
   }
 }

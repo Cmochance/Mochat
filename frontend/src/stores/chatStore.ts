@@ -54,9 +54,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
   setMessages: (messages) => set({ messages }),
   
-  prependMessages: (newMessages) => set((state) => ({
-    messages: [...newMessages, ...state.messages],
-  })),
+ prependMessages: (newMessages) => set((state) => ({
+    // 去重：过滤掉已存在的消息（基于 id）
+    messages: [
+      ...newMessages.filter((m) => !state.messages.some((existing) => existing.id === m.id)),
+      ...state.messages,
+    ],
+ })),
   
   addMessage: (message) => set((state) => ({
     messages: [...state.messages, message],

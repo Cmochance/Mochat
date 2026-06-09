@@ -138,73 +138,95 @@ export const chatService = {
     onChunk: (chunk: StreamChunk) => void,
     model?: string
   ): Promise<void> {
-    const response = await fetchWithAuthRetry('/api/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Request-ID': generateRequestId(),
-      },
-      body: JSON.stringify({
-        session_id: sessionId,
-        content,
-        model: model || undefined,
-      }),
-    })
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 2000
 
-    if (!response.ok) {
-      throw new Error('发送消息失败')
-    }
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      let receivedDone = false
 
-    const reader = response.body?.getReader()
-    if (!reader) return
+      try {
+        const response = await fetchWithAuthRetry('/api/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Request-ID': generateRequestId(),
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            content,
+            model: model || undefined,
+          }),
+        })
 
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let chunkCount = 0
+        if (!response.ok) {
+          throw new Error('发送消息失败')
+        }
 
-    console.log('[Stream] 开始接收流式数据...')
+        const reader = response.body?.getReader()
+        if (!reader) return
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        console.log(`[Stream] 流式传输完成，共收到 ${chunkCount} 个数据块`)
-        break
-      }
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let chunkCount = 0
 
-      // 调试日志：确认收到数据
-      chunkCount++
-      console.log(`[Stream] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
+        console.log(`[Stream] 开始接收流式数据 (attempt ${attempt + 1}/${MAX_RETRIES})...`)
 
-      // 使用 stream: true 处理多字节字符
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      
-      // 保留最后一个可能不完整的行
-      buffer = lines.pop() || ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) {
+            console.log(`[Stream] 流式传输完成，共收到 ${chunkCount} 个数据块`)
+            break
+          }
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
+          chunkCount++
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6)) as StreamChunk
+                if (data.type === 'done') receivedDone = true
+                onChunk(data)
+              } catch {
+                // 忽略解析错误
+              }
+            }
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 0))
+        }
+
+        // 处理剩余的 buffer
+        if (buffer.startsWith('data: ')) {
           try {
-            const data = JSON.parse(line.slice(6)) as StreamChunk
-            // 立即调用回调，让 React 处理更新
+            const data = JSON.parse(buffer.slice(6)) as StreamChunk
+            if (data.type === 'done') receivedDone = true
             onChunk(data)
           } catch {
-            // 忽略解析错误
+            // 忽略
           }
         }
-      }
-      
-      // 给浏览器一个渲染的机会
-      await new Promise(resolve => setTimeout(resolve, 0))
-    }
 
-    // 处理剩余的 buffer
-    if (buffer.startsWith('data: ')) {
-      try {
-        const data = JSON.parse(buffer.slice(6)) as StreamChunk
-        onChunk(data)
-      } catch {
-        // 忽略
+        // 流正常结束，无需重试
+        return
+      } catch (err) {
+        // 如果已收到 done，说明后端已完成，不需要重试
+        if (receivedDone) return
+
+        console.warn(`[Stream] 连接中断 (attempt ${attempt + 1}/${MAX_RETRIES}):`, err)
+
+        // 最后一次尝试也失败了，抛出错误
+        if (attempt >= MAX_RETRIES - 1) {
+          throw err
+        }
+
+        // 等待后重试
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        // 通知调用方正在重试
+        onChunk({ type: 'status', data: `reconnect_${attempt + 1}` })
       }
     }
   },

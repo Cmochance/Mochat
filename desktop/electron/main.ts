@@ -10,6 +10,7 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, safeStorage } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs'
+import * as http from 'http'
 import { startSidecar, stopSidecar, getReadyInfo, type SidecarPorts } from './sidecar'
 import { createTray, destroyTray } from './tray'
 import { initUpdater, installUpdate } from './updater'
@@ -22,6 +23,62 @@ const isDev = !app.isPackaged
 let isQuitting = false
 
 // 安全存储文件路径
+// ---------------------------------------------------------------------------
+// 生产模式静态文件服务器
+// ---------------------------------------------------------------------------
+let frontendServer: http.Server | null = null
+let frontendPort = 0
+
+function startFrontendServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const distDir = path.join(process.resourcesPath, 'frontend', 'dist')
+    const mimeTypes: Record<string, string> = {
+      '.html': 'text/html',
+      '.js': 'application/javascript',
+      '.css': 'text/css',
+      '.json': 'application/json',
+      '.png': 'image/png',
+      '.svg': 'image/svg+xml',
+      '.ico': 'image/x-icon',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2',
+    }
+
+    frontendServer = http.createServer((req, res) => {
+      let filePath = path.join(distDir, req.url === '/' ? 'index.html' : req.url!)
+      // SPA fallback：非文件请求返回 index.html
+      if (!path.extname(filePath)) {
+        filePath = path.join(distDir, 'index.html')
+      }
+      const ext = path.extname(filePath).toLowerCase()
+      const contentType = mimeTypes[ext] || 'application/octet-stream'
+
+      fs.readFile(filePath, (err, content) => {
+        if (err) {
+          // 404 fallback 到 index.html（SPA 路由）
+          fs.readFile(path.join(distDir, 'index.html'), (_err2, fallback) => {
+            res.writeHead(200, { 'Content-Type': 'text/html' })
+            res.end(fallback)
+          })
+        } else {
+          res.writeHead(200, { 'Content-Type': contentType })
+          res.end(content)
+        }
+      })
+    })
+
+    frontendServer.listen(0, '127.0.0.1', () => {
+      const addr = frontendServer!.address()
+      if (typeof addr === 'object' && addr) {
+        frontendPort = addr.port
+        resolve(frontendPort)
+      } else {
+        reject(new Error('Failed to start frontend server'))
+      }
+    })
+  })
+}
+
 function getSecureStorePath(): string {
   return path.join(app.getPath('userData'), 'secure-storage.json')
 }
@@ -154,8 +211,9 @@ async function createWindow(): Promise<BrowserWindow> {
     mainWindow.loadURL('http://localhost:3721')
     mainWindow.webContents.openDevTools()
   } else {
-    // 生产模式：加载打包后的前端文件
-    mainWindow.loadFile(path.join(process.resourcesPath, 'frontend', 'dist', 'index.html'))
+    // 生产模式：通过本地 HTTP 服务器加载前端（避免 file:// 的 CORS 限制）
+    const port = await startFrontendServer()
+    mainWindow.loadURL(`http://127.0.0.1:${port}`)
   }
 
   return mainWindow
@@ -228,4 +286,9 @@ app.on('will-quit', () => {
   stopSidecar()
   // 销毁托盘
   destroyTray()
+  // 关闭前端静态服务器
+  if (frontendServer) {
+    frontendServer.close()
+    frontendServer = null
+  }
 })

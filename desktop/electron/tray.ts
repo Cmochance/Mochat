@@ -11,7 +11,10 @@ let tray: Tray | null = null
  */
 export function createTray(mainWindow: BrowserWindow): Tray {
   // 使用应用图标
-  const iconPath = path.join(__dirname, '..', 'resources', 'tray-icon.png')
+  const isDev = !app.isPackaged
+  const iconPath = isDev
+    ? path.join(__dirname, '..', 'resources', 'tray-icon.png')
+    : path.join(process.resourcesPath, 'tray-icon.png')
   const icon = nativeImage.createFromPath(iconPath)
 
   tray = new Tray(icon.resize({ width: 16, height: 16 }))

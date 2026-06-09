@@ -50,18 +50,23 @@ def _import_main_backend():
 def _import_module_app(module_name: str):
     """导入模块 app（各模块互相隔离，不修改原代码）"""
     mod_dir = MODULES_DIR / module_name / "backend"
-    # 用唯一模块名避免各模块的 main.py 互相覆盖
     mod_dir_str = str(mod_dir)
-    if mod_dir_str not in sys.path:
-        sys.path.insert(0, mod_dir_str)
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        f"mochat_mod_{module_name}", str(mod_dir / "main.py")
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[f"mochat_mod_{module_name}"] = mod
-    spec.loader.exec_module(mod)
-    return mod.app
+
+    # 临时将模块目录插入 sys.path 前端，确保该模块的 config.py 等
+    # 能被正确找到，导入完成后恢复，避免模块间互相干扰
+    original_path = sys.path.copy()
+    sys.path.insert(0, mod_dir_str)
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            f"mochat_mod_{module_name}", str(mod_dir / "main.py")
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[f"mochat_mod_{module_name}"] = mod
+        spec.loader.exec_module(mod)
+        return mod.app
+    finally:
+        sys.path = original_path
 
 
 SERVICE_IMPORTERS = {

@@ -15,8 +15,12 @@ BACKEND_DIR = PROJECT_ROOT / "backend"
 MODULES_DIR = PROJECT_ROOT / "modules"
 DESKTOP_BACKEND = Path(SPECPATH)
 
-# 收集所有 Python 源码路径
+# 收集模块后端源码文件（PyInstaller 不会自动收集通过 importlib 加载的文件）
 datas = []
+for mod_name in ["uppic", "upword", "upgrade", "picgenerate", "pptgen"]:
+    mod_dir = MODULES_DIR / mod_name / "backend"
+    for py_file in mod_dir.glob("*.py"):
+        datas.append((str(py_file), f"modules/{mod_name}/backend"))
 hiddenimports = [
     "uvicorn",
     "uvicorn.logging",
@@ -45,6 +49,9 @@ hiddenimports = [
     "resend",
     "boto3",
     "botocore",
+    "markitdown",
+    "mammoth",
+    "docx",
 ]
 
 a = Analysis(

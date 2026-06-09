@@ -10,13 +10,9 @@ from .core.config import settings
 from .db.database import init_db, close_db
 from .api import api_router
 from .services.auth_service import AuthService
+from .services.ai_service import ai_service
 from .db.database import AsyncSessionLocal
 
-# 导入验证码模块
-import sys
-from pathlib import Path
-# 添加 verify 模块到路径
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from verify import verify_router
 
 logger = logging.getLogger(__name__)
@@ -51,6 +47,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # 关闭时清理资源
+    await ai_service.close()
     await close_db()
 
 

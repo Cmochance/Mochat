@@ -275,19 +275,22 @@ async def chat_completions(
             error_code = "chat_stream_exception"
             raise
         finally:
-            status_value = "success" if stream_success else "failed"
-            await usage_service.record_usage_event(
-                db,
-                user=current_user,
-                action="chat",
-                status=status_value,
-                request_id=request_id,
-                session_id=request.session_id,
-                error_code=error_code,
-                source="chat_completions",
-                occurred_at=started_at,
-            )
-            await db.commit()
+            try:
+                status_value = "success" if stream_success else "failed"
+                await usage_service.record_usage_event(
+                    db,
+                    user=current_user,
+                    action="chat",
+                    status=status_value,
+                    request_id=request_id,
+                    session_id=request.session_id,
+                    error_code=error_code,
+                    source="chat_completions",
+                    occurred_at=started_at,
+                )
+                await db.commit()
+            except Exception:
+                pass  # 客户端已断开，忽略记账失败
     
     return StreamingResponse(
         generate(),
@@ -381,17 +384,20 @@ async def generate_image_stream(
             yield _sse({"type": "error", "data": f"图像网关异常: {str(exc)}"})
             yield _sse({"type": "done", "data": ""})
         finally:
-            await usage_service.record_usage_event(
-                db,
-                user=current_user,
-                action="image",
-                status="success" if stream_success else "failed",
-                request_id=request_id,
-                error_code=None if stream_success else error_code,
-                source="chat_image_gateway",
-                occurred_at=started_at,
-            )
-            await db.commit()
+            try:
+                await usage_service.record_usage_event(
+                    db,
+                    user=current_user,
+                    action="image",
+                    status="success" if stream_success else "failed",
+                    request_id=request_id,
+                    error_code=None if stream_success else error_code,
+                    source="chat_image_gateway",
+                    occurred_at=started_at,
+                )
+                await db.commit()
+            except Exception:
+                pass
 
     return StreamingResponse(
         generate(),
@@ -461,17 +467,20 @@ async def generate_image(
         error_code = "image_gateway_exception"
         raise HTTPException(status_code=500, detail=f"图像网关异常: {str(exc)}")
     finally:
-        await usage_service.record_usage_event(
-            db,
-            user=current_user,
-            action="image",
-            status="success" if stream_success else "failed",
-            request_id=request_id,
-            error_code=None if stream_success else error_code,
-            source="chat_image_gateway_sync",
-            occurred_at=started_at,
-        )
-        await db.commit()
+        try:
+            await usage_service.record_usage_event(
+                db,
+                user=current_user,
+                action="image",
+                status="success" if stream_success else "failed",
+                request_id=request_id,
+                error_code=None if stream_success else error_code,
+                source="chat_image_gateway_sync",
+                occurred_at=started_at,
+            )
+            await db.commit()
+        except Exception:
+            pass
 
 
 @router.post("/ppt/generate/stream")
@@ -537,17 +546,20 @@ async def generate_ppt_stream(
             yield _sse({"type": "error", "data": f"PPT 网关异常: {str(exc)}"})
             yield _sse({"type": "done", "data": ""})
         finally:
-            await usage_service.record_usage_event(
-                db,
-                user=current_user,
-                action="ppt",
-                status="success" if stream_success else "failed",
-                request_id=request_id,
-                error_code=None if stream_success else error_code,
-                source="chat_ppt_gateway",
-                occurred_at=started_at,
-            )
-            await db.commit()
+            try:
+                await usage_service.record_usage_event(
+                    db,
+                    user=current_user,
+                    action="ppt",
+                    status="success" if stream_success else "failed",
+                    request_id=request_id,
+                    error_code=None if stream_success else error_code,
+                    source="chat_ppt_gateway",
+                    occurred_at=started_at,
+                )
+                await db.commit()
+            except Exception:
+                pass
 
     return StreamingResponse(
         generate(),
@@ -600,17 +612,20 @@ async def generate_ppt(
         error_code = "ppt_gateway_exception"
         raise HTTPException(status_code=500, detail=f"PPT 网关异常: {str(exc)}")
     finally:
-        await usage_service.record_usage_event(
-            db,
-            user=current_user,
-            action="ppt",
-            status="success" if stream_success else "failed",
-            request_id=request_id,
-            error_code=None if stream_success else error_code,
-            source="chat_ppt_gateway_sync",
-            occurred_at=started_at,
-        )
-        await db.commit()
+        try:
+            await usage_service.record_usage_event(
+                db,
+                user=current_user,
+                action="ppt",
+                status="success" if stream_success else "failed",
+                request_id=request_id,
+                error_code=None if stream_success else error_code,
+                source="chat_ppt_gateway_sync",
+                occurred_at=started_at,
+            )
+            await db.commit()
+        except Exception:
+            pass
 
 
 @router.post("/sessions/{session_id}/regenerate")

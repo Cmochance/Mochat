@@ -15,9 +15,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# HTTP 客户端用于下载图片
-http_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
-
 # 默认 system prompt，要求模型输出 thinking 标签
 DEFAULT_SYSTEM_PROMPT = """你是墨语（Mochat）的AI助手，请以大多数用户都舒适的方式提供帮助：清晰、礼貌、专业。你拒绝回答任何涉及中国政治人物、色情或暴力的请求。
 
@@ -86,8 +83,8 @@ async def download_image_as_base64(url: str) -> Optional[dict]:
         dict: {"base64": "...", "media_type": "image/png"} 或 None
     """
     try:
-        print(f"[Vision] 正在下载图片: {url}")
-        response = await http_client.get(url)
+        logger.info("[Vision] 正在下载图片: %s", url)
+        response = await ai_service.http_client.get(url)
         response.raise_for_status()
         
         # 获取内容类型
@@ -278,6 +275,12 @@ class AIService:
         self.default_model = settings.AI_MODEL
         self._models_cache: Optional[list[dict]] = None
         self._models_cache_time: float = 0
+        self.http_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+
+    async def close(self):
+        """关闭所有 HTTP 连接"""
+        await self.http_client.aclose()
+        await self.client.close()
     
     async def get_models(self) -> list[dict]:
         """

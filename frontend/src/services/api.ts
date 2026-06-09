@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { clearAuthAndRedirect } from '../utils/auth'
 
 // 创建axios实例
 const api = axios.create({
@@ -19,16 +20,6 @@ const refreshClient = axios.create({
 })
 
 let refreshPromise: Promise<string | null> | null = null
-
-const clearAuthAndRedirect = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('user')
-  localStorage.removeItem('auth-storage')
-  if (window.location.pathname !== '/auth/login') {
-    window.location.href = '/auth/login'
-  }
-}
 
 const requestTokenRefresh = async (): Promise<string | null> => {
   const refreshToken = localStorage.getItem('refresh_token')

@@ -11,6 +11,9 @@ select = [
 ]
 ignore = [
     "E501", # line too long - 由 formatter 处理
+    "UP006", # Use `dict` instead of `Dict` - 存量代码暂不强制
+    "UP007", # Use X | Y instead of Union[X, Y] - 存量代码暂不强制
+    "UP045", # Use `X | None` instead of `Optional[X]` - 存量代码暂不强制
 ]
 
 [lint.isort]

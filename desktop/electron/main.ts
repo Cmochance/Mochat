@@ -298,7 +298,8 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient('mochat')
 }
 
-let deepLinkUrl: string | null = null
+// 从命令行参数提取深度链接（Windows/Linux 冷启动时）
+let deepLinkUrl: string | null = process.argv.find((arg) => arg.startsWith('mochat://')) || null
 
 // macOS: 通过 open-url 事件接收
 app.on('open-url', (event, url) => {
@@ -364,10 +365,13 @@ app.whenReady().then(async () => {
     initUpdater(win)
   }
 
-  // 7. 发送待处理的深度链接
+  // 7. 发送待处理的深度链接（等页面加载完成后再发送，避免消息丢失）
   if (deepLinkUrl) {
-    win.webContents.send('deep-link', deepLinkUrl)
+    const pendingUrl = deepLinkUrl
     deepLinkUrl = null
+    win.webContents.once('did-finish-load', () => {
+      win.webContents.send('deep-link', pendingUrl)
+    })
   }
 })
 

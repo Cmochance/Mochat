@@ -3,13 +3,12 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import type { VersionInfo, UpgradeConfig } from './types'
+import { getModuleBaseUrl } from '@/utils/env'
 
-const DEFAULT_CONFIG: UpgradeConfig = {
-  apiBasePath: '/upgrade',
-}
+const getDefaultApiBasePath = (): string => getModuleBaseUrl('upgrade')
 
 export function useVersion(config?: UpgradeConfig) {
-  const mergedConfig = { ...DEFAULT_CONFIG, ...config }
+  const mergedConfig = { apiBasePath: config?.apiBasePath ?? getDefaultApiBasePath() }
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -93,7 +92,7 @@ export function useVersion(config?: UpgradeConfig) {
 }
 
 // 获取当前版本号（无需认证）
-export async function getCurrentVersion(apiBasePath = '/upgrade'): Promise<string> {
+export async function getCurrentVersion(apiBasePath = getDefaultApiBasePath()): Promise<string> {
   try {
     const response = await fetch(`${apiBasePath}/api/version/current`)
     if (response.ok) {
@@ -107,7 +106,7 @@ export async function getCurrentVersion(apiBasePath = '/upgrade'): Promise<strin
 }
 
 // 获取完整版本信息（用于手动触发弹窗）
-export async function getVersionInfo(apiBasePath = '/upgrade'): Promise<VersionInfo> {
+export async function getVersionInfo(apiBasePath = getDefaultApiBasePath()): Promise<VersionInfo> {
   const token = localStorage.getItem('token')
   
   const response = await fetch(`${apiBasePath}/api/version`, {

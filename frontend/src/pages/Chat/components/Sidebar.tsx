@@ -106,13 +106,13 @@ export default function Sidebar({
 
   // 获取当前版本号
   useEffect(() => {
-    getCurrentVersion('/upgrade').then(setVersion)
+    getCurrentVersion().then(setVersion)
   }, [])
 
   // 点击版本号显示弹窗
   const handleVersionClick = async () => {
     try {
-      const info = await getVersionInfo('/upgrade')
+      const info = await getVersionInfo()
       setVersionInfo(info)
       setShowVersionModal(true)
     } catch (error) {

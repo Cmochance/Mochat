@@ -1,0 +1,162 @@
+name: Desktop Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "modules/**"
+      - "desktop/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "backend/**"
+      - "modules/**"
+      - "desktop/**"
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # 第一阶段：构建 Python sidecar（每个平台独立构建）
+  # ============================================================
+  build-sidecar:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+            platform: mac
+          - os: macos-15
+            arch: x64
+            platform: mac
+          - os: windows-latest
+            arch: x64
+            platform: win
+          - os: ubuntu-latest
+            arch: x64
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pandoc (macOS)
+        if: matrix.platform == 'mac'
+        run: brew install pandoc
+
+      - name: Install pandoc (Linux)
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Install pandoc (Windows)
+        if: matrix.platform == 'win'
+        run: choco install pandoc -y
+
+      - name: Install Python dependencies
+        run: |
+          cd desktop/backend
+          pip install -r requirements.txt
+
+      - name: Build sidecar with PyInstaller
+        run: |
+          cd desktop/backend
+          pyinstaller build.spec --distpath ../resources/mochat-server
+
+      - name: Upload sidecar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sidecar-${{ matrix.platform }}-${{ matrix.arch }}
+          path: desktop/resources/mochat-server/
+          retention-days: 1
+
+  # ============================================================
+  # 第二阶段：构建 Electron 应用
+  # ============================================================
+  build-electron:
+    needs: build-sidecar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+            platform: mac
+          - os: macos-15
+            arch: x64
+            platform: mac
+          - os: windows-latest
+            arch: x64
+            platform: win
+          - os: ubuntu-latest
+            arch: x64
+            platform: linux
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci --legacy-peer-deps
+
+      # 模块前端代码通过路径别名引用 frontend/node_modules
+      - name: Link node_modules for modules
+        shell: bash
+        run: ln -s $GITHUB_WORKSPACE/frontend/node_modules $GITHUB_WORKSPACE/node_modules
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Install desktop dependencies
+        run: |
+          cd desktop
+          npm install
+
+      - name: Build Electron main process
+        run: |
+          cd desktop
+          npm run build:electron
+
+      - name: Download sidecar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sidecar-${{ matrix.platform }}-${{ matrix.arch }}
+          path: desktop/resources/mochat-server
+
+      - name: Build Electron app
+        run: |
+          cd desktop
+          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.exe
+            desktop/release/*.AppImage
+          retention-days: 7

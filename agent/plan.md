@@ -51,6 +51,6 @@
 ## CI
 | 工作流 | 状态 | PR |
 |--------|------|----|
-| frontend.yml (类型检查+构建) | ✅ | #3 |
-| backend.yml (ruff lint) | ✅ | #3 |
+| frontend.yml (类型检查+构建) | ✅ | #3, #7 修复符号链接 |
+| backend.yml (ruff lint) | ✅ | #3, #7 放宽存量规则 |
 | docker.yml (全服务构建) | ✅ | #3 |

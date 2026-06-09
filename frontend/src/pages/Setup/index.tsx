@@ -18,13 +18,14 @@ export default function Setup({ onComplete }: { onComplete: (config: SetupConfig
   const [saving, setSaving] = useState(false)
   const navigate = useNavigate()
 
+  const [step, setStep] = useState<'form' | 'saving' | 'done'>('form')
+
   useEffect(() => {
     if (step === 'done') {
       const timer = setTimeout(() => navigate('/'), 1500)
       return () => clearTimeout(timer)
     }
   }, [step, navigate])
-  const [step, setStep] = useState<'form' | 'saving' | 'done'>('form')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

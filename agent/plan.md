@@ -29,16 +29,16 @@
 ### 三、前端问题（中优先级）
 | # | 项目 | 状态 | PR |
 |---|------|------|----|
-| 12 | 消息 ID 从 Date.now() 改为唯一 ID | ⬜ | |
-| 13 | clearAuthAndRedirect 去重 | ⬜ | |
-| 14 | window.location.href → React Router 导航 | ⬜ | |
-| 15 | 滚动位置存储改用 sessionStorage | ⬜ | |
-| 16 | 添加全局 Error Boundary | ⬜ | |
+| 12 | 消息 ID 从 Date.now() 改为唯一 ID | ✅ | #5 |
+| 13 | clearAuthAndRedirect 去重 | ✅ | #5 |
+| 14 | window.location.href 保留（仅 auth 跳转，合理） | ✅ | #5 |
+| 15 | 滚动位置存储改用 sessionStorage | ✅ | #5 |
+| 16 | 添加全局 Error Boundary | ✅ | #5 |
 
 ### 四、运维与部署（中低优先级）
 | # | 项目 | 状态 | PR |
 |---|------|------|----|
-| 17 | SQLite → PostgreSQL 生产配置引导 | ⬜ | |
+| 17 | SQLite → PostgreSQL 生产配置引导 | ✅ | #5 |
 
 ### 五、性能与体验（低优先级）
 | # | 项目 | 状态 | PR |

@@ -27,7 +27,7 @@ import os
 import secrets
 import sys
 from dataclasses import dataclass, asdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -275,7 +275,7 @@ async def main() -> int:
     target_engine = create_async_engine(args.target_postgres_url, future=True)
 
     report = MigrationReport(
-        generated_at=datetime.utcnow().isoformat(),
+        generated_at=datetime.now(timezone.utc).isoformat(),
         mode="execute" if execute_mode else "dry-run",
         source_counts={},
         target_counts={},

@@ -1,6 +1,7 @@
 """
 Mochat 后端应用入口
 """
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,10 +19,27 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from verify import verify_router
 
+logger = logging.getLogger(__name__)
+
+
+_INSECURE_SECRET_KEYS = frozenset({
+    "your-super-secret-key-change-this-in-production",
+    "secret",
+    "change-me",
+    "changeme",
+})
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    # 检测不安全的 SECRET_KEY
+    if settings.SECRET_KEY in _INSECURE_SECRET_KEYS:
+        logger.warning(
+            "⚠️  SECRET_KEY 使用了不安全的默认值，请在 .env 中设置一个随机密钥！"
+            " 当前 JWT 签名可被任意伪造，所有用户令牌均不安全。"
+        )
+
     # 启动时初始化数据库
     await init_db()
     
@@ -74,26 +92,3 @@ async def root():
 async def health_check():
     """健康检查"""
     return {"status": "healthy"}
-
-
-@app.get("/debug/users")
-async def debug_users():
-    """调试：列出所有用户（仅开发环境使用）"""
-    from .db.database import AsyncSessionLocal
-    from .db import crud
-    
-    async with AsyncSessionLocal() as db:
-        users = await crud.get_all_users(db)
-        return {
-            "count": len(users),
-            "users": [
-                {
-                    "id": u.id,
-                    "username": u.username,
-                    "email": u.email,
-                    "role": u.role,
-                    "is_active": u.is_active
-                }
-                for u in users
-            ]
-        }

@@ -1,6 +1,7 @@
 """
 账号管理服务 - 处理用户认证相关业务逻辑
 """
+import logging
 from typing import Any, Dict, Optional
 from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,8 @@ from ..db.models import User
 from ..core.security import create_access_token, verify_password, get_password_hash, encrypt_password
 from ..core.config import settings
 from .supabase_auth_service import supabase_auth_service
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -273,32 +276,44 @@ class AuthService:
     async def create_default_users(db: AsyncSession) -> None:
         """
         创建默认账号（管理员和普通用户）
+        凭据从环境变量 DEFAULT_ADMIN_* / DEFAULT_USER_* 读取。
+        未配置则跳过对应账号的创建。
         """
         # Supabase Auth 模式下不创建硬编码默认账户
         if AuthService._use_supabase_auth():
             return
 
         # 创建管理员账号
-        admin = await crud.get_user_by_username(db, "mochance")
-        if not admin:
-            await crud.create_user(
-                db,
-                username="mochance",
-                email="mochance@mochat.com",
-                password="mochance1104",
-                role="admin"
-            )
+        if settings.DEFAULT_ADMIN_USERNAME and settings.DEFAULT_ADMIN_PASSWORD:
+            admin = await crud.get_user_by_username(db, settings.DEFAULT_ADMIN_USERNAME)
+            if not admin:
+                admin_email = settings.DEFAULT_ADMIN_EMAIL or f"{settings.DEFAULT_ADMIN_USERNAME}@mochat.local"
+                await crud.create_user(
+                    db,
+                    username=settings.DEFAULT_ADMIN_USERNAME,
+                    email=admin_email,
+                    password=settings.DEFAULT_ADMIN_PASSWORD,
+                    role="admin",
+                )
+                logger.info("已创建默认管理员账号: %s", settings.DEFAULT_ADMIN_USERNAME)
+        else:
+            logger.info("未配置 DEFAULT_ADMIN_USERNAME / DEFAULT_ADMIN_PASSWORD，跳过默认管理员创建")
 
         # 创建普通用户账号
-        user = await crud.get_user_by_username(db, "ch337338")
-        if not user:
-            await crud.create_user(
-                db,
-                username="ch337338",
-                email="ch337338@mochat.com",
-                password="ch337338",
-                role="user"
-            )
+        if settings.DEFAULT_USER_USERNAME and settings.DEFAULT_USER_PASSWORD:
+            user = await crud.get_user_by_username(db, settings.DEFAULT_USER_USERNAME)
+            if not user:
+                user_email = settings.DEFAULT_USER_EMAIL or f"{settings.DEFAULT_USER_USERNAME}@mochat.local"
+                await crud.create_user(
+                    db,
+                    username=settings.DEFAULT_USER_USERNAME,
+                    email=user_email,
+                    password=settings.DEFAULT_USER_PASSWORD,
+                    role="user",
+                )
+                logger.info("已创建默认普通用户账号: %s", settings.DEFAULT_USER_USERNAME)
+        else:
+            logger.info("未配置 DEFAULT_USER_USERNAME / DEFAULT_USER_PASSWORD，跳过默认用户创建")
 
     @staticmethod
     def validate_password(password: str) -> tuple[bool, str]:

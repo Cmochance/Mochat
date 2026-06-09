@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     # 微服务内部地址（网关转发）
     PICGEN_INTERNAL_URL: str = "http://picgenerate:3903"
     PPTGEN_INTERNAL_URL: str = "http://pptgen:3904"
+
+    # 默认账号配置（首次启动时自动创建）
+    # 留空则跳过创建对应默认账号
+    DEFAULT_ADMIN_USERNAME: str = ""
+    DEFAULT_ADMIN_EMAIL: str = ""
+    DEFAULT_ADMIN_PASSWORD: str = ""
+    DEFAULT_USER_USERNAME: str = ""
+    DEFAULT_USER_EMAIL: str = ""
+    DEFAULT_USER_PASSWORD: str = ""
     
     @property
     def cors_origins_list(self) -> List[str]:

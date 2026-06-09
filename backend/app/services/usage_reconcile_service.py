@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from sqlalchemy import func, select
@@ -30,7 +30,7 @@ class UsageReconcileService:
 
         if not user_ids:
             return {
-                "generated_at": datetime.utcnow().isoformat(),
+                "generated_at": datetime.now(timezone.utc).isoformat(),
                 "summary": {
                     "users_checked": 0,
                     "user_total_mismatches": 0,
@@ -181,7 +181,7 @@ class UsageReconcileService:
                 )
 
         return {
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "summary": {
                 "users_checked": len(user_ids),
                 "user_total_mismatches": len(user_total_mismatches),

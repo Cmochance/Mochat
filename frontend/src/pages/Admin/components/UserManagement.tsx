@@ -8,8 +8,6 @@ import {
   Trash2,
   Shield,
   User as UserIcon,
-  Eye,
-  EyeOff,
   ChevronDown
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -38,19 +36,6 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
-  const [visiblePasswordIds, setVisiblePasswordIds] = useState<Set<number>>(new Set())
-
-  const togglePasswordVisibility = (userId: number) => {
-    setVisiblePasswordIds(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(userId)) {
-        newSet.delete(userId)
-      } else {
-        newSet.add(userId)
-      }
-      return newSet
-    })
-  }
 
   const filteredUsers = users.filter(
     (user) =>
@@ -148,7 +133,6 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.user')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.email')}</th>
-                <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.passwordHash')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.role')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.tier')}</th>
                 <th className="px-6 py-3 text-left text-sm font-medium text-ink-medium">{t('admin.users.tableHeaders.status')}</th>
@@ -180,22 +164,6 @@ export default function UserManagement({ users, loading, onRefresh }: UserManage
                       </div>
                     </td>
                     <td className="px-6 py-4 text-ink-medium">{user.email}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <code className="text-xs font-mono text-ink-light bg-paper-cream px-2 py-1 rounded max-w-[120px] truncate">
-                          {visiblePasswordIds.has(user.id) 
-                            ? (user.password_hash || t('admin.users.none')) 
-                            : '••••••••'}
-                        </code>
-                        <button
-                          className="p-1 rounded hover:bg-paper-cream transition-colors text-ink-light hover:text-ink-dark"
-                          onClick={() => togglePasswordVisibility(user.id)}
-                          title={visiblePasswordIds.has(user.id) ? t('common.hide') : t('common.show')}
-                        >
-                          {visiblePasswordIds.has(user.id) ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-sm ${user.role === 'admin' ? 'bg-vermilion/10 text-vermilion' : 'bg-cyan-ink/10 text-cyan-ink'}`}>
                         {user.role === 'admin' ? t('common.admin') : t('common.user')}

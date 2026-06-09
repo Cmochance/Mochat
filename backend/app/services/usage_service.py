@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Optional, Dict, Any
 import uuid
 
@@ -225,7 +225,7 @@ class UsageService:
             raise ValueError("user or user_id is required")
 
         safe_amount = max(1, int(amount or 1))
-        event_time = occurred_at or datetime.utcnow()
+        event_time = occurred_at or datetime.now(timezone.utc)
 
         existing = await db.execute(
             select(UsageEvent).where(

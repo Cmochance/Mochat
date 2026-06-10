@@ -218,3 +218,47 @@ async def study_chat_stream(
 
     async for chunk in ai_service.chat_stream(messages=messages, system_prompt=system_prompt, model=model):
         yield chunk
+
+
+# --------------- 闪卡生成 ---------------
+
+FLASHCARD_SYSTEM_PROMPT = """你是一位专业的学习助手。请根据以下学习资料内容，生成一组高质量的学习闪卡。
+
+要求：
+1. 提取核心知识点，每张闪卡正面是一个问题或概念，背面是对应的答案或解释
+2. 生成 10-20 张闪卡，覆盖资料的主要内容
+3. 问题要具体明确，答案要简洁准确
+4. 用中文生成
+5. 严格按以下 JSON 格式返回，不要包含其他内容：
+[{{"front": "问题", "back": "答案"}}, {{"front": "问题", "back": "答案"}}]
+
+---
+资料内容：
+{content}"""
+
+
+async def generate_flashcards(content: str) -> List[dict]:
+    """
+    调用 AI 生成闪卡。
+    返回 [{"front": "...", "back": "..."}, ...]
+    """
+    truncated = content[:15000] if len(content) > 15000 else content
+    prompt = FLASHCARD_SYSTEM_PROMPT.format(content=truncated)
+    try:
+        _thinking, result = await ai_service.chat_complete(
+            messages=[{"role": "user", "content": "请为我生成学习闪卡。"}],
+            system_prompt=prompt,
+        )
+        # 解析 JSON
+        # 尝试提取 JSON 数组
+        import re as _re
+        match = _re.search(r'\[.*\]', result, _re.DOTALL)
+        if match:
+            cards = json.loads(match.group())
+            # 验证格式
+            valid = [c for c in cards if isinstance(c, dict) and "front" in c and "back" in c]
+            return valid
+        return []
+    except Exception as e:
+        logger.error("生成闪卡失败: %s", e)
+        raise

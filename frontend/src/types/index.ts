@@ -173,6 +173,17 @@ export interface StudyMessage {
   created_at: string
 }
 
+// 闪卡
+export interface Flashcard {
+  id: number
+  material_id: number
+  front: string
+  back: string
+  status: 'new' | 'learning' | 'mastered'
+  review_count: number
+  created_at: string
+}
+
 // API响应类型
 export interface ApiResponse<T> {
   data?: T

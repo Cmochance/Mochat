@@ -483,12 +483,26 @@ export default {
       placeholder: '输入你的问题...',
       thinking: '思考中...',
     },
+    tabs: {
+      chat: '对话',
+      flashcards: '闪卡',
+    },
     summary: {
       title: 'AI 摘要',
       selectHint: '选择一份资料查看摘要',
       noSummary: '尚未生成摘要',
       generateBtn: '生成摘要',
       generating: '生成中...',
+    },
+    flashcards: {
+      empty: '暂无闪卡，点击生成',
+      generateBtn: '生成闪卡',
+      generating: 'AI 正在生成闪卡...',
+      regenerate: '重新生成',
+      total: '共 {{count}} 张',
+      clickToFlip: '点击卡片翻转',
+      stillLearning: '还需复习',
+      mastered: '已掌握',
     },
   },
 

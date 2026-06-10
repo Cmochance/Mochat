@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { LearningMaterial, StudySession, StudyMessage } from '../types'
+import type { LearningMaterial, StudySession, StudyMessage, Flashcard } from '../types'
 
 let _tempIdCounter = 0
 
@@ -14,6 +14,12 @@ interface LearnState {
 
   // 消息
   messages: StudyMessage[]
+
+  // 闪卡
+  flashcards: Flashcard[]
+  flashcardLoading: boolean
+  currentCardIndex: number
+  isFlipped: boolean
 
   // 状态
   isLoading: boolean
@@ -46,6 +52,13 @@ interface LearnState {
   clearStreaming: () => void
   endStreaming: () => void
   finalizeStreaming: (thinking: string, content: string) => void
+
+  // 闪卡 Actions
+  setFlashcards: (cards: Flashcard[]) => void
+  setFlashcardLoading: (loading: boolean) => void
+  setCurrentCardIndex: (index: number) => void
+  setIsFlipped: (flipped: boolean) => void
+  updateFlashcardStatus: (id: number, status: string) => void
 }
 
 export const useLearnStore = create<LearnState>((set, get) => ({
@@ -54,6 +67,10 @@ export const useLearnStore = create<LearnState>((set, get) => ({
   sessions: [],
   currentSession: null,
   messages: [],
+  flashcards: [],
+  flashcardLoading: false,
+  currentCardIndex: 0,
+  isFlipped: false,
   isLoading: false,
   isStreaming: false,
   streamingContent: '',
@@ -112,4 +129,15 @@ export const useLearnStore = create<LearnState>((set, get) => ({
       isStreaming: false,
     }))
   },
+
+  // 闪卡
+  setFlashcards: (cards) => set({ flashcards: cards, currentCardIndex: 0, isFlipped: false }),
+  setFlashcardLoading: (loading) => set({ flashcardLoading: loading }),
+  setCurrentCardIndex: (index) => set({ currentCardIndex: index, isFlipped: false }),
+  setIsFlipped: (flipped) => set({ isFlipped: flipped }),
+  updateFlashcardStatus: (id, status) => set((s) => ({
+    flashcards: s.flashcards.map((c) =>
+      c.id === id ? { ...c, status: status as Flashcard['status'], review_count: c.review_count + 1 } : c
+    ),
+  })),
 }))

@@ -26,6 +26,9 @@ from ..schemas.learn import (
     StudyMessageCreate,
     StudyMessageResponse,
     StudyMessagesResponse,
+    FlashcardResponse,
+    FlashcardListResponse,
+    FlashcardStatusUpdate,
 )
 from ..services.learn_service import (
     extract_text,
@@ -33,6 +36,7 @@ from ..services.learn_service import (
     retrieve_relevant_chunks,
     generate_summary,
     study_chat_stream,
+    generate_flashcards,
 )
 
 logger = logging.getLogger(__name__)
@@ -102,6 +106,14 @@ async def upload_material(
     chunks = chunk_text(raw_text)
     await crud.create_material_chunks(db=db, material_id=material.id, chunks=chunks)
 
+    # 自动生成摘要（失败不阻塞上传）
+    try:
+        summary = await generate_summary(raw_text)
+        await crud.update_material_summary(db, material.id, summary)
+        material.summary = summary
+    except Exception as e:
+        logger.warning("自动生成摘要失败（不影响上传）: %s", e)
+
     return material
 
 
@@ -122,6 +134,14 @@ async def create_text_material(
 
     chunks = chunk_text(body.content)
     await crud.create_material_chunks(db=db, material_id=material.id, chunks=chunks)
+
+    # 自动生成摘要（失败不阻塞上传）
+    try:
+        summary = await generate_summary(body.content)
+        await crud.update_material_summary(db, material.id, summary)
+        material.summary = summary
+    except Exception as e:
+        logger.warning("自动生成摘要失败（不影响上传）: %s", e)
 
     return material
 
@@ -317,3 +337,60 @@ async def send_study_message(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ============ 闪卡 ============
+
+
+@router.post("/materials/{material_id}/flashcards", response_model=FlashcardListResponse)
+async def create_flashcards_for_material(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """为资料生成闪卡（如已有则先删除再重新生成）"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    # 删除旧闪卡
+    await crud.delete_flashcards_by_material(db, material_id)
+
+    # AI 生成
+    cards = await generate_flashcards(material.raw_text)
+    if not cards:
+        raise HTTPException(status_code=500, detail="闪卡生成失败，请重试")
+
+    flashcards = await crud.create_flashcards(db, material_id, cards)
+    return FlashcardListResponse(flashcards=flashcards, total=len(flashcards))
+
+
+@router.get("/materials/{material_id}/flashcards", response_model=FlashcardListResponse)
+async def list_flashcards(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取资料的闪卡列表"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    flashcards = await crud.get_flashcards_by_material(db, material_id)
+    return FlashcardListResponse(flashcards=flashcards, total=len(flashcards))
+
+
+@router.patch("/flashcards/{card_id}/status", response_model=FlashcardResponse)
+async def update_flashcard_status(
+    card_id: int,
+    body: FlashcardStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """更新闪卡状态（标记为 learning / mastered）"""
+    card = await crud.get_flashcard_by_id(db, card_id, current_user.id)
+    if not card:
+        raise HTTPException(status_code=404, detail="闪卡不存在")
+
+    updated = await crud.update_flashcard_status(db, card_id, body.status)
+    return updated

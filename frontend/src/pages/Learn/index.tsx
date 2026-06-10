@@ -8,7 +8,9 @@ import { useAuthStore } from '../../stores/authStore'
 import { learnService } from '../../services/learnService'
 import MaterialUpload from './components/MaterialUpload'
 import MaterialList from './components/MaterialList'
+import { MessageSquare, Layers } from 'lucide-react'
 import StudyChat from './components/StudyChat'
+import FlashcardView from './components/FlashcardView'
 import SummaryPanel from './components/SummaryPanel'
 import Button from '../../components/common/Button'
 import Modal from '../../components/common/Modal'
@@ -52,6 +54,7 @@ export default function Learn() {
   const [showUpload, setShowUpload] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [summaryPanelOpen, setSummaryPanelOpen] = useState(true)
+  const [activeTab, setActiveTab] = useState<'chat' | 'flashcards'>('chat')
   const [isUploading, setIsUploading] = useState(false)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
@@ -288,14 +291,44 @@ export default function Learn() {
                   + {t('learn.chat.newSession')}
                 </button>
               </div>
-              <StudyChat
-                messages={messages}
-                isStreaming={isStreaming}
-                streamingContent={streamingContent}
-                streamingThinking={streamingThinking}
-                onSend={handleSendMessage}
-                disabled={isLoading}
-              />
+              {/* Tab 切换 */}
+              <div className="flex border-b border-paper-aged bg-paper-white">
+                <button
+                  onClick={() => setActiveTab('chat')}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
+                    activeTab === 'chat'
+                      ? 'border-ink-black text-ink-black'
+                      : 'border-transparent text-ink-faint hover:text-ink-medium'
+                  }`}
+                >
+                  <MessageSquare size={14} />
+                  {t('learn.tabs.chat')}
+                </button>
+                <button
+                  onClick={() => setActiveTab('flashcards')}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
+                    activeTab === 'flashcards'
+                      ? 'border-ink-black text-ink-black'
+                      : 'border-transparent text-ink-faint hover:text-ink-medium'
+                  }`}
+                >
+                  <Layers size={14} />
+                  {t('learn.tabs.flashcards')}
+                </button>
+              </div>
+              {/* 内容区 */}
+              {activeTab === 'chat' ? (
+                <StudyChat
+                  messages={messages}
+                  isStreaming={isStreaming}
+                  streamingContent={streamingContent}
+                  streamingThinking={streamingThinking}
+                  onSend={handleSendMessage}
+                  disabled={isLoading}
+                />
+              ) : (
+                <FlashcardView materialId={currentMaterial.id} />
+              )}
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-ink-faint">

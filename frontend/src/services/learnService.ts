@@ -4,6 +4,7 @@ import type {
   LearningMaterialDetail,
   StudySession,
   StudyMessage,
+  Flashcard,
 } from '../types'
 import { getApiBaseUrl } from '../utils/env'
 
@@ -130,6 +131,23 @@ async function sendMessageStream(
   }
 }
 
+// ---- 闪卡 ----
+
+async function generateFlashcards(materialId: number): Promise<{ flashcards: Flashcard[]; total: number }> {
+  const res = await api.post(`/learn/materials/${materialId}/flashcards`)
+  return res.data
+}
+
+async function getFlashcards(materialId: number): Promise<{ flashcards: Flashcard[]; total: number }> {
+  const res = await api.get(`/learn/materials/${materialId}/flashcards`)
+  return res.data
+}
+
+async function updateFlashcardStatus(cardId: number, status: string): Promise<Flashcard> {
+  const res = await api.patch(`/learn/flashcards/${cardId}/status`, { status })
+  return res.data
+}
+
 export const learnService = {
   uploadMaterial,
   createTextMaterial,
@@ -142,4 +160,7 @@ export const learnService = {
   deleteSession,
   getMessages,
   sendMessageStream,
+  generateFlashcards,
+  getFlashcards,
+  updateFlashcardStatus,
 }

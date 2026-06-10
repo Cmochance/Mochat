@@ -483,12 +483,26 @@ export default {
       placeholder: 'Type your question...',
       thinking: 'Thinking...',
     },
+    tabs: {
+      chat: 'Chat',
+      flashcards: 'Flashcards',
+    },
     summary: {
       title: 'AI Summary',
       selectHint: 'Select a material to view its summary',
       noSummary: 'No summary generated yet',
       generateBtn: 'Generate Summary',
       generating: 'Generating...',
+    },
+    flashcards: {
+      empty: 'No flashcards yet, click to generate',
+      generateBtn: 'Generate Flashcards',
+      generating: 'AI is generating flashcards...',
+      regenerate: 'Regenerate',
+      total: '{{count}} cards total',
+      clickToFlip: 'Click card to flip',
+      stillLearning: 'Still Learning',
+      mastered: 'Mastered',
     },
   },
 

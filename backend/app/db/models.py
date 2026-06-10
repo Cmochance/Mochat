@@ -250,3 +250,17 @@ class MaterialChunk(Base):
     material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
+
+
+class Flashcard(Base):
+    """闪卡模型"""
+    __tablename__ = "flashcards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    front = Column(Text, nullable=False)        # 正面（问题/概念）
+    back = Column(Text, nullable=False)         # 背面（答案/解释）
+    status = Column(String(20), default="new")  # new / learning / mastered
+    review_count = Column(Integer, default=0)   # 复习次数
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

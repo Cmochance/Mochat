@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from .models import (
     User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel,
     LearningMaterial, StudySession, StudyMessage, MaterialChunk,
+    Flashcard,
 )
 from ..core.config import settings
 from ..core.security import get_password_hash, verify_password, encrypt_password
@@ -88,6 +89,86 @@ async def get_all_users(
         select(User).offset(skip).limit(limit).order_by(User.created_at.desc())
     )
     return result.scalars().all()
+
+
+# ---- 闪卡 ----
+
+
+async def create_flashcards(
+    db: AsyncSession,
+    material_id: int,
+    cards: list,
+) -> list:
+    """批量创建闪卡。cards: [{"front": "...", "back": "..."}]"""
+    objects = []
+    for card in cards:
+        fc = Flashcard(
+            material_id=material_id,
+            front=card["front"],
+            back=card["back"],
+        )
+        db.add(fc)
+        objects.append(fc)
+    await db.flush()
+    for obj in objects:
+        await db.refresh(obj)
+    return objects
+
+
+async def get_flashcards_by_material(
+    db: AsyncSession,
+    material_id: int,
+) -> list:
+    """获取资料的所有闪卡"""
+    result = await db.execute(
+        select(Flashcard)
+        .where(Flashcard.material_id == material_id)
+        .order_by(Flashcard.created_at.asc())
+    )
+    return result.scalars().all()
+
+
+async def get_flashcard_by_id(
+    db: AsyncSession,
+    card_id: int,
+    user_id: int,
+) -> Optional[Flashcard]:
+    """获取单张闪卡（校验所属用户）"""
+    result = await db.execute(
+        select(Flashcard)
+        .join(LearningMaterial, Flashcard.material_id == LearningMaterial.id)
+        .where(Flashcard.id == card_id, LearningMaterial.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_flashcard_status(
+    db: AsyncSession,
+    card_id: int,
+    status: str,
+) -> Optional[Flashcard]:
+    """更新闪卡状态（new / learning / mastered）"""
+    result = await db.execute(
+        select(Flashcard).where(Flashcard.id == card_id)
+    )
+    card = result.scalar_one_or_none()
+    if card:
+        card.status = status
+        card.review_count = (card.review_count or 0) + 1
+        await db.flush()
+        await db.refresh(card)
+    return card
+
+
+async def delete_flashcards_by_material(
+    db: AsyncSession,
+    material_id: int,
+) -> int:
+    """删除资料的所有闪卡，返回删除数量"""
+    result = await db.execute(
+        delete(Flashcard).where(Flashcard.material_id == material_id)
+    )
+    return result.rowcount
 
 
 async def update_user(

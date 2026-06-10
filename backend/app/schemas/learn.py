@@ -99,3 +99,30 @@ class StudyMessageResponse(BaseModel):
 class StudyMessagesResponse(BaseModel):
     """学习消息列表响应"""
     messages: List[StudyMessageResponse]
+
+
+# ---- 闪卡 ----
+
+class FlashcardResponse(BaseModel):
+    """闪卡响应"""
+    id: int
+    material_id: int
+    front: str
+    back: str
+    status: str
+    review_count: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class FlashcardListResponse(BaseModel):
+    """闪卡列表响应"""
+    flashcards: List[FlashcardResponse]
+    total: int
+
+
+class FlashcardStatusUpdate(BaseModel):
+    """更新闪卡状态"""
+    status: str = Field(..., pattern=r"^(new|learning|mastered)$")

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   RotateCcw,
@@ -60,11 +60,9 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
   }, [materialId, setFlashcards, setFlashcardLoading])
 
   // 初次加载
-  useState(() => {
+  useEffect(() => {
     handleLoad()
-  })
-
-  const currentCard = flashcards[currentCardIndex]
+  }, [handleLoad])
 
   const goNext = () => {
     if (currentCardIndex < flashcards.length - 1) {
@@ -78,28 +76,6 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
       setDirection(-1)
       setCurrentCardIndex(currentCardIndex - 1)
     }
-  }
-
-  const handleMark = async (status: 'learning' | 'mastered') => {
-    if (!currentCard) return
-    try {
-      await learnService.updateFlashcardStatus(currentCard.id, status)
-      updateFlashcardStatus(currentCard.id, status)
-      // 自动跳到下一张
-      if (currentCardIndex < flashcards.length - 1) {
-        setDirection(1)
-        setCurrentCardIndex(currentCardIndex + 1)
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // 统计
-  const stats = {
-    new: flashcards.filter((c) => c.status === 'new').length,
-    learning: flashcards.filter((c) => c.status === 'learning').length,
-    mastered: flashcards.filter((c) => c.status === 'mastered').length,
   }
 
   if (flashcardLoading) {
@@ -127,6 +103,30 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
         </button>
       </div>
     )
+  }
+
+  const currentCard = flashcards[currentCardIndex]
+
+  const handleMark = async (status: 'learning' | 'mastered') => {
+    if (!currentCard) return
+    try {
+      await learnService.updateFlashcardStatus(currentCard.id, status)
+      updateFlashcardStatus(currentCard.id, status)
+      // 自动跳到下一张
+      if (currentCardIndex < flashcards.length - 1) {
+        setDirection(1)
+        setCurrentCardIndex(currentCardIndex + 1)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 统计
+  const stats = {
+    new: flashcards.filter((c) => c.status === 'new').length,
+    learning: flashcards.filter((c) => c.status === 'learning').length,
+    mastered: flashcards.filter((c) => c.status === 'mastered').length,
   }
 
   const variants = {

@@ -4,6 +4,7 @@
 import json
 import os
 import logging
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
@@ -297,34 +298,41 @@ async def send_study_message(
 
     # 保存用户消息
     await crud.create_study_message(db, session_id, role="user", content=body.content)
+    await db.commit()
 
     # 流式生成 AI 回复
     async def event_generator():
         full_content = ""
         full_thinking = ""
 
-        async for chunk in study_chat_stream(
-            user_message=body.content,
-            context_chunks=context_texts,
-            history=history,
-            model=body.model,
-        ):
-            if chunk["type"] == "thinking":
-                full_thinking += chunk["data"]
-            elif chunk["type"] == "content":
-                full_content += chunk["data"]
-            # 转发给前端
-            yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+        try:
+            async for chunk in study_chat_stream(
+                user_message=body.content,
+                context_chunks=context_texts,
+                history=history,
+                model=body.model,
+            ):
+                if chunk["type"] == "thinking":
+                    full_thinking += chunk["data"]
+                elif chunk["type"] == "content":
+                    full_content += chunk["data"]
+                # 转发给前端
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0)
 
-        # 保存 AI 回复
-        await crud.create_study_message(
-            db,
-            session_id,
-            role="assistant",
-            content=full_content,
-            thinking=full_thinking if full_thinking else None,
-            cited_chunks=json.dumps(cited_indices),
-        )
+            # 保存 AI 回复
+            await crud.create_study_message(
+                db,
+                session_id,
+                role="assistant",
+                content=full_content,
+                thinking=full_thinking if full_thinking else None,
+                cited_chunks=json.dumps(cited_indices),
+            )
+            await db.commit()
+        except Exception as e:
+            logger.error("生成学习对话流式输出失败: %s", e)
+            yield f"data: {json.dumps({'type': 'error', 'data': str(e)}, ensure_ascii=False)}\n\n"
 
         yield f"data: {json.dumps({'type': 'done', 'data': ''})}\n\n"
 
@@ -362,6 +370,7 @@ async def create_flashcards_for_material(
         raise HTTPException(status_code=500, detail="闪卡生成失败，请重试")
 
     flashcards = await crud.create_flashcards(db, material_id, cards)
+    await db.commit()
     return FlashcardListResponse(flashcards=flashcards, total=len(flashcards))
 
 
@@ -393,4 +402,5 @@ async def update_flashcard_status(
         raise HTTPException(status_code=404, detail="闪卡不存在")
 
     updated = await crud.update_flashcard_status(db, card_id, body.status)
+    await db.commit()
     return updated

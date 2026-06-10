@@ -190,7 +190,7 @@ async def generate_summary(content: str) -> str:
     truncated = content[:15000] if len(content) > 15000 else content
     prompt = SUMMARY_SYSTEM_PROMPT.format(content=truncated)
     try:
-        _thinking, summary = await ai_service.chat_complete(
+        _thinking, summary = await ai_service.chat_simple(
             messages=[{"role": "user", "content": "请为我生成学习摘要。"}],
             system_prompt=prompt,
         )
@@ -245,7 +245,7 @@ async def generate_flashcards(content: str) -> List[dict]:
     truncated = content[:15000] if len(content) > 15000 else content
     prompt = FLASHCARD_SYSTEM_PROMPT.format(content=truncated)
     try:
-        _thinking, result = await ai_service.chat_complete(
+        _thinking, result = await ai_service.chat_simple(
             messages=[{"role": "user", "content": "请为我生成学习闪卡。"}],
             system_prompt=prompt,
         )

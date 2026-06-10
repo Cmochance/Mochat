@@ -262,3 +262,72 @@ async def generate_flashcards(content: str) -> List[dict]:
     except Exception as e:
         logger.error("生成闪卡失败: %s", e)
         raise
+
+
+# --------------- 测验生成 ---------------
+
+QUIZ_SYSTEM_PROMPT = """你是一位专业的学习助手。请根据以下学习资料内容，生成一份测验卷。
+
+要求：
+1. 提取核心知识点，生成 5-10 道测验题。
+2. 题目类型包括单选题（single）和判断题（boolean）。
+3. 单选题必须提供 4 个选项。判断题的正确答案必须是 "正确" 或 "错误"。
+4. 题目干和解析要具体明确。
+5. 用中文生成。
+6. 严格按以下 JSON 格式返回，不要包含其他内容：
+[
+  {{
+    "question_type": "single",
+    "question_text": "题干",
+    "options": ["A选项内容", "B选项内容", "C选项内容", "D选项内容"],
+    "correct_answer": "正确选项的文字内容，必须与options中的某一项完全一致",
+    "explanation": "本题的详细解析"
+  }},
+  {{
+    "question_type": "boolean",
+    "question_text": "题干",
+    "options": null,
+    "correct_answer": "正确 或 错误",
+    "explanation": "本题的详细解析"
+  }}
+]
+
+---
+资料内容：
+{content}"""
+
+
+async def generate_quiz(content: str) -> List[dict]:
+    """
+    调用 AI 生成测验试题。
+    返回符合规格的题目列表。
+    """
+    truncated = content[:15000] if len(content) > 15000 else content
+    prompt = QUIZ_SYSTEM_PROMPT.format(content=truncated)
+    try:
+        _thinking, result = await ai_service.chat_simple(
+            messages=[{"role": "user", "content": "请为我生成测验试卷。"}],
+            system_prompt=prompt,
+        )
+        import re as _re
+        match = _re.search(r'\[.*\]', result, _re.DOTALL)
+        if match:
+            questions = json.loads(match.group())
+            valid = []
+            for q in questions:
+                if not isinstance(q, dict):
+                    continue
+                q_type = q.get("question_type")
+                if q_type not in ("single", "boolean"):
+                    continue
+                # 单选题校验 options
+                if q_type == "single":
+                    opts = q.get("options")
+                    if not isinstance(opts, list) or len(opts) != 4:
+                        continue
+                valid.append(q)
+            return valid
+        return []
+    except Exception as e:
+        logger.error("生成测验失败: %s", e)
+        raise

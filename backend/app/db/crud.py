@@ -2,6 +2,7 @@
 CRUD操作封装
 """
 from typing import Optional, List
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
@@ -9,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from .models import (
     User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel,
     LearningMaterial, StudySession, StudyMessage, MaterialChunk,
-    Flashcard,
+    Flashcard, StudyQuiz, QuizQuestion,
 )
 from ..core.config import settings
 from ..core.security import get_password_hash, verify_password, encrypt_password
@@ -91,6 +92,139 @@ async def get_all_users(
     return result.scalars().all()
 
 
+# ---- 测验 (Quiz) ----
+
+
+async def create_study_quiz(
+    db: AsyncSession,
+    material_id: int,
+    user_id: int,
+    total_questions: int,
+) -> StudyQuiz:
+    """创建测验"""
+    quiz = StudyQuiz(
+        material_id=material_id,
+        user_id=user_id,
+        total_questions=total_questions,
+    )
+    db.add(quiz)
+    await db.flush()
+    await db.refresh(quiz)
+    return quiz
+
+
+async def create_quiz_questions(
+    db: AsyncSession,
+    quiz_id: int,
+    questions: list,
+) -> list:
+    """批量创建测验的题目。questions: [{"question_type": "...", "question_text": "...", "options": "...", "correct_answer": "...", "explanation": "..."}]"""
+    objects = []
+    for q in questions:
+        qq = QuizQuestion(
+            quiz_id=quiz_id,
+            question_type=q["question_type"],
+            question_text=q["question_text"],
+            options=q.get("options"),  # 这里已经是 JSON 序列化好的 string 或者 None
+            correct_answer=q["correct_answer"],
+            explanation=q.get("explanation"),
+        )
+        db.add(qq)
+        objects.append(qq)
+    await db.flush()
+    for obj in objects:
+        await db.refresh(obj)
+    return objects
+
+
+async def get_study_quiz_by_id(
+    db: AsyncSession,
+    quiz_id: int,
+    user_id: int,
+) -> Optional[StudyQuiz]:
+    """获取单个测验历史详情"""
+    result = await db.execute(
+        select(StudyQuiz)
+        .where(StudyQuiz.id == quiz_id, StudyQuiz.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_quiz_questions(
+    db: AsyncSession,
+    quiz_id: int,
+) -> list:
+    """获取一个测验的所有题目"""
+    result = await db.execute(
+        select(QuizQuestion)
+        .where(QuizQuestion.quiz_id == quiz_id)
+        .order_by(QuizQuestion.id.asc())
+    )
+    return result.scalars().all()
+
+
+async def get_user_quizzes(
+    db: AsyncSession,
+    user_id: int,
+    material_id: Optional[int] = None,
+) -> list:
+    """获取用户的测验历史列表"""
+    stmt = select(StudyQuiz).where(StudyQuiz.user_id == user_id)
+    if material_id is not None:
+        stmt = stmt.where(StudyQuiz.material_id == material_id)
+    stmt = stmt.order_by(StudyQuiz.created_at.desc())
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+async def get_quiz_question_by_id(
+    db: AsyncSession,
+    question_id: int,
+) -> Optional[QuizQuestion]:
+    """获取单道题目内容"""
+    result = await db.execute(
+        select(QuizQuestion).where(QuizQuestion.id == question_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def submit_quiz_answer(
+    db: AsyncSession,
+    question_id: int,
+    user_answer: str,
+    is_correct: bool,
+) -> Optional[QuizQuestion]:
+    """提交并记录用户回答"""
+    result = await db.execute(
+        select(QuizQuestion).where(QuizQuestion.id == question_id)
+    )
+    q = result.scalar_one_or_none()
+    if q:
+        q.user_answer = user_answer
+        q.is_correct = is_correct
+        await db.flush()
+        await db.refresh(q)
+    return q
+
+
+async def complete_study_quiz(
+    db: AsyncSession,
+    quiz_id: int,
+    score: int,
+) -> Optional[StudyQuiz]:
+    """完成测验打分"""
+    result = await db.execute(
+        select(StudyQuiz).where(StudyQuiz.id == quiz_id)
+    )
+    quiz = result.scalar_one_or_none()
+    if quiz:
+        quiz.score = score
+        quiz.is_completed = True
+        await db.flush()
+        await db.refresh(quiz)
+    return quiz
+
+
 # ---- 闪卡 ----
 
 
@@ -155,9 +289,42 @@ async def update_flashcard_status(
     if card:
         card.status = status
         card.review_count = (card.review_count or 0) + 1
+
+        # 经典 Leitner 艾宾浩斯复习盒子系统
+        box = card.box_number or 1
+        if status == "mastered":
+            box = min(box + 1, 5)
+        else:  # learning / new
+            box = 1
+
+        # 各盒子对应的复习时间间隔（天）
+        box_intervals = {1: 1, 2: 3, 3: 7, 4: 15, 5: 30}
+        interval = box_intervals.get(box, 1)
+
+        card.box_number = box
+        card.interval = interval
+        card.next_review_at = datetime.now(timezone.utc) + timedelta(days=interval)
+
         await db.flush()
         await db.refresh(card)
     return card
+
+
+async def get_due_flashcards_by_material(
+    db: AsyncSession,
+    material_id: int,
+) -> list:
+    """获取资料中到期需要复习的闪卡（包括未学习 new 的和 next_review_at 已经过期的）"""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Flashcard)
+        .where(
+            Flashcard.material_id == material_id,
+            (Flashcard.next_review_at <= now) | (Flashcard.status == "new")
+        )
+        .order_by(Flashcard.box_number.asc(), Flashcard.created_at.asc())
+    )
+    return result.scalars().all()
 
 
 async def delete_flashcards_by_material(

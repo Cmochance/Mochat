@@ -26,11 +26,13 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
     flashcardLoading,
     currentCardIndex,
     isFlipped,
+    flashcardMode,
     setFlashcards,
     setFlashcardLoading,
     setCurrentCardIndex,
     setIsFlipped,
     updateFlashcardStatus,
+    setFlashcardMode,
   } = useLearnStore()
 
   const [direction, setDirection] = useState(0)
@@ -50,14 +52,14 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
   const handleLoad = useCallback(async () => {
     setFlashcardLoading(true)
     try {
-      const res = await learnService.getFlashcards(materialId)
+       const res = await learnService.getFlashcards(materialId, flashcardMode === 'due')
       setFlashcards(res.flashcards)
     } catch {
       // ignore
     } finally {
       setFlashcardLoading(false)
     }
-  }, [materialId, setFlashcards, setFlashcardLoading])
+   }, [materialId, flashcardMode, setFlashcards, setFlashcardLoading])
 
   // 初次加载
   useEffect(() => {
@@ -139,11 +141,27 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
     <div className="flex flex-col h-full">
       {/* 顶部：统计 + 重新生成 */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-paper-aged">
-        <div className="flex items-center gap-3 text-xs text-ink-faint">
-          <span>{t('learn.flashcards.total', { count: flashcards.length })}</span>
-          <span className="text-green-600">✓ {stats.mastered}</span>
-          <span className="text-yellow-600">◐ {stats.learning}</span>
-          <span>○ {stats.new}</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFlashcardMode('due')}
+            className={`px-2.5 py-1 text-xs rounded-sm transition-colors ${
+              flashcardMode === 'due'
+                ? 'bg-ink-black text-paper-white'
+                : 'text-ink-medium hover:text-ink-black hover:bg-paper-aged'
+            }`}
+          >
+            {t('learn.flashcards.modeDue')}
+          </button>
+          <button
+            onClick={() => setFlashcardMode('all')}
+            className={`px-2.5 py-1 text-xs rounded-sm transition-colors ${
+              flashcardMode === 'all'
+                ? 'bg-ink-black text-paper-white'
+                : 'text-ink-medium hover:text-ink-black hover:bg-paper-aged'
+            }`}
+          >
+            {t('learn.flashcards.modeAll')}
+          </button>
         </div>
         <button
           onClick={handleGenerate}
@@ -160,6 +178,11 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
         <div className="w-full max-w-md mb-4">
           <div className="flex items-center justify-between text-xs text-ink-faint mb-1">
             <span>{currentCardIndex + 1} / {flashcards.length}</span>
+            {currentCard && (
+              <span className="bg-paper-aged px-1.5 py-0.5 rounded-sm text-[10px]">
+                Box {currentCard.box_number || 1} · {currentCard.interval || 1}天后复习
+              </span>
+            )}
           </div>
           <div className="w-full h-1 bg-paper-aged rounded-full">
             <div

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { LearningMaterial, StudySession, StudyMessage, Flashcard } from '../types'
+import type { LearningMaterial, StudySession, StudyMessage, Flashcard, StudyQuiz, QuizQuestion, QuizDetail } from '../types'
 
 let _tempIdCounter = 0
 
@@ -20,6 +20,12 @@ interface LearnState {
   flashcardLoading: boolean
   currentCardIndex: number
   isFlipped: boolean
+  flashcardMode: 'all' | 'due'
+
+  // 测验
+  quizzes: StudyQuiz[]
+  currentQuizDetail: QuizDetail | null
+  quizLoading: boolean
 
   // 状态
   isLoading: boolean
@@ -59,6 +65,14 @@ interface LearnState {
   setCurrentCardIndex: (index: number) => void
   setIsFlipped: (flipped: boolean) => void
   updateFlashcardStatus: (id: number, status: string) => void
+  setFlashcardMode: (mode: 'all' | 'due') => void
+
+  // 测验 Actions
+  setQuizzes: (quizzes: StudyQuiz[]) => void
+  addQuiz: (quiz: StudyQuiz) => void
+  setCurrentQuizDetail: (detail: QuizDetail | null) => void
+  setQuizLoading: (loading: boolean) => void
+  submitQuestionAnswer: (questionId: number, answer: string) => void
 }
 
 export const useLearnStore = create<LearnState>((set, get) => ({
@@ -71,6 +85,10 @@ export const useLearnStore = create<LearnState>((set, get) => ({
   flashcardLoading: false,
   currentCardIndex: 0,
   isFlipped: false,
+  flashcardMode: 'due',
+  quizzes: [],
+  currentQuizDetail: null,
+  quizLoading: false,
   isLoading: false,
   isStreaming: false,
   streamingContent: '',
@@ -140,4 +158,22 @@ export const useLearnStore = create<LearnState>((set, get) => ({
       c.id === id ? { ...c, status: status as Flashcard['status'], review_count: c.review_count + 1 } : c
     ),
   })),
+  setFlashcardMode: (mode) => set({ flashcardMode: mode }),
+
+  // 测验
+  setQuizzes: (quizzes) => set({ quizzes }),
+  addQuiz: (quiz) => set((s) => ({ quizzes: [quiz, ...s.quizzes] })),
+  setCurrentQuizDetail: (detail) => set({ currentQuizDetail: detail }),
+  setQuizLoading: (loading) => set({ quizLoading: loading }),
+  submitQuestionAnswer: (questionId, answer) => set((s) => {
+    if (!s.currentQuizDetail) return {}
+    return {
+      currentQuizDetail: {
+        ...s.currentQuizDetail,
+        questions: s.currentQuizDetail.questions.map((q) =>
+          q.id === questionId ? { ...q, user_answer: answer } : q
+        ),
+      },
+    }
+  }),
 }))

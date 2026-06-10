@@ -30,6 +30,11 @@ from ..schemas.learn import (
     FlashcardResponse,
     FlashcardListResponse,
     FlashcardStatusUpdate,
+    StudyQuizResponse,
+    StudyQuizDetailResponse,
+    QuizSubmitRequest,
+    StudyQuizListResponse,
+    QuizQuestionResponse,
 )
 from ..services.learn_service import (
     extract_text,
@@ -38,6 +43,7 @@ from ..services.learn_service import (
     generate_summary,
     study_chat_stream,
     generate_flashcards,
+    generate_quiz,
 )
 
 logger = logging.getLogger(__name__)
@@ -389,6 +395,21 @@ async def list_flashcards(
     return FlashcardListResponse(flashcards=flashcards, total=len(flashcards))
 
 
+@router.get("/materials/{material_id}/flashcards/due", response_model=FlashcardListResponse)
+async def list_due_flashcards(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取资料中今天到期需要复习的闪卡列表"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    flashcards = await crud.get_due_flashcards_by_material(db, material_id)
+    return FlashcardListResponse(flashcards=flashcards, total=len(flashcards))
+
+
 @router.patch("/flashcards/{card_id}/status", response_model=FlashcardResponse)
 async def update_flashcard_status(
     card_id: int,
@@ -404,3 +425,152 @@ async def update_flashcard_status(
     updated = await crud.update_flashcard_status(db, card_id, body.status)
     await db.commit()
     return updated
+
+
+# ============ 测验 (Quiz) ============
+
+
+@router.post("/materials/{material_id}/quizzes", response_model=StudyQuizResponse)
+async def create_quiz_for_material(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """为资料生成新测验"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    # AI 生成题目
+    ai_questions = await generate_quiz(material.raw_text)
+    if not ai_questions:
+        raise HTTPException(status_code=500, detail="生成测验试题失败，请重试")
+
+    # 创建测验主记录
+    quiz = await crud.create_study_quiz(db, material_id, current_user.id, len(ai_questions))
+
+    # 转换并保存题目
+    db_questions = []
+    for q in ai_questions:
+        opts_json = json.dumps(q.get("options")) if q.get("options") else None
+        db_questions.append({
+            "question_type": q["question_type"],
+            "question_text": q["question_text"],
+            "options": opts_json,
+            "correct_answer": q["correct_answer"],
+            "explanation": q.get("explanation"),
+        })
+
+    await crud.create_quiz_questions(db, quiz.id, db_questions)
+    await db.commit()
+    return quiz
+
+
+@router.get("/quizzes", response_model=StudyQuizListResponse)
+async def list_quizzes(
+    material_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取历史测验列表"""
+    quizzes = await crud.get_user_quizzes(db, current_user.id, material_id)
+    return StudyQuizListResponse(quizzes=quizzes)
+
+
+@router.get("/quizzes/{quiz_id}")
+async def get_quiz_detail(
+    quiz_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取单个测验的详细数据，包括题目（未完成时不返回正确答案和解析）"""
+    quiz = await crud.get_study_quiz_by_id(db, quiz_id, current_user.id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="测验不存在")
+
+    questions = await crud.get_quiz_questions(db, quiz_id)
+
+    # 动态构建返回结构，处理题目数据的保密性
+    result_questions = []
+    for q in questions:
+        q_data = {
+            "id": q.id,
+            "quiz_id": q.quiz_id,
+            "question_type": q.question_type,
+            "question_text": q.question_text,
+            "options": q.options,
+            "user_answer": q.user_answer,
+            "is_correct": q.is_correct,
+        }
+        if quiz.is_completed:
+            q_data["correct_answer"] = q.correct_answer
+            q_data["explanation"] = q.explanation
+        result_questions.append(q_data)
+
+    return {
+        "quiz": quiz,
+        "questions": result_questions
+    }
+
+
+@router.post("/quizzes/{quiz_id}/submit")
+async def submit_quiz(
+    quiz_id: int,
+    body: QuizSubmitRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """提交测验答案，执行判定与算分"""
+    quiz = await crud.get_study_quiz_by_id(db, quiz_id, current_user.id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="测验不存在")
+    if quiz.is_completed:
+        raise HTTPException(status_code=400, detail="该测验已提交，不可重复提交")
+
+    questions = await crud.get_quiz_questions(db, quiz_id)
+    q_map = {q.id: q for q in questions}
+
+    correct_count = 0
+    for ans in body.answers:
+        q = q_map.get(ans.question_id)
+        if not q:
+            continue
+        
+        user_ans = ans.user_answer.strip()
+        correct_ans = q.correct_answer.strip()
+        is_correct = (user_ans == correct_ans)
+        
+        if is_correct:
+            correct_count += 1
+            
+        await crud.submit_quiz_answer(db, q.id, user_ans, is_correct)
+
+    await crud.complete_study_quiz(db, quiz_id, correct_count)
+    await db.commit()
+
+    # 重新加载题目列表返回给前端
+    questions = await crud.get_quiz_questions(db, quiz_id)
+    return {
+        "quiz": {
+            "id": quiz.id,
+            "material_id": quiz.material_id,
+            "score": correct_count,
+            "total_questions": quiz.total_questions,
+            "is_completed": True,
+            "created_at": quiz.created_at,
+        },
+        "questions": [
+            {
+                "id": q.id,
+                "quiz_id": q.quiz_id,
+                "question_type": q.question_type,
+                "question_text": q.question_text,
+                "options": q.options,
+                "user_answer": q.user_answer,
+                "is_correct": q.is_correct,
+                "correct_answer": q.correct_answer,
+                "explanation": q.explanation,
+            }
+            for q in questions
+        ]
+    }

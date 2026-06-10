@@ -181,7 +181,36 @@ export interface Flashcard {
   back: string
   status: 'new' | 'learning' | 'mastered'
   review_count: number
+  box_number: number
+  interval: number
+  next_review_at: string
   created_at: string
+}
+
+export interface StudyQuiz {
+  id: number
+  material_id: number
+  score: number | null
+  total_questions: number
+  is_completed: boolean
+  created_at: string
+}
+
+export interface QuizQuestion {
+  id: number
+  quiz_id: number
+  question_type: 'single' | 'boolean'
+  question_text: string
+  options: string | null
+  user_answer: string | null
+  is_correct: boolean | null
+  correct_answer?: string
+  explanation?: string
+}
+
+export interface QuizDetail {
+  quiz: StudyQuiz
+  questions: QuizQuestion[]
 }
 
 // API响应类型

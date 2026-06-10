@@ -111,6 +111,9 @@ class FlashcardResponse(BaseModel):
     back: str
     status: str
     review_count: int
+    box_number: int
+    interval: int
+    next_review_at: datetime
     created_at: datetime
 
     class Config:
@@ -126,3 +129,60 @@ class FlashcardListResponse(BaseModel):
 class FlashcardStatusUpdate(BaseModel):
     """更新闪卡状态"""
     status: str = Field(..., pattern=r"^(new|learning|mastered)$")
+
+
+# ---- 测验 (Quiz) ----
+
+class QuizQuestionResponse(BaseModel):
+    """测验题目简要响应"""
+    id: int
+    quiz_id: int
+    question_type: str
+    question_text: str
+    options: Optional[str] = None
+    user_answer: Optional[str] = None
+    is_correct: Optional[bool] = None
+
+    class Config:
+        from_attributes = True
+
+
+class QuizQuestionDetailResponse(QuizQuestionResponse):
+    """测验题目详细响应"""
+    correct_answer: str
+    explanation: Optional[str] = None
+
+
+class StudyQuizResponse(BaseModel):
+    """测验简要响应"""
+    id: int
+    material_id: int
+    score: Optional[int] = None
+    total_questions: int
+    is_completed: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class StudyQuizDetailResponse(BaseModel):
+    """测验详细响应"""
+    quiz: StudyQuizResponse
+    questions: List[QuizQuestionResponse]
+
+
+class QuizSubmitAnswer(BaseModel):
+    """单题作答"""
+    question_id: int
+    user_answer: str
+
+
+class QuizSubmitRequest(BaseModel):
+    """测验整卷提交"""
+    answers: List[QuizSubmitAnswer]
+
+
+class StudyQuizListResponse(BaseModel):
+    """测验历史列表响应"""
+    quizzes: List[StudyQuizResponse]

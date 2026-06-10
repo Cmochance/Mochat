@@ -8,9 +8,10 @@ import { useAuthStore } from '../../stores/authStore'
 import { learnService } from '../../services/learnService'
 import MaterialUpload from './components/MaterialUpload'
 import MaterialList from './components/MaterialList'
-import { MessageSquare, Layers } from 'lucide-react'
+import { MessageSquare, Layers, HelpCircle } from 'lucide-react'
 import StudyChat from './components/StudyChat'
 import FlashcardView from './components/FlashcardView'
+import QuizView from './components/QuizView'
 import SummaryPanel from './components/SummaryPanel'
 import Button from '../../components/common/Button'
 import Modal from '../../components/common/Modal'
@@ -54,7 +55,7 @@ export default function Learn() {
   const [showUpload, setShowUpload] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [summaryPanelOpen, setSummaryPanelOpen] = useState(true)
-  const [activeTab, setActiveTab] = useState<'chat' | 'flashcards'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'flashcards' | 'quiz'>('chat')
   const [isUploading, setIsUploading] = useState(false)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
@@ -315,6 +316,17 @@ export default function Learn() {
                   <Layers size={14} />
                   {t('learn.tabs.flashcards')}
                 </button>
+                <button
+                  onClick={() => setActiveTab('quiz')}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
+                    activeTab === 'quiz'
+                      ? 'border-ink-black text-ink-black'
+                      : 'border-transparent text-ink-faint hover:text-ink-medium'
+                  }`}
+                >
+                  <HelpCircle size={14} />
+                  {t('learn.tabs.quiz')}
+                </button>
               </div>
               {/* 内容区 */}
               {activeTab === 'chat' ? (
@@ -326,8 +338,10 @@ export default function Learn() {
                   onSend={handleSendMessage}
                   disabled={isLoading}
                 />
-              ) : (
+              ) : activeTab === 'flashcards' ? (
                 <FlashcardView materialId={currentMaterial.id} />
+              ) : (
+                <QuizView materialId={currentMaterial.id} />
               )}
             </>
           ) : (

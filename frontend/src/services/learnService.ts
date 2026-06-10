@@ -138,13 +138,39 @@ async function generateFlashcards(materialId: number): Promise<{ flashcards: Fla
   return res.data
 }
 
-async function getFlashcards(materialId: number): Promise<{ flashcards: Flashcard[]; total: number }> {
-  const res = await api.get(`/learn/materials/${materialId}/flashcards`)
+async function getFlashcards(materialId: number, dueOnly: boolean = false): Promise<{ flashcards: Flashcard[]; total: number }> {
+  const path = dueOnly 
+    ? `/learn/materials/${materialId}/flashcards/due`
+    : `/learn/materials/${materialId}/flashcards`
+  const res = await api.get(path)
   return res.data
 }
 
 async function updateFlashcardStatus(cardId: number, status: string): Promise<Flashcard> {
   const res = await api.patch(`/learn/flashcards/${cardId}/status`, { status })
+  return res.data
+}
+
+// ---- 测验 ----
+
+async function generateQuiz(materialId: number): Promise<any> {
+  const res = await api.post(`/learn/materials/${materialId}/quizzes`)
+  return res.data
+}
+
+async function getQuizzes(materialId?: number): Promise<any> {
+  const params = materialId ? { material_id: materialId } : {}
+  const res = await api.get('/learn/quizzes', { params })
+  return res.data
+}
+
+async function getQuizDetail(quizId: number): Promise<any> {
+  const res = await api.get(`/learn/quizzes/${quizId}`)
+  return res.data
+}
+
+async function submitQuiz(quizId: number, answers: { question_id: number; user_answer: string }[]): Promise<any> {
+  const res = await api.post(`/learn/quizzes/${quizId}/submit`, { answers })
   return res.data
 }
 
@@ -163,4 +189,8 @@ export const learnService = {
   generateFlashcards,
   getFlashcards,
   updateFlashcardStatus,
+  generateQuiz,
+  getQuizzes,
+  getQuizDetail,
+  submitQuiz,
 }

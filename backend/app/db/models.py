@@ -262,5 +262,37 @@ class Flashcard(Base):
     back = Column(Text, nullable=False)         # 背面（答案/解释）
     status = Column(String(20), default="new")  # new / learning / mastered
     review_count = Column(Integer, default=0)   # 复习次数
+    box_number = Column(Integer, default=1)     # Leitner 盒子号（1-5）
+    interval = Column(Integer, default=1)       # 下一次复习的时间间隔（天）
+    next_review_at = Column(DateTime, default=_utcnow) # 下一次复习的到期时间
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class StudyQuiz(Base):
+    """学习测验历史"""
+    __tablename__ = "study_quizzes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    score = Column(Integer, nullable=True)        # 答对题数
+    total_questions = Column(Integer, nullable=False) # 总题数
+    is_completed = Column(Boolean, default=False)  # 是否已完成提交
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class QuizQuestion(Base):
+    """测验题目记录"""
+    __tablename__ = "quiz_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quiz_id = Column(Integer, ForeignKey("study_quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
+    question_type = Column(String(20), nullable=False)  # single / boolean
+    question_text = Column(Text, nullable=False)        # 题干
+    options = Column(Text, nullable=True)               # JSON 格式选项（单选题有，判断题为 None）
+    correct_answer = Column(Text, nullable=False)       # 正确选项/答案
+    explanation = Column(Text, nullable=True)           # 解析内容
+    user_answer = Column(Text, nullable=True)          # 用户选择的答案
+    is_correct = Column(Boolean, nullable=True)         # 是否答对

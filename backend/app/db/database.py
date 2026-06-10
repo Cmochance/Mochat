@@ -10,7 +10,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 # 当前 schema 版本号，每次新增迁移时递增
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # 创建异步引擎
 engine = create_async_engine(
@@ -136,6 +136,23 @@ async def migrate_db(conn):
             "user_usages",
             "last_ppt_at",
             "ALTER TABLE user_usages ADD COLUMN last_ppt_at DATETIME",
+        )
+
+        # flashcards 新增艾宾浩斯记忆字段
+        add_column_if_missing(
+            "flashcards",
+            "box_number",
+            "ALTER TABLE flashcards ADD COLUMN box_number INTEGER",
+        )
+        add_column_if_missing(
+            "flashcards",
+            "interval",
+            "ALTER TABLE flashcards ADD COLUMN interval INTEGER",
+        )
+        add_column_if_missing(
+            "flashcards",
+            "next_review_at",
+            "ALTER TABLE flashcards ADD COLUMN next_review_at DATETIME",
         )
     
     await conn.run_sync(check_and_migrate)

@@ -5,6 +5,7 @@ import { isDesktop } from './utils/env'
 import Welcome from './pages/Welcome'
 import Auth from './pages/Auth'
 import Chat from './pages/Chat'
+import Learn from './pages/Learn'
 import Admin from './pages/Admin'
 import Setup from './pages/Setup'
 
@@ -46,6 +47,9 @@ function App() {
         
         {/* 对话页面 */}
         <Route path="/chat/*" element={<Chat />} />
+
+        {/* 学习页面 */}
+        <Route path="/learn/*" element={<Learn />} />
         
         {/* 管理页面 - 需要管理员权限 */}
         <Route

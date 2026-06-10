@@ -137,6 +137,42 @@ export interface StreamChunk {
 // 聊天输入模式
 export type ChatMode = 'chat' | 'draw' | 'ppt'
 
+// ============ 学习模块 ============
+
+// 学习资料
+export interface LearningMaterial {
+  id: number
+  title: string
+  file_type: string
+  summary: string | null
+  created_at: string
+  updated_at: string
+}
+
+// 资料详情（含原文）
+export interface LearningMaterialDetail extends LearningMaterial {
+  raw_text: string
+}
+
+// 学习会话
+export interface StudySession {
+  id: number
+  material_id: number
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+// 学习消息
+export interface StudyMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  thinking?: string
+  cited_chunks?: string
+  created_at: string
+}
+
 // API响应类型
 export interface ApiResponse<T> {
   data?: T

@@ -450,6 +450,48 @@ export default {
       confirmDeleteKeyword: '确定要删除这个限制词吗？',
     },
   },
+  // 学习模块
+  learn: {
+    title: '学习',
+    backToChat: '返回对话',
+    toggleSummary: '切换摘要面板',
+    empty: {
+      title: '开始学习之旅',
+      subtitle: '上传学习资料，AI 帮你高效学习',
+    },
+    upload: {
+      title: '导入学习资料',
+      newMaterial: '导入资料',
+      fileMode: '上传文件',
+      textMode: '粘贴文本',
+      dragHint: '拖拽文件到此处，或点击选择',
+      supportedTypes: '支持 PDF、DOCX、TXT、Markdown',
+      titlePlaceholder: '资料标题',
+      contentPlaceholder: '粘贴学习内容...',
+      submitText: '提交',
+      processing: '处理中...',
+      error: '上传失败，请重试',
+      unsupportedType: '不支持的文件类型: {{ext}}',
+    },
+    materials: {
+      empty: '暂无学习资料',
+      confirmDelete: '确定要删除这份资料吗？',
+    },
+    chat: {
+      newSession: '新会话',
+      emptyHint: '开始提问，AI 将基于你的资料进行辅导',
+      placeholder: '输入你的问题...',
+      thinking: '思考中...',
+    },
+    summary: {
+      title: 'AI 摘要',
+      selectHint: '选择一份资料查看摘要',
+      noSummary: '尚未生成摘要',
+      generateBtn: '生成摘要',
+      generating: '生成中...',
+    },
+  },
+
 
   // 语言切换
   language: {

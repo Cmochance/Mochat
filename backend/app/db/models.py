@@ -197,3 +197,56 @@ class VerificationIPLimit(Base):
     ip = Column(String(64), primary_key=True)
     count = Column(Integer, nullable=False, default=0)
     reset_at = Column(DateTime, nullable=False)
+
+
+# ============ 学习模块 ============
+
+
+class LearningMaterial(Base):
+    """学习资料模型"""
+    __tablename__ = "learning_materials"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(300), nullable=False)
+    file_type = Column(String(20), nullable=False)  # pdf/txt/md/docx/text
+    file_path = Column(String(500), nullable=True)   # 上传文件存储路径（纯文本粘贴为 None）
+    raw_text = Column(Text, nullable=False)           # 提取的纯文本
+    summary = Column(Text, nullable=True)             # AI 生成的摘要
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class StudySession(Base):
+    """学习会话模型"""
+    __tablename__ = "study_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(200), nullable=False, default="学习会话")
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class StudyMessage(Base):
+    """学习对话消息模型"""
+    __tablename__ = "study_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(20), nullable=False)  # user / assistant
+    content = Column(Text, nullable=False)
+    thinking = Column(Text, nullable=True)      # AI 思考过程
+    cited_chunks = Column(Text, nullable=True)  # JSON: 引用的资料片段索引列表
+    created_at = Column(DateTime, default=_utcnow)
+
+
+class MaterialChunk(Base):
+    """资料文本分块模型（用于检索）"""
+    __tablename__ = "material_chunks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    content = Column(Text, nullable=False)

@@ -450,6 +450,48 @@ export default {
       confirmDeleteKeyword: 'Are you sure you want to delete this keyword?',
     },
   },
+  // Learn module
+  learn: {
+    title: 'Learn',
+    backToChat: 'Back to Chat',
+    toggleSummary: 'Toggle Summary Panel',
+    empty: {
+      title: 'Start Your Learning Journey',
+      subtitle: 'Upload study materials and let AI help you learn efficiently',
+    },
+    upload: {
+      title: 'Import Study Material',
+      newMaterial: 'Import Material',
+      fileMode: 'Upload File',
+      textMode: 'Paste Text',
+      dragHint: 'Drag and drop a file here, or click to select',
+      supportedTypes: 'Supports PDF, DOCX, TXT, Markdown',
+      titlePlaceholder: 'Material title',
+      contentPlaceholder: 'Paste study content...',
+      submitText: 'Submit',
+      processing: 'Processing...',
+      error: 'Upload failed, please try again',
+      unsupportedType: 'Unsupported file type: {{ext}}',
+    },
+    materials: {
+      empty: 'No study materials yet',
+      confirmDelete: 'Are you sure you want to delete this material?',
+    },
+    chat: {
+      newSession: 'New Session',
+      emptyHint: 'Ask a question — AI will tutor you based on your materials',
+      placeholder: 'Type your question...',
+      thinking: 'Thinking...',
+    },
+    summary: {
+      title: 'AI Summary',
+      selectHint: 'Select a material to view its summary',
+      noSummary: 'No summary generated yet',
+      generateBtn: 'Generate Summary',
+      generating: 'Generating...',
+    },
+  },
+
 
   // Language switch
   language: {

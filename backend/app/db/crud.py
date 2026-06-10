@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import selectinload
 
-from .models import User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel
+from .models import (
+    User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel,
+    LearningMaterial, StudySession, StudyMessage, MaterialChunk,
+)
 from ..core.config import settings
 from ..core.security import get_password_hash, verify_password, encrypt_password
 
@@ -471,3 +474,214 @@ async def get_allowed_model_count(db: AsyncSession) -> int:
     """获取允许的模型总数"""
     result = await db.execute(select(func.count(AllowedModel.id)))
     return result.scalar()
+
+
+# ============ 学习模块 CRUD ============
+
+
+async def create_learning_material(
+    db: AsyncSession,
+    user_id: int,
+    title: str,
+    file_type: str,
+    raw_text: str,
+    file_path: Optional[str] = None,
+) -> LearningMaterial:
+    """创建学习资料"""
+    material = LearningMaterial(
+        user_id=user_id,
+        title=title,
+        file_type=file_type,
+        raw_text=raw_text,
+        file_path=file_path,
+    )
+    db.add(material)
+    await db.flush()
+    await db.refresh(material)
+    return material
+
+
+async def get_user_materials(
+    db: AsyncSession,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 50,
+) -> List[LearningMaterial]:
+    """获取用户的学习资料列表"""
+    result = await db.execute(
+        select(LearningMaterial)
+        .where(LearningMaterial.user_id == user_id)
+        .order_by(LearningMaterial.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+async def get_material_by_id(
+    db: AsyncSession,
+    material_id: int,
+    user_id: int,
+) -> Optional[LearningMaterial]:
+    """根据 ID 获取学习资料（需校验用户）"""
+    result = await db.execute(
+        select(LearningMaterial)
+        .where(LearningMaterial.id == material_id, LearningMaterial.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_material(db: AsyncSession, material_id: int, user_id: int) -> bool:
+    """删除学习资料"""
+    result = await db.execute(
+        delete(LearningMaterial)
+        .where(LearningMaterial.id == material_id, LearningMaterial.user_id == user_id)
+    )
+    return result.rowcount > 0
+
+
+async def update_material_summary(
+    db: AsyncSession,
+    material_id: int,
+    summary: str,
+) -> None:
+    """更新资料摘要"""
+    await db.execute(
+        update(LearningMaterial)
+        .where(LearningMaterial.id == material_id)
+        .values(summary=summary)
+    )
+
+
+# ---- 分块 ----
+
+
+async def create_material_chunks(
+    db: AsyncSession,
+    material_id: int,
+    chunks: List[str],
+) -> List[MaterialChunk]:
+    """批量创建资料分块"""
+    objects = []
+    for i, text in enumerate(chunks):
+        chunk = MaterialChunk(material_id=material_id, chunk_index=i, content=text)
+        db.add(chunk)
+        objects.append(chunk)
+    await db.flush()
+    for obj in objects:
+        await db.refresh(obj)
+    return objects
+
+
+async def get_material_chunks(
+    db: AsyncSession,
+    material_id: int,
+) -> List[MaterialChunk]:
+    """获取资料的所有分块"""
+    result = await db.execute(
+        select(MaterialChunk)
+        .where(MaterialChunk.material_id == material_id)
+        .order_by(MaterialChunk.chunk_index)
+    )
+    return result.scalars().all()
+
+
+# ---- 学习会话 ----
+
+
+async def create_study_session(
+    db: AsyncSession,
+    user_id: int,
+    material_id: int,
+    title: str = "学习会话",
+) -> StudySession:
+    """创建学习会话"""
+    session = StudySession(
+        user_id=user_id,
+        material_id=material_id,
+        title=title,
+    )
+    db.add(session)
+    await db.flush()
+    await db.refresh(session)
+    return session
+
+
+async def get_user_study_sessions(
+    db: AsyncSession,
+    user_id: int,
+    material_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> List[StudySession]:
+    """获取用户的学习会话列表"""
+    stmt = select(StudySession).where(StudySession.user_id == user_id)
+    if material_id is not None:
+        stmt = stmt.where(StudySession.material_id == material_id)
+    stmt = stmt.order_by(StudySession.updated_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+async def get_study_session_by_id(
+    db: AsyncSession,
+    session_id: int,
+    user_id: int,
+) -> Optional[StudySession]:
+    """根据 ID 获取学习会话"""
+    result = await db.execute(
+        select(StudySession)
+        .where(StudySession.id == session_id, StudySession.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_study_session(db: AsyncSession, session_id: int, user_id: int) -> bool:
+    """删除学习会话"""
+    result = await db.execute(
+        delete(StudySession)
+        .where(StudySession.id == session_id, StudySession.user_id == user_id)
+    )
+    return result.rowcount > 0
+
+
+# ---- 学习消息 ----
+
+
+async def create_study_message(
+    db: AsyncSession,
+    session_id: int,
+    role: str,
+    content: str,
+    thinking: Optional[str] = None,
+    cited_chunks: Optional[str] = None,
+) -> StudyMessage:
+    """创建学习消息"""
+    msg = StudyMessage(
+        session_id=session_id,
+        role=role,
+        content=content,
+        thinking=thinking,
+        cited_chunks=cited_chunks,
+    )
+    db.add(msg)
+    await db.flush()
+    await db.refresh(msg)
+    return msg
+
+
+async def get_study_messages(
+    db: AsyncSession,
+    session_id: int,
+    skip: int = 0,
+    limit: int = 100,
+) -> List[StudyMessage]:
+    """获取学习会话的消息列表"""
+    result = await db.execute(
+        select(StudyMessage)
+        .where(StudyMessage.session_id == session_id)
+        .order_by(StudyMessage.created_at.asc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()

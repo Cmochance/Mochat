@@ -10,7 +10,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 # 当前 schema 版本号，每次新增迁移时递增
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # 创建异步引擎
 engine = create_async_engine(

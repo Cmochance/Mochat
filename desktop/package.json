@@ -105,6 +105,7 @@
           "mochat"
         ]
       }
-    ]
+    ],
+    "afterSign": "scripts/after-sign.js"
   }
 }

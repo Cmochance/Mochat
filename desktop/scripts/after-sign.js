@@ -18,6 +18,6 @@ exports.default = async function afterSign(context) {
     console.log('[after-sign] Ad-hoc signing successful')
   } catch (err) {
     console.error('[after-sign] Ad-hoc signing failed:', err.message)
-    // 不阻止构建，只是警告
+    throw err
   }
 }

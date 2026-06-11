@@ -8,13 +8,6 @@ on:
       - "backend/**"
       - "modules/**"
       - "desktop/**"
-  pull_request:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - "backend/**"
-      - "modules/**"
-      - "desktop/**"
   workflow_dispatch:
 
 jobs:
@@ -145,11 +138,8 @@ jobs:
           npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # 禁用 electron-builder 自动签名，使用 ad-hoc 签名
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

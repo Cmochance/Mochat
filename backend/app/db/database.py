@@ -1,31 +1,26 @@
 """
 数据库连接模块 - 管理数据库会话
 """
+
 import logging
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from sqlalchemy import inspect, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import text, inspect
+
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # 当前 schema 版本号，每次新增迁移时递增
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 7
 
 # 创建异步引擎
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True
-)
+engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, future=True)
 
 # 创建异步会话工厂
 AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
+    engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
 )
 
 # 创建基类
@@ -50,6 +45,7 @@ async def migrate_db(conn):
     数据库迁移 - 检查并添加缺失的列
     用于兼容旧数据库结构
     """
+
     def check_and_migrate(connection):
         inspector = inspect(connection)
         table_names = inspector.get_table_names()
@@ -73,7 +69,7 @@ async def migrate_db(conn):
             logger.info("Migration: Creating index '%s' on %s table...", index_name, table_name)
             connection.execute(text(create_sql))
             logger.info("Migration: Index '%s' created successfully.", index_name)
-        
+
         # users 表历史迁移
         add_column_if_missing(
             "users",
@@ -137,7 +133,36 @@ async def migrate_db(conn):
             "last_ppt_at",
             "ALTER TABLE user_usages ADD COLUMN last_ppt_at DATETIME",
         )
-    
+
+        # flashcards 新增艾宾浩斯记忆字段
+        add_column_if_missing(
+            "flashcards",
+            "box_number",
+            "ALTER TABLE flashcards ADD COLUMN box_number INTEGER",
+        )
+        add_column_if_missing(
+            "flashcards",
+            "interval",
+            "ALTER TABLE flashcards ADD COLUMN interval INTEGER",
+        )
+        add_column_if_missing(
+            "flashcards",
+            "next_review_at",
+            "ALTER TABLE flashcards ADD COLUMN next_review_at DATETIME",
+        )
+
+        # material_annotations 新增划词位置偏移量字段
+        add_column_if_missing(
+            "material_annotations",
+            "start_offset",
+            "ALTER TABLE material_annotations ADD COLUMN start_offset INTEGER",
+        )
+        add_column_if_missing(
+            "material_annotations",
+            "end_offset",
+            "ALTER TABLE material_annotations ADD COLUMN end_offset INTEGER",
+        )
+
     await conn.run_sync(check_and_migrate)
 
 
@@ -150,22 +175,26 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
         # 更新 schema 版本
-        conn.execute(text(
-            "CREATE TABLE IF NOT EXISTS schema_version ("
-            "  id INTEGER PRIMARY KEY CHECK (id = 1),"
-            "  version INTEGER NOT NULL,"
-            "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
-            ")"
-        ))
-        row = conn.execute(text("SELECT version FROM schema_version WHERE id = 1")).fetchone()
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS schema_version ("
+                "  id INTEGER PRIMARY KEY CHECK (id = 1),"
+                "  version INTEGER NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )
+        )
+        result = await conn.execute(text("SELECT version FROM schema_version WHERE id = 1"))
+        row = result.fetchone()
         if row is None:
-            conn.execute(text(
-                "INSERT INTO schema_version (id, version) VALUES (1, :ver)"
-            ), {"ver": SCHEMA_VERSION})
+            await conn.execute(
+                text("INSERT INTO schema_version (id, version) VALUES (1, :ver)"), {"ver": SCHEMA_VERSION}
+            )
         elif row[0] < SCHEMA_VERSION:
-            conn.execute(text(
-                "UPDATE schema_version SET version = :ver, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
-            ), {"ver": SCHEMA_VERSION})
+            await conn.execute(
+                text("UPDATE schema_version SET version = :ver, updated_at = CURRENT_TIMESTAMP WHERE id = 1"),
+                {"ver": SCHEMA_VERSION},
+            )
             logger.info("Schema upgraded: %s → %s", row[0], SCHEMA_VERSION)
         logger.info("Database schema version: %s", SCHEMA_VERSION)
 

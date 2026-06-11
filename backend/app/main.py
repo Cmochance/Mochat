@@ -1,29 +1,34 @@
 """
 Mochat 后端应用入口
 """
+
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .core.config import settings
-from .db.database import init_db, close_db
-from .api import api_router
-from .services.auth_service import AuthService
-from .services.ai_service import ai_service
-from .db.database import AsyncSessionLocal
-
 from verify import verify_router
+
+from .api import api_router
+from .core.config import settings
+from .db.database import AsyncSessionLocal, close_db, init_db
+from .services.ai_service import ai_service
+from .services.auth_service import AuthService
+from .services.chat_service import chat_service
+from .services.supabase_auth_service import supabase_auth_service
 
 logger = logging.getLogger(__name__)
 
 
-_INSECURE_SECRET_KEYS = frozenset({
-    "your-super-secret-key-change-this-in-production",
-    "secret",
-    "change-me",
-    "changeme",
-})
+_INSECURE_SECRET_KEYS = frozenset(
+    {
+        "your-super-secret-key-change-this-in-production",
+        "secret",
+        "change-me",
+        "changeme",
+    }
+)
 
 
 @asynccontextmanager
@@ -45,26 +50,23 @@ async def lifespan(app: FastAPI):
 
     # 启动时初始化数据库
     await init_db()
-    
+
     # 创建默认账号（管理员和普通用户）
     async with AsyncSessionLocal() as db:
         await AuthService.create_default_users(db)
         await db.commit()
-    
+
     yield
-    
+
     # 关闭时清理资源
     await ai_service.close()
+    await chat_service.close()
+    await supabase_auth_service.close()
     await close_db()
 
 
 # 创建FastAPI应用
-app = FastAPI(
-    title="Mochat API",
-    description="水墨风格AI对话平台后端API",
-    version="1.0.0",
-    lifespan=lifespan
-)
+app = FastAPI(title="Mochat API", description="水墨风格AI对话平台后端API", version="1.0.0", lifespan=lifespan)
 
 # 配置CORS
 app.add_middleware(
@@ -85,11 +87,7 @@ app.include_router(verify_router, prefix="/api")
 @app.get("/")
 async def root():
     """根路径"""
-    return {
-        "name": "Mochat API",
-        "version": "1.0.0",
-        "description": "水墨风格AI对话平台"
-    }
+    return {"name": "Mochat API", "version": "1.0.0", "description": "水墨风格AI对话平台"}
 
 
 @app.get("/health")

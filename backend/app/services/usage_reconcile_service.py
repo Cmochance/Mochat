@@ -1,10 +1,11 @@
 """
 使用量对账服务：用于校验 usage_events / usage_daily_aggregates / user_usages 一致性
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+from datetime import UTC, datetime
+from typing import Any, Dict, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,7 +31,7 @@ class UsageReconcileService:
 
         if not user_ids:
             return {
-                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
                 "summary": {
                     "users_checked": 0,
                     "user_total_mismatches": 0,
@@ -41,12 +42,14 @@ class UsageReconcileService:
             }
 
         usage_rows = (
-            await db.execute(
-                select(UserUsage)
-                .where(UserUsage.user_id.in_(user_ids))
-                .order_by(UserUsage.user_id.asc())
+            (
+                await db.execute(
+                    select(UserUsage).where(UserUsage.user_id.in_(user_ids)).order_by(UserUsage.user_id.asc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         usage_map = {row.user_id: row for row in usage_rows}
 
         success_totals_rows = (
@@ -181,7 +184,7 @@ class UsageReconcileService:
                 )
 
         return {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "summary": {
                 "users_checked": len(user_ids),
                 "user_total_mismatches": len(user_total_mismatches),

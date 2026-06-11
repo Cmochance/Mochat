@@ -137,6 +137,82 @@ export interface StreamChunk {
 // 聊天输入模式
 export type ChatMode = 'chat' | 'draw' | 'ppt'
 
+// ============ 学习模块 ============
+
+// 学习资料
+export interface LearningMaterial {
+  id: number
+  title: string
+  file_type: string
+  summary: string | null
+  created_at: string
+  updated_at: string
+}
+
+// 资料详情（含原文）
+export interface LearningMaterialDetail extends LearningMaterial {
+  raw_text: string
+}
+
+// 学习会话
+export interface StudySession {
+  id: number
+  material_id: number
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+// 学习消息
+export interface StudyMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  thinking?: string
+  cited_chunks?: string
+  created_at: string
+}
+
+// 闪卡
+export interface Flashcard {
+  id: number
+  material_id: number
+  front: string
+  back: string
+  status: 'new' | 'learning' | 'mastered'
+  review_count: number
+  box_number: number
+  interval: number
+  next_review_at: string
+  created_at: string
+}
+
+export interface StudyQuiz {
+  id: number
+  material_id: number
+  score: number | null
+  total_questions: number
+  is_completed: boolean
+  created_at: string
+}
+
+export interface QuizQuestion {
+  id: number
+  quiz_id: number
+  question_type: 'single' | 'boolean'
+  question_text: string
+  options: string | null
+  user_answer: string | null
+  is_correct: boolean | null
+  correct_answer?: string
+  explanation?: string
+}
+
+export interface QuizDetail {
+  quiz: StudyQuiz
+  questions: QuizQuestion[]
+}
+
 // API响应类型
 export interface ApiResponse<T> {
   data?: T
@@ -156,6 +232,57 @@ export interface RestrictedKeyword {
   id: number
   keyword: string
   is_active: boolean
+  created_at: string
+}
+
+export interface LearningMap {
+  id: number
+  material_id: number
+  map_type: 'mindmap' | 'concept_graph'
+  map_data: string
+  created_at: string
+}
+
+export interface MindmapNode {
+  topic: string
+  children: MindmapNode[]
+}
+
+export interface GraphNode {
+  id: string
+  label: string
+  type: string
+  desc: string
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  label: string
+}
+
+export interface ConceptGraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export interface EvaluationReport {
+  quizzes_count: number
+  average_accuracy: number
+  wrong_questions_count: number
+  flashcards_total: number
+  flashcards_by_box: number[]
+  ai_diagnostic: string
+}
+
+export interface MaterialAnnotation {
+  id: number
+  material_id: number
+  selected_text: string
+  note: string | null
+  color: string
+  start_offset?: number | null
+  end_offset?: number | null
   created_at: string
 }
 

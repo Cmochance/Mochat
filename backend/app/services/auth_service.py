@@ -1,15 +1,17 @@
 """
 账号管理服务 - 处理用户认证相关业务逻辑
 """
+
 import logging
-from typing import Any, Dict, Optional
 from datetime import timedelta
+from typing import Any, Dict, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.config import settings
+from ..core.security import create_access_token, encrypt_password, get_password_hash, verify_password
 from ..db import crud
 from ..db.models import User
-from ..core.security import create_access_token, verify_password, get_password_hash, encrypt_password
-from ..core.config import settings
 from .supabase_auth_service import supabase_auth_service
 
 logger = logging.getLogger(__name__)
@@ -24,10 +26,7 @@ class AuthService:
 
     @staticmethod
     async def register(
-        db: AsyncSession,
-        username: str,
-        email: str,
-        password: str
+        db: AsyncSession, username: str, email: str, password: str
     ) -> tuple[Optional[User], Optional[str]]:
         """
         用户注册
@@ -73,9 +72,7 @@ class AuthService:
 
     @staticmethod
     async def login(
-        db: AsyncSession,
-        identifier: str,
-        password: str
+        db: AsyncSession, identifier: str, password: str
     ) -> tuple[Optional[Dict[str, Any]], Optional[User], Optional[str]]:
         """
         用户登录
@@ -142,19 +139,22 @@ class AuthService:
 
         access_token = create_access_token(
             data={"sub": str(user.id), "username": user.username, "role": user.role},
-            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
         )
-        return {
-            "access_token": access_token,
-            "refresh_token": None,
-            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "token_type": "bearer",
-        }, user, None
+        return (
+            {
+                "access_token": access_token,
+                "refresh_token": None,
+                "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                "token_type": "bearer",
+            },
+            user,
+            None,
+        )
 
     @staticmethod
     async def refresh_login(
-        db: AsyncSession,
-        refresh_token: str
+        db: AsyncSession, refresh_token: str
     ) -> tuple[Optional[Dict[str, Any]], Optional[User], Optional[str]]:
         """
         刷新登录令牌
@@ -189,19 +189,20 @@ class AuthService:
         if not access_token:
             return None, None, "刷新失败：未获取访问令牌"
 
-        return {
-            "access_token": access_token,
-            "refresh_token": (token_data or {}).get("refresh_token"),
-            "expires_in": (token_data or {}).get("expires_in"),
-            "token_type": (token_data or {}).get("token_type", "bearer"),
-        }, user, None
+        return (
+            {
+                "access_token": access_token,
+                "refresh_token": (token_data or {}).get("refresh_token"),
+                "expires_in": (token_data or {}).get("expires_in"),
+                "token_type": (token_data or {}).get("token_type", "bearer"),
+            },
+            user,
+            None,
+        )
 
     @staticmethod
     async def change_password(
-        db: AsyncSession,
-        user: User,
-        old_password: str,
-        new_password: str
+        db: AsyncSession, user: User, old_password: str, new_password: str
     ) -> tuple[bool, Optional[str]]:
         """
         修改密码
@@ -325,13 +326,13 @@ class AuthService:
         import re
 
         # 检查是否只包含数字、小写字母、大写字母
-        if not re.match(r'^[a-zA-Z0-9]+$', password):
+        if not re.match(r"^[a-zA-Z0-9]+$", password):
             return False, "失败，密码不支持特殊符号！"
 
         # 检查是否至少包含两种字符类型
-        has_lower = bool(re.search(r'[a-z]', password))
-        has_upper = bool(re.search(r'[A-Z]', password))
-        has_digit = bool(re.search(r'[0-9]', password))
+        has_lower = bool(re.search(r"[a-z]", password))
+        has_upper = bool(re.search(r"[A-Z]", password))
+        has_digit = bool(re.search(r"[0-9]", password))
 
         type_count = sum([has_lower, has_upper, has_digit])
         if type_count < 2:

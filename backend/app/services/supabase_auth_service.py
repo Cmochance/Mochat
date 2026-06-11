@@ -1,6 +1,7 @@
 """
 Supabase Auth 适配层
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
@@ -149,4 +150,3 @@ class SupabaseAuthService:
 
 
 supabase_auth_service = SupabaseAuthService()
-

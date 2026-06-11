@@ -1,17 +1,17 @@
 """
 用户使用量服务 - 管理用户配额、事件统计和管理员查询
 """
+
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from typing import Optional, Dict, Any
 import uuid
+from datetime import UTC, date, datetime
+from typing import Any, Dict, Optional
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db.models import UsageDailyAggregate, UsageEvent, User, UserUsage
-
 
 # 用户等级配额配置
 TIER_LIMITS = {
@@ -225,7 +225,7 @@ class UsageService:
             raise ValueError("user or user_id is required")
 
         safe_amount = max(1, int(amount or 1))
-        event_time = occurred_at or datetime.now(timezone.utc)
+        event_time = occurred_at or datetime.now(UTC)
 
         existing = await db.execute(
             select(UsageEvent).where(

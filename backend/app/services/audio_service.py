@@ -3,13 +3,12 @@
 - 摘要朗读：AI 生成摘要 → edge-tts 转语音
 - 双人播客：AI 生成对话脚本 → edge-tts 多语音合成 → 拼接
 """
-import asyncio
+
 import io
 import logging
-import os
 import re
-import tempfile
-from typing import AsyncGenerator, Dict, List, Optional, Tuple
+from collections.abc import AsyncGenerator
+from typing import Dict, List, Tuple
 
 from .ai_service import ai_service
 
@@ -17,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 # 中文语音列表（edge-tts 支持的高质量中文语音）
 VOICE_PROFILES = {
-    "narrator": "zh-CN-YunxiNeural",       # 旁白：沉稳男声
-    "host_a": "zh-CN-XiaoxiaoNeural",      # 主持人 A：活泼女声
-    "host_b": "zh-CN-YunjianNeural",        # 主持人 B：稳重男声
-    "host_c": "zh-CN-XiaoyiNeural",         # 备选：温和女声
+    "narrator": "zh-CN-YunxiNeural",  # 旁白：沉稳男声
+    "host_a": "zh-CN-XiaoxiaoNeural",  # 主持人 A：活泼女声
+    "host_b": "zh-CN-YunjianNeural",  # 主持人 B：稳重男声
+    "host_c": "zh-CN-XiaoyiNeural",  # 备选：温和女声
 }
 
 # 播客对话脚本生成 Prompt
@@ -86,7 +85,7 @@ async def _generate_podcast_script(content: str) -> List[Tuple[str, str]]:
         line = line.strip()
         if not line:
             continue
-        match = re.match(r'\[([AB])\]\s*(.*)', line)
+        match = re.match(r"\[([AB])\]\s*(.*)", line)
         if match:
             speaker = match.group(1)
             text = match.group(2).strip()

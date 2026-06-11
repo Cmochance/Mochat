@@ -1,10 +1,13 @@
 """
 数据库连接模块 - 管理数据库会话
 """
+
 import logging
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from sqlalchemy import inspect, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
-from sqlalchemy import text, inspect
+
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -13,19 +16,11 @@ logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 7
 
 # 创建异步引擎
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True
-)
+engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, future=True)
 
 # 创建异步会话工厂
 AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
+    engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
 )
 
 # 创建基类
@@ -50,6 +45,7 @@ async def migrate_db(conn):
     数据库迁移 - 检查并添加缺失的列
     用于兼容旧数据库结构
     """
+
     def check_and_migrate(connection):
         inspector = inspect(connection)
         table_names = inspector.get_table_names()
@@ -73,7 +69,7 @@ async def migrate_db(conn):
             logger.info("Migration: Creating index '%s' on %s table...", index_name, table_name)
             connection.execute(text(create_sql))
             logger.info("Migration: Index '%s' created successfully.", index_name)
-        
+
         # users 表历史迁移
         add_column_if_missing(
             "users",
@@ -166,7 +162,7 @@ async def migrate_db(conn):
             "end_offset",
             "ALTER TABLE material_annotations ADD COLUMN end_offset INTEGER",
         )
-    
+
     await conn.run_sync(check_and_migrate)
 
 
@@ -179,23 +175,26 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
         # 更新 schema 版本
-        await conn.execute(text(
-            "CREATE TABLE IF NOT EXISTS schema_version ("
-            "  id INTEGER PRIMARY KEY CHECK (id = 1),"
-            "  version INTEGER NOT NULL,"
-            "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
-            ")"
-        ))
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS schema_version ("
+                "  id INTEGER PRIMARY KEY CHECK (id = 1),"
+                "  version INTEGER NOT NULL,"
+                "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )
+        )
         result = await conn.execute(text("SELECT version FROM schema_version WHERE id = 1"))
         row = result.fetchone()
         if row is None:
-            await conn.execute(text(
-                "INSERT INTO schema_version (id, version) VALUES (1, :ver)"
-            ), {"ver": SCHEMA_VERSION})
+            await conn.execute(
+                text("INSERT INTO schema_version (id, version) VALUES (1, :ver)"), {"ver": SCHEMA_VERSION}
+            )
         elif row[0] < SCHEMA_VERSION:
-            await conn.execute(text(
-                "UPDATE schema_version SET version = :ver, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
-            ), {"ver": SCHEMA_VERSION})
+            await conn.execute(
+                text("UPDATE schema_version SET version = :ver, updated_at = CURRENT_TIMESTAMP WHERE id = 1"),
+                {"ver": SCHEMA_VERSION},
+            )
             logger.info("Schema upgraded: %s → %s", row[0], SCHEMA_VERSION)
         logger.info("Database schema version: %s", SCHEMA_VERSION)
 

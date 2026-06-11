@@ -1,7 +1,7 @@
 # API module
 from fastapi import APIRouter
-from . import auth, chat, user, admin, learn
-from . import knowledge
+
+from . import admin, auth, chat, knowledge, learn, user
 
 # 创建主路由
 api_router = APIRouter()

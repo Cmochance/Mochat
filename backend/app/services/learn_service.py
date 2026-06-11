@@ -6,6 +6,7 @@
 - 可选向量检索（sentence-transformers）
 - AI 摘要 / 学习对话
 """
+
 import io
 import json
 import logging
@@ -23,37 +24,38 @@ logger = logging.getLogger(__name__)
 
 # PDF 常见页眉页脚噪音模式
 _PDF_HEADER_FOOTER_PATTERNS = [
-    r'第\s*\d+\s*页',
-    r'共\s*\d+\s*页',
-    r'Page\s*\d+\s*(of|/)\s*\d+',
-    r'\d{4}[-/]\d{1,2}[-/]\d{1,2}',
-    r'©.*?\d{4}',
-    r'www\.\S+',
-    r'http[s]?://\S+',
+    r"第\s*\d+\s*页",
+    r"共\s*\d+\s*页",
+    r"Page\s*\d+\s*(of|/)\s*\d+",
+    r"\d{4}[-/]\d{1,2}[-/]\d{1,2}",
+    r"©.*?\d{4}",
+    r"www\.\S+",
+    r"http[s]?://\S+",
 ]
-_PDF_NOISE_RE = re.compile('|'.join(_PDF_HEADER_FOOTER_PATTERNS), re.IGNORECASE)
+_PDF_NOISE_RE = re.compile("|".join(_PDF_HEADER_FOOTER_PATTERNS), re.IGNORECASE)
 
 
 def _clean_pdf_text(text: str) -> str:
     """清理 PDF 提取文本中的常见噪音（页眉页脚、页码等）"""
-    lines = text.split('\n')
+    lines = text.split("\n")
     cleaned = []
     for line in lines:
         stripped = line.strip()
         # 跳过纯页码行
-        if re.match(r'^\d{1,4}$', stripped):
+        if re.match(r"^\d{1,4}$", stripped):
             continue
         # 跳过已知噪音模式（且行较短，避免误杀正文）
         if _PDF_NOISE_RE.search(stripped) and len(stripped) < 50:
             continue
         cleaned.append(line)
-    return '\n'.join(cleaned)
+    return "\n".join(cleaned)
 
 
 def _extract_text_from_pdf(data: bytes) -> str:
     """从 PDF 二进制数据中提取文本，附带噪音清理"""
     try:
         from pypdf import PdfReader
+
         reader = PdfReader(io.BytesIO(data))
         pages = []
         for page in reader.pages:
@@ -72,6 +74,7 @@ def _extract_text_from_docx(data: bytes) -> str:
     """从 DOCX 二进制数据中提取文本，保留标题层级结构"""
     try:
         from docx import Document
+
         doc = Document(io.BytesIO(data))
         paragraphs = []
         for p in doc.paragraphs:
@@ -81,7 +84,7 @@ def _extract_text_from_docx(data: bytes) -> str:
             style_name = (p.style.name or "").lower()
             # 检测标题样式并转为 Markdown 标记
             if "heading" in style_name or "标题" in style_name:
-                level_match = re.search(r'(\d)', style_name)
+                level_match = re.search(r"(\d)", style_name)
                 level = int(level_match.group(1)) if level_match else 1
                 paragraphs.append(f"{'#' * level} {text}")
             else:
@@ -120,6 +123,7 @@ def extract_text(filename: str, data: bytes) -> Tuple[str, str]:
 
 # --------------- 文本分块（增强版） ---------------
 
+
 def _split_by_headings(text: str) -> List[Tuple[str, str]]:
     """
     按 Markdown 标题拆分文本，返回 [(heading, body), ...] 列表。
@@ -131,7 +135,7 @@ def _split_by_headings(text: str) -> List[Tuple[str, str]]:
     current_body_lines: List[str] = []
 
     for line in lines:
-        heading_match = re.match(r'^(#{1,6})\s+(.+)', line)
+        heading_match = re.match(r"^(#{1,6})\s+(.+)", line)
         if heading_match:
             # 保存上一段
             body = "\n".join(current_body_lines).strip()
@@ -163,7 +167,7 @@ def chunk_text(text: str, max_chars: int = 1000, overlap_chars: int = 150) -> Li
 
     if len(sections) <= 1:
         # 无有效标题，回退到纯段落分割
-        sections = [("", s) for s in re.split(r'\n{2,}', text.strip()) if s.strip()]
+        sections = [("", s) for s in re.split(r"\n{2,}", text.strip()) if s.strip()]
 
     chunks: List[str] = []
 
@@ -178,7 +182,7 @@ def chunk_text(text: str, max_chars: int = 1000, overlap_chars: int = 150) -> Li
             chunks.append(prefix + body)
         else:
             # 按句子分割超长段落
-            sentences = re.split(r'(?<=[。！？.!?\n])', body)
+            sentences = re.split(r"(?<=[。！？.!?\n])", body)
             current = prefix
             for sent in sentences:
                 if not sent.strip():
@@ -206,9 +210,10 @@ def chunk_text(text: str, max_chars: int = 1000, overlap_chars: int = 150) -> Li
 
 # --------------- 混合检索引擎（BM25 + TF-IDF + 重排） ---------------
 
+
 def _tokenize(text: str) -> List[str]:
     """分词：支持中英文混合，按非字母数字字符拆分，转小写"""
-    return re.findall(r'[\w\u4e00-\u9fff]+', text.lower())
+    return re.findall(r"[\w\u4e00-\u9fff]+", text.lower())
 
 
 def _compute_idf(documents: List[List[str]]) -> Dict[str, float]:
@@ -359,7 +364,12 @@ def retrieve_relevant_chunks(
 
         # 轻量级重排
         final_score = _rerank_score(
-            query_token_set, query, chunk_tokens, chunk.content, bm25, tfidf,
+            query_token_set,
+            query,
+            chunk_tokens,
+            chunk.content,
+            bm25,
+            tfidf,
         )
         scored.append((chunk, final_score))
 
@@ -385,6 +395,7 @@ def _get_vector_model():
     model_name = "all-MiniLM-L6-v2"
     try:
         from sentence_transformers import SentenceTransformer
+
         _vector_model = SentenceTransformer(model_name)
         _vector_model_name = model_name
         logger.info("已加载向量模型: %s", model_name)
@@ -454,6 +465,8 @@ STUDY_CHAT_SYSTEM_PROMPT = """你是一位专业的学习辅导助手。用户�
 ---
 参考资料片段：
 {context}"""
+
+
 async def generate_summary(content: str) -> str:
     """调用 AI 生成学习资料摘要"""
     # 截断过长内容，避免超出上下文窗口
@@ -522,7 +535,8 @@ async def generate_flashcards(content: str) -> List[dict]:
         # 解析 JSON
         # 尝试提取 JSON 数组
         import re as _re
-        match = _re.search(r'\[.*\]', result, _re.DOTALL)
+
+        match = _re.search(r"\[.*\]", result, _re.DOTALL)
         if match:
             cards = json.loads(match.group())
             # 验证格式
@@ -580,7 +594,8 @@ async def generate_quiz(content: str) -> List[dict]:
             system_prompt=prompt,
         )
         import re as _re
-        match = _re.search(r'\[.*\]', result, _re.DOTALL)
+
+        match = _re.search(r"\[.*\]", result, _re.DOTALL)
         if match:
             questions = json.loads(match.group())
             valid = []
@@ -678,7 +693,8 @@ async def generate_learning_map(content: str, map_type: str) -> dict:
 
         # 提取第一个合法的 JSON 对象
         import re as _re
-        match = _re.search(r'\{.*\}', result, _re.DOTALL)
+
+        match = _re.search(r"\{.*\}", result, _re.DOTALL)
         if match:
             map_dict = json.loads(match.group())
 
@@ -745,6 +761,7 @@ ADAPTIVE_QUIZ_SYSTEM_PROMPT = """你是一位资深的教育评估专家。请�
 ]
 """
 
+
 async def generate_evaluation_report(
     material_summary: str,
     quiz_accuracy: float,
@@ -753,10 +770,12 @@ async def generate_evaluation_report(
 ) -> str:
     """生成AI学习诊断评估报告"""
     if wrong_questions:
-        wrong_summary = "\n".join([
-            f"- 题目：{q.question_text}\n  用户回答：{q.user_answer or '未作答'}\n  正确答案：{q.correct_answer}\n  解析：{q.explanation or '无'}"
-            for q in wrong_questions[:10]
-        ])
+        wrong_summary = "\n".join(
+            [
+                f"- 题目：{q.question_text}\n  用户回答：{q.user_answer or '未作答'}\n  正确答案：{q.correct_answer}\n  解析：{q.explanation or '无'}"
+                for q in wrong_questions[:10]
+            ]
+        )
     else:
         wrong_summary = "暂无错题记录"
 
@@ -777,6 +796,7 @@ async def generate_evaluation_report(
         logger.error("生成学习评估报告失败: %s", e)
         return "评估报告生成失败，请重试。"
 
+
 async def generate_adaptive_quiz(
     content: str,
     wrong_questions: List[any],  # noqa: F821
@@ -784,10 +804,12 @@ async def generate_adaptive_quiz(
     """生成自适应错题强化训练测验题"""
     truncated = content[:12000] if len(content) > 12000 else content
     if wrong_questions:
-        wrong_context = "\n".join([
-            f"- 题目：{q.question_text}\n  正确答案：{q.correct_answer}\n  解析：{q.explanation or '无'}"
-            for q in wrong_questions[:8]
-        ])
+        wrong_context = "\n".join(
+            [
+                f"- 题目：{q.question_text}\n  正确答案：{q.correct_answer}\n  解析：{q.explanation or '无'}"
+                for q in wrong_questions[:8]
+            ]
+        )
     else:
         wrong_context = "暂无具体错题记录，请围绕资料核心知识点生成基础题目。"
 
@@ -802,7 +824,8 @@ async def generate_adaptive_quiz(
             system_prompt=prompt,
         )
         import re as _re
-        match = _re.search(r'\[.*\]', result, _re.DOTALL)
+
+        match = _re.search(r"\[.*\]", result, _re.DOTALL)
         if match:
             questions = json.loads(match.group())
             valid = []

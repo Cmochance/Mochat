@@ -1,32 +1,36 @@
 """
 数据库模型定义
 """
-from datetime import datetime, date, timezone
+
+from datetime import UTC, date, datetime
+
 from sqlalchemy import (
+    Boolean,
     Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    DateTime,
-    Boolean,
-    ForeignKey,
-    Date,
     UniqueConstraint,
-    Index,
 )
 from sqlalchemy.orm import relationship
+
 from .database import Base
 
 
 def _utcnow() -> datetime:
     """返回当前 UTC 时间（timezone-aware），替代已弃用的 datetime.utcnow()"""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class User(Base):
     """用户模型"""
+
     __tablename__ = "users"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
@@ -39,7 +43,7 @@ class User(Base):
     last_seen_version = Column(String(20), nullable=True)  # 用户已阅读的最新版本号
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
-    
+
     # 关联
     sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
     usage = relationship("UserUsage", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -49,8 +53,9 @@ class User(Base):
 
 class UserUsage(Base):
     """用户使用量追踪模型"""
+
     __tablename__ = "user_usages"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     chat_count = Column(Integer, default=0)  # 今日对话次数
@@ -63,21 +68,22 @@ class UserUsage(Base):
     last_chat_at = Column(DateTime, nullable=True)
     last_image_at = Column(DateTime, nullable=True)
     last_ppt_at = Column(DateTime, nullable=True)
-    
+
     # 关联
     user = relationship("User", back_populates="usage")
 
 
 class ChatSession(Base):
     """对话会话模型"""
+
     __tablename__ = "chat_sessions"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String(200), default="新对话")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
-    
+
     # 关联
     user = relationship("User", back_populates="sessions")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
@@ -85,6 +91,7 @@ class ChatSession(Base):
 
 class UsageEvent(Base):
     """用户使用量事件流水（事实表）"""
+
     __tablename__ = "usage_events"
     __table_args__ = (
         UniqueConstraint("user_id", "action", "request_id", name="uq_usage_events_user_action_request"),
@@ -109,10 +116,9 @@ class UsageEvent(Base):
 
 class UsageDailyAggregate(Base):
     """用户使用量日聚合表"""
+
     __tablename__ = "usage_daily_aggregates"
-    __table_args__ = (
-        Index("idx_usage_daily_user_date", "user_id", "stat_date"),
-    )
+    __table_args__ = (Index("idx_usage_daily_user_date", "user_id", "stat_date"),)
 
     stat_date = Column(Date, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
@@ -126,23 +132,25 @@ class UsageDailyAggregate(Base):
 
 class Message(Base):
     """消息模型"""
+
     __tablename__ = "messages"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
     role = Column(String(20), nullable=False)  # user, assistant
     content = Column(Text, nullable=False)
     thinking = Column(Text, nullable=True)  # AI思考过程
     created_at = Column(DateTime, default=_utcnow)
-    
+
     # 关联
     session = relationship("ChatSession", back_populates="messages")
 
 
 class SystemConfig(Base):
     """系统配置模型"""
+
     __tablename__ = "system_config"
-    
+
     key = Column(String(50), primary_key=True)
     value = Column(Text, nullable=False)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -150,8 +158,9 @@ class SystemConfig(Base):
 
 class RestrictedKeyword(Base):
     """限制词模型"""
+
     __tablename__ = "restricted_keywords"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     keyword = Column(String(100), unique=True, nullable=False, index=True)
     is_active = Column(Boolean, default=True)
@@ -161,8 +170,9 @@ class RestrictedKeyword(Base):
 
 class AllowedModel(Base):
     """允许显示的模型"""
+
     __tablename__ = "allowed_models"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     model_id = Column(String(200), unique=True, nullable=False, index=True)  # 模型ID
     display_name = Column(String(200), nullable=True)  # 自定义显示名称（可选）
@@ -174,6 +184,7 @@ class AllowedModel(Base):
 
 class VerificationCode(Base):
     """验证码持久化表"""
+
     __tablename__ = "verification_codes"
     __table_args__ = (
         UniqueConstraint("email", "purpose", name="uq_verification_codes_email_purpose"),
@@ -192,6 +203,7 @@ class VerificationCode(Base):
 
 class VerificationIPLimit(Base):
     """验证码IP限流持久化表"""
+
     __tablename__ = "verification_ip_limits"
 
     ip = Column(String(64), primary_key=True)
@@ -204,21 +216,23 @@ class VerificationIPLimit(Base):
 
 class LearningMaterial(Base):
     """学习资料模型"""
+
     __tablename__ = "learning_materials"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title = Column(String(300), nullable=False)
     file_type = Column(String(20), nullable=False)  # pdf/txt/md/docx/text
-    file_path = Column(String(500), nullable=True)   # 上传文件存储路径（纯文本粘贴为 None）
-    raw_text = Column(Text, nullable=False)           # 提取的纯文本
-    summary = Column(Text, nullable=True)             # AI 生成的摘要
+    file_path = Column(String(500), nullable=True)  # 上传文件存储路径（纯文本粘贴为 None）
+    raw_text = Column(Text, nullable=False)  # 提取的纯文本
+    summary = Column(Text, nullable=True)  # AI 生成的摘要
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class StudySession(Base):
     """学习会话模型"""
+
     __tablename__ = "study_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -231,19 +245,21 @@ class StudySession(Base):
 
 class StudyMessage(Base):
     """学习对话消息模型"""
+
     __tablename__ = "study_messages"
 
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("study_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(20), nullable=False)  # user / assistant
     content = Column(Text, nullable=False)
-    thinking = Column(Text, nullable=True)      # AI 思考过程
+    thinking = Column(Text, nullable=True)  # AI 思考过程
     cited_chunks = Column(Text, nullable=True)  # JSON: 引用的资料片段索引列表
     created_at = Column(DateTime, default=_utcnow)
 
 
 class MaterialChunk(Base):
     """资料文本分块模型（用于检索）"""
+
     __tablename__ = "material_chunks"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -254,30 +270,32 @@ class MaterialChunk(Base):
 
 class Flashcard(Base):
     """闪卡模型"""
+
     __tablename__ = "flashcards"
 
     id = Column(Integer, primary_key=True, index=True)
     material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
-    front = Column(Text, nullable=False)        # 正面（问题/概念）
-    back = Column(Text, nullable=False)         # 背面（答案/解释）
+    front = Column(Text, nullable=False)  # 正面（问题/概念）
+    back = Column(Text, nullable=False)  # 背面（答案/解释）
     status = Column(String(20), default="new")  # new / learning / mastered
-    review_count = Column(Integer, default=0)   # 复习次数
-    box_number = Column(Integer, default=1)     # Leitner 盒子号（1-5）
-    interval = Column(Integer, default=1)       # 下一次复习的时间间隔（天）
-    next_review_at = Column(DateTime, default=_utcnow) # 下一次复习的到期时间
+    review_count = Column(Integer, default=0)  # 复习次数
+    box_number = Column(Integer, default=1)  # Leitner 盒子号（1-5）
+    interval = Column(Integer, default=1)  # 下一次复习的时间间隔（天）
+    next_review_at = Column(DateTime, default=_utcnow)  # 下一次复习的到期时间
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class StudyQuiz(Base):
     """学习测验历史"""
+
     __tablename__ = "study_quizzes"
 
     id = Column(Integer, primary_key=True, index=True)
     material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    score = Column(Integer, nullable=True)        # 答对题数
-    total_questions = Column(Integer, nullable=False) # 总题数
+    score = Column(Integer, nullable=True)  # 答对题数
+    total_questions = Column(Integer, nullable=False)  # 总题数
     is_completed = Column(Boolean, default=False)  # 是否已完成提交
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -285,33 +303,36 @@ class StudyQuiz(Base):
 
 class QuizQuestion(Base):
     """测验题目记录"""
+
     __tablename__ = "quiz_questions"
 
     id = Column(Integer, primary_key=True, index=True)
     quiz_id = Column(Integer, ForeignKey("study_quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
     question_type = Column(String(20), nullable=False)  # single / boolean
-    question_text = Column(Text, nullable=False)        # 题干
-    options = Column(Text, nullable=True)               # JSON 格式选项（单选题有，判断题为 None）
-    correct_answer = Column(Text, nullable=False)       # 正确选项/答案
-    explanation = Column(Text, nullable=True)           # 解析内容
-    user_answer = Column(Text, nullable=True)          # 用户选择的答案
-    is_correct = Column(Boolean, nullable=True)         # 是否答对
+    question_text = Column(Text, nullable=False)  # 题干
+    options = Column(Text, nullable=True)  # JSON 格式选项（单选题有，判断题为 None）
+    correct_answer = Column(Text, nullable=False)  # 正确选项/答案
+    explanation = Column(Text, nullable=True)  # 解析内容
+    user_answer = Column(Text, nullable=True)  # 用户选择的答案
+    is_correct = Column(Boolean, nullable=True)  # 是否答对
 
 
 class LearningMap(Base):
     """知识导图与概念关系图谱"""
+
     __tablename__ = "learning_maps"
 
     id = Column(Integer, primary_key=True, index=True)
     material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
     map_type = Column(String(20), nullable=False)  # mindmap / concept_graph
-    map_data = Column(Text, nullable=False)        # 存储大纲树/节点关系的 JSON 字符串
+    map_data = Column(Text, nullable=False)  # 存储大纲树/节点关系的 JSON 字符串
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class MaterialAnnotation(Base):
     """文献研读划词高亮与批注"""
+
     __tablename__ = "material_annotations"
 
     id = Column(Integer, primary_key=True, index=True)

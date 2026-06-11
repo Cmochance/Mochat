@@ -1,4 +1,5 @@
 import io
+
 """
 学习模块 API 路由
 """
@@ -40,8 +41,8 @@ from ..schemas.learn import (
     WrongQuestionsListResponse,
 )
 from ..services.audio_service import (
-    generate_summary_audio,
     generate_podcast_audio,
+    generate_summary_audio,
 )
 from ..services.learn_service import (
     chunk_text,
@@ -465,13 +466,15 @@ async def create_quiz_for_material(
     db_questions = []
     for q in ai_questions:
         opts_json = json.dumps(q.get("options")) if q.get("options") else None
-        db_questions.append({
-            "question_type": q["question_type"],
-            "question_text": q["question_text"],
-            "options": opts_json,
-            "correct_answer": q["correct_answer"],
-            "explanation": q.get("explanation"),
-        })
+        db_questions.append(
+            {
+                "question_type": q["question_type"],
+                "question_text": q["question_text"],
+                "options": opts_json,
+                "correct_answer": q["correct_answer"],
+                "explanation": q.get("explanation"),
+            }
+        )
 
     await crud.create_quiz_questions(db, quiz.id, db_questions)
     await db.commit()
@@ -479,6 +482,7 @@ async def create_quiz_for_material(
 
 
 # ============ 划词高亮与批注 (Annotations) ============
+
 
 @router.post("/materials/{material_id}/annotations", response_model=AnnotationResponse)
 async def add_material_annotation(
@@ -576,10 +580,7 @@ async def get_quiz_detail(
             q_data["explanation"] = q.explanation
         result_questions.append(q_data)
 
-    return {
-        "quiz": quiz,
-        "questions": result_questions
-    }
+    return {"quiz": quiz, "questions": result_questions}
 
 
 @router.post("/quizzes/{quiz_id}/submit")
@@ -607,7 +608,7 @@ async def submit_quiz(
 
         user_ans = ans.user_answer.strip()
         correct_ans = q.correct_answer.strip()
-        is_correct = (user_ans == correct_ans)
+        is_correct = user_ans == correct_ans
 
         if is_correct:
             correct_count += 1
@@ -641,7 +642,7 @@ async def submit_quiz(
                 "explanation": q.explanation,
             }
             for q in questions
-        ]
+        ],
     }
 
 
@@ -703,6 +704,7 @@ async def get_material_map(
 
 # ============ 错题本与学习诊断评估 (Evaluation & Wrong Questions) ============
 
+
 @router.get("/materials/{material_id}/wrong-questions", response_model=WrongQuestionsListResponse)
 async def get_wrong_questions_for_material(
     material_id: int,
@@ -748,7 +750,7 @@ async def get_evaluation_for_material(
         flashcards_by_box[box - 1] += 1
 
     # 4. 生成 AI 诊断报告
-    flashcard_progress_str = ", ".join([f"第{i+1}盒: {count}张" for i, count in enumerate(flashcards_by_box)])
+    flashcard_progress_str = ", ".join([f"第{i + 1}盒: {count}张" for i, count in enumerate(flashcards_by_box)])
     material_summary = material.summary or material.raw_text[:2000]
 
     ai_diagnostic = await generate_evaluation_report(
@@ -794,19 +796,23 @@ async def create_adaptive_quiz(
     db_questions = []
     for q in ai_questions:
         opts_json = json.dumps(q.get("options")) if q.get("options") else None
-        db_questions.append({
-            "question_type": q["question_type"],
-            "question_text": q["question_text"],
-            "options": opts_json,
-            "correct_answer": q["correct_answer"],
-            "explanation": q.get("explanation"),
-        })
+        db_questions.append(
+            {
+                "question_type": q["question_type"],
+                "question_text": q["question_text"],
+                "options": opts_json,
+                "correct_answer": q["correct_answer"],
+                "explanation": q.get("explanation"),
+            }
+        )
 
     await crud.create_quiz_questions(db, quiz.id, db_questions)
     await db.commit()
     return quiz
 
+
 # ============ 有声书/播客 API ============
+
 
 @router.post("/materials/{material_id}/audio/summary")
 async def generate_audio_summary(
@@ -873,6 +879,7 @@ async def generate_podcast_script(
 
     try:
         from ..services.audio_service import _generate_podcast_script
+
         dialogue = await _generate_podcast_script(material.raw_text)
         return {
             "script": [{"speaker": s, "text": t} for s, t in dialogue],

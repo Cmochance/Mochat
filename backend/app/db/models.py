@@ -296,3 +296,31 @@ class QuizQuestion(Base):
     explanation = Column(Text, nullable=True)           # 解析内容
     user_answer = Column(Text, nullable=True)          # 用户选择的答案
     is_correct = Column(Boolean, nullable=True)         # 是否答对
+
+
+class LearningMap(Base):
+    """知识导图与概念关系图谱"""
+    __tablename__ = "learning_maps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    map_type = Column(String(20), nullable=False)  # mindmap / concept_graph
+    map_data = Column(Text, nullable=False)        # 存储大纲树/节点关系的 JSON 字符串
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class MaterialAnnotation(Base):
+    """文献研读划词高亮与批注"""
+    __tablename__ = "material_annotations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    material_id = Column(Integer, ForeignKey("learning_materials.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    selected_text = Column(Text, nullable=False)
+    note = Column(Text, nullable=True)
+    color = Column(String(20), default="yellow")  # yellow, green, blue, pink
+    start_offset = Column(Integer, nullable=True)
+    end_offset = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)

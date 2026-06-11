@@ -13,7 +13,6 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useLearnStore } from '../../../stores/learnStore'
 import { learnService } from '../../../services/learnService'
-import type { Flashcard } from '../../../types'
 
 interface FlashcardViewProps {
   materialId: number
@@ -124,12 +123,6 @@ export default function FlashcardView({ materialId }: FlashcardViewProps) {
     }
   }
 
-  // 统计
-  const stats = {
-    new: flashcards.filter((c) => c.status === 'new').length,
-    learning: flashcards.filter((c) => c.status === 'learning').length,
-    mastered: flashcards.filter((c) => c.status === 'mastered').length,
-  }
 
   const variants = {
     enter: (d: number) => ({ x: d > 0 ? 200 : -200, opacity: 0 }),

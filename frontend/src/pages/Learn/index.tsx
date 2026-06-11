@@ -8,10 +8,14 @@ import { useAuthStore } from '../../stores/authStore'
 import { learnService } from '../../services/learnService'
 import MaterialUpload from './components/MaterialUpload'
 import MaterialList from './components/MaterialList'
-import { MessageSquare, Layers, HelpCircle } from 'lucide-react'
+import { MessageSquare, Layers, HelpCircle, Network, Award, Headphones } from 'lucide-react'
 import StudyChat from './components/StudyChat'
 import FlashcardView from './components/FlashcardView'
 import QuizView from './components/QuizView'
+import MapView from './components/MapView'
+import AudioView from './components/AudioView'
+import EvaluationView from './components/EvaluationView'
+import ReaderView from './components/ReaderView'
 import SummaryPanel from './components/SummaryPanel'
 import Button from '../../components/common/Button'
 import Modal from '../../components/common/Modal'
@@ -25,7 +29,6 @@ export default function Learn() {
   const {
     materials,
     currentMaterial,
-    sessions,
     currentSession,
     messages,
     isLoading,
@@ -39,7 +42,6 @@ export default function Learn() {
     updateMaterialSummary,
     setSessions,
     addSession,
-    removeSession,
     setCurrentSession,
     setMessages,
     addMessage,
@@ -55,7 +57,7 @@ export default function Learn() {
   const [showUpload, setShowUpload] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [summaryPanelOpen, setSummaryPanelOpen] = useState(true)
-  const [activeTab, setActiveTab] = useState<'chat' | 'flashcards' | 'quiz'>('chat')
+  const [activeTab, setActiveTab] = useState<'read' | 'chat' | 'flashcards' | 'quiz' | 'map' | 'evaluation' | 'audio'>('read')
   const [isUploading, setIsUploading] = useState(false)
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
@@ -75,9 +77,18 @@ export default function Learn() {
 
   // 选择资料后加载会话
   const handleSelectMaterial = useCallback(async (material: LearningMaterial) => {
-    setCurrentMaterial(material)
+    try {
+      const detail = await learnService.getMaterial(material.id)
+      setCurrentMaterial(detail)
+    } catch {
+      setCurrentMaterial({
+        ...material,
+        raw_text: '',
+      })
+    }
     setCurrentSession(null)
     setMessages([])
+    setActiveTab('read')
     try {
       const res = await learnService.getSessions(material.id)
       setSessions(res.sessions)
@@ -188,6 +199,7 @@ export default function Learn() {
         currentSession.id,
         content,
         undefined,
+        undefined,
         (chunk) => {
           if (chunk.type === 'thinking') {
             appendStreamingThinking(chunk.data)
@@ -208,6 +220,66 @@ export default function Learn() {
       setLoading(false)
     }
   }, [currentSession, addMessage, setLoading, setStreaming, clearStreaming, appendStreamingThinking, appendStreamingContent, finalizeStreaming, endStreaming])
+
+  // 划词解释
+  const handleExplainInChat = useCallback(async (text: string) => {
+    if (!currentMaterial) return
+
+    let activeSession = currentSession
+    if (!activeSession) {
+      try {
+        activeSession = await learnService.createSession(currentMaterial.id)
+        addSession(activeSession)
+        setCurrentSession(activeSession)
+        setMessages([])
+      } catch (err) {
+        console.error('Failed to create session', err)
+        return
+      }
+    }
+
+    setActiveTab('chat')
+    const prompt = t('learn.annotation.explainPrompt', '请帮我解释选中的文本内容：\n\n> {{text}}', { text })
+
+    const userMsg = {
+      id: Date.now(),
+      role: 'user' as const,
+      content: prompt,
+      created_at: new Date().toISOString(),
+    }
+    addMessage(userMsg)
+    setLoading(true)
+    setStreaming(true)
+    clearStreaming()
+
+    abortRef.current = new AbortController()
+
+    try {
+      await learnService.sendMessageStream(
+        activeSession.id,
+        prompt,
+        undefined,
+        text,
+        (chunk) => {
+          if (chunk.type === 'thinking') {
+            appendStreamingThinking(chunk.data)
+          } else if (chunk.type === 'content') {
+            appendStreamingContent(chunk.data)
+          } else if (chunk.type === 'done') {
+            const state = useLearnStore.getState()
+            finalizeStreaming(state.streamingThinking, state.streamingContent)
+          }
+        },
+        abortRef.current.signal,
+      )
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        endStreaming()
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [currentMaterial, currentSession, addSession, setCurrentSession, setMessages, setActiveTab, addMessage, setLoading, setStreaming, clearStreaming, appendStreamingThinking, appendStreamingContent, finalizeStreaming, endStreaming])
 
   return (
     <div className="h-screen flex flex-col bg-paper-cream">
@@ -295,6 +367,17 @@ export default function Learn() {
               {/* Tab 切换 */}
               <div className="flex border-b border-paper-aged bg-paper-white">
                 <button
+                  onClick={() => setActiveTab('read')}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
+                    activeTab === 'read'
+                      ? 'border-ink-black text-ink-black'
+                      : 'border-transparent text-ink-faint hover:text-ink-medium'
+                  }`}
+                >
+                  <BookOpen size={14} />
+                  {t('learn.tabs.read')}
+                </button>
+                <button
                   onClick={() => setActiveTab('chat')}
                   className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
                     activeTab === 'chat'
@@ -327,9 +410,48 @@ export default function Learn() {
                   <HelpCircle size={14} />
                   {t('learn.tabs.quiz')}
                 </button>
+               <button
+                 onClick={() => setActiveTab('map')}
+                 className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
+                   activeTab === 'map'
+                     ? 'border-ink-black text-ink-black'
+                     : 'border-transparent text-ink-faint hover:text-ink-medium'
+                 }`}
+               >
+                 <Network size={14} />
+                 {t('learn.tabs.map')}
+               </button>
+              <button
+                onClick={() => setActiveTab('evaluation')}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm border-b-2 transition-colors ${
+                  activeTab === 'evaluation'
+                    ? 'border-ink-black text-ink-black'
+                    : 'border-transparent text-ink-faint hover:text-ink-medium'
+                }`}
+              >
+                <Award size={14} />
+                {t('learn.tabs.evaluation')}
+              </button>
+              <button
+                   onClick={() => setActiveTab('audio')}
+                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-sm transition-colors ${
+                     activeTab === 'audio'
+                       ? 'bg-ink-black text-paper-white'
+                       : 'text-ink-medium hover:text-ink-black hover:bg-paper-aged'
+                   }`}
+                 >
+                   <Headphones size={14} />
+                   {t('learn.tabs.audio')}
+                 </button>
               </div>
               {/* 内容区 */}
-              {activeTab === 'chat' ? (
+              {activeTab === 'read' ? (
+                <ReaderView
+                  materialId={currentMaterial.id}
+                  rawText={currentMaterial.raw_text}
+                  onExplainInChat={handleExplainInChat}
+                />
+              ) : activeTab === 'chat' ? (
                 <StudyChat
                   messages={messages}
                   isStreaming={isStreaming}
@@ -340,9 +462,21 @@ export default function Learn() {
                 />
               ) : activeTab === 'flashcards' ? (
                 <FlashcardView materialId={currentMaterial.id} />
-              ) : (
-                <QuizView materialId={currentMaterial.id} />
-              )}
+             ) : activeTab === 'quiz' ? (
+               <QuizView materialId={currentMaterial.id} />
+            ) : activeTab === 'map' ? (
+              <MapView
+                  materialId={currentMaterial.id}
+                  onAskAboutConcept={(_concept) => {
+                    setActiveTab('chat')
+                  }}
+                  onViewFlashcards={() => setActiveTab('flashcards')}
+                />
+            ) : activeTab === 'audio' ? (
+              <AudioView materialId={currentMaterial.id} />
+            ) : (
+              <EvaluationView materialId={currentMaterial.id} onSwitchToTab={setActiveTab} />
+            )}
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-ink-faint">

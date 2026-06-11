@@ -100,14 +100,14 @@ async def download_image_as_base64(url: str) -> Optional[dict]:
         image_data = response.content
         base64_data = base64.b64encode(image_data).decode("utf-8")
         
-        print(f"[Vision] 图片下载成功: {len(image_data)} bytes, type={content_type}")
+        logger.info(f"[Vision] 图片下载成功: {len(image_data)} bytes, type={content_type}")
         
         return {
             "base64": base64_data,
             "media_type": content_type
         }
     except Exception as e:
-        print(f"[Vision] 图片下载失败: {url}, 错误: {e}")
+        logger.error(f"[Vision] 图片下载失败: {url}, 错误: {e}")
         return None
 
 
@@ -161,7 +161,7 @@ async def parse_content_for_vision(content: str) -> Union[str, list]:
     if not image_urls:
         return content  # 无图片，保持原格式
     
-    print(f"[Vision] 检测到 {len(image_urls)} 张图片，准备下载并转换为 Base64")
+    logger.info(f"[Vision] 检测到 {len(image_urls)} 张图片，准备下载并转换为 Base64")
     
     # 移除图片相关内容后的纯文本
     text_content = content
@@ -210,10 +210,10 @@ async def parse_content_for_vision(content: str) -> Union[str, list]:
                     }
                 }
                 parts.append(image_part)
-                print(f"[Vision] 图片已转换为 Base64: {validated_url[:50]}... ({len(image_data['base64'])} chars)")
+                logger.info(f"[Vision] 图片已转换为 Base64: {validated_url[:50]}... ({len(image_data['base64'])} chars)")
             else:
                 # 下载失败，尝试使用原始 URL（可能某些 API 支持）
-                print(f"[Vision] 图片下载失败，使用原始 URL: {validated_url}")
+                logger.warning(f"[Vision] 图片下载失败，使用原始 URL: {validated_url}")
                 image_part = {
                     "type": "image_url",
                     "image_url": {
@@ -230,7 +230,7 @@ async def parse_content_for_vision(content: str) -> Union[str, list]:
     if len(parts) == 1 and parts[0]["type"] == "text":
         return content
     
-    print(f"[Vision] 构建多模态消息完成，共 {len(parts)} 个部分")
+    logger.info(f"[Vision] 构建多模态消息完成，共 {len(parts)} 个部分")
     return parts
 
 
@@ -354,12 +354,12 @@ class AIService:
         chat_messages.extend(converted_messages)
         
         # 调试日志：打印最终发送的消息结构
-        print(f"[Vision] 准备发送 {len(chat_messages)} 条消息到 AI")
+        logger.debug(f"[Vision] 准备发送 {len(chat_messages)} 条消息到 AI")
         for i, msg in enumerate(chat_messages):
             content = msg.get("content")
             role = msg.get("role")
             if isinstance(content, list):
-                print(f"[Vision] 消息 {i} ({role}) 是多模态格式，包含 {len(content)} 个部分")
+                logger.debug(f"[Vision] 消息 {i} ({role}) 是多模态格式，包含 {len(content)} 个部分")
                 for j, part in enumerate(content):
                     part_type = part.get("type")
                     if part_type == "image_url":
@@ -367,15 +367,15 @@ class AIService:
                         url_type = type(img_url).__name__
                         # 检查是否是 Base64 格式
                         if img_url.startswith("data:"):
-                            print(f"  [Part {j}] type=image_url, format=BASE64, size={len(img_url)} chars")
+                            logger.debug(f"  [Part {j}] type=image_url, format=BASE64, size={len(img_url)} chars")
                         else:
-                            print(f"  [Part {j}] type=image_url, format=URL, url={img_url[:80]}...")
+                            logger.debug(f"  [Part {j}] type=image_url, format=URL, url={img_url[:80]}...")
                     elif part_type == "text":
                         text = part.get("text", "")
-                        print(f"  [Part {j}] type=text, text={text[:50]}...")
+                        logger.debug(f"  [Part {j}] type=text, text={text[:50]}...")
             else:
                 content_preview = str(content)[:100] if content else "empty"
-                print(f"[Vision] 消息 {i} ({role}) 是纯文本: {content_preview}...")
+                logger.debug(f"[Vision] 消息 {i} ({role}) 是纯文本: {content_preview}...")
         
         # 确定使用的模型
         use_model = model or self.default_model
@@ -407,7 +407,7 @@ class AIService:
                 
                 # 调试日志：确认收到流式数据
                 chunk_index += 1
-                print(f"[Stream] Chunk #{chunk_index}: {len(delta.content)} chars")
+                logger.debug(f"[Stream] Chunk #{chunk_index}: {len(delta.content)} chars")
                 
                 # 合并之前缓冲的可能不完整的标签
                 text = tag_buffer + delta.content
@@ -524,7 +524,8 @@ class AIService:
                 temperature=0.7
             )
             return response.choices[0].message.content.strip()[:50]
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[AI] 生成对话标题失败: {e}")
             return first_message[:20] + "..." if len(first_message) > 20 else first_message
 
 

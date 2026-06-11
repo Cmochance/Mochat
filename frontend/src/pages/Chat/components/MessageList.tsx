@@ -43,6 +43,7 @@ export default function MessageList({
   const topRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef(0)
   const hasInitializedRef = useRef(false)  // 防止重复初始化
+  const isAtBottomRef = useRef(true)  // 追踪用户是否处于页面底部
 
   // 保存滚动位置
   const saveScrollPosition = useCallback(() => {
@@ -85,7 +86,29 @@ export default function MessageList({
     hasInitializedRef.current = false
   }, [sessionId])
 
-  // 注意：新消息、流式输出、加载历史消息都不自动滚动，保持当前位置
+  // 交互逻辑：
+  // 1. 当用户自己发送新消息时，强制平滑滚动到底部
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.role === 'user') {
+        requestAnimationFrame(() => {
+          containerRef.current?.scrollTo({
+            top: containerRef.current.scrollHeight,
+            behavior: 'smooth'
+          })
+          isAtBottomRef.current = true
+        })
+      }
+    }
+  }, [messages.length])
+
+  // 2. 当 AI 正在流式输出并且用户在底部时，跟随自动滚动
+  useEffect(() => {
+    if (isStreaming && isAtBottomRef.current && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight
+    }
+  }, [isStreaming, streamingContent, streamingThinking])
 
   // 监听滚动事件保存位置 & 检测滚动到顶部加载更多
   useEffect(() => {
@@ -95,6 +118,10 @@ export default function MessageList({
     const handleScroll = () => {
       // 保存滚动位置
       saveScrollPosition()
+      
+      // 判断用户是否接近底部 (阈值定为 120px)
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120
+      isAtBottomRef.current = isAtBottom
       
       // 检测是否滚动到顶部附近（距离顶部 50px 内）
       if (container.scrollTop < 50 && hasMore && !loadingMore && onLoadMore) {

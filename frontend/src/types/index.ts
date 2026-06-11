@@ -235,4 +235,55 @@ export interface RestrictedKeyword {
   created_at: string
 }
 
+export interface LearningMap {
+  id: number
+  material_id: number
+  map_type: 'mindmap' | 'concept_graph'
+  map_data: string
+  created_at: string
+}
+
+export interface MindmapNode {
+  topic: string
+  children: MindmapNode[]
+}
+
+export interface GraphNode {
+  id: string
+  label: string
+  type: string
+  desc: string
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  label: string
+}
+
+export interface ConceptGraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export interface EvaluationReport {
+  quizzes_count: number
+  average_accuracy: number
+  wrong_questions_count: number
+  flashcards_total: number
+  flashcards_by_box: number[]
+  ai_diagnostic: string
+}
+
+export interface MaterialAnnotation {
+  id: number
+  material_id: number
+  selected_text: string
+  note: string | null
+  color: string
+  start_offset?: number | null
+  end_offset?: number | null
+  created_at: string
+}
+
 // 版本相关类型已移至 modules/upgrade/frontend/types.ts

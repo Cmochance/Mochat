@@ -5,6 +5,10 @@ import type {
   StudySession,
   StudyMessage,
   Flashcard,
+  StudyQuiz,
+  QuizQuestion,
+  EvaluationReport,
+  MaterialAnnotation,
 } from '../types'
 import { getApiBaseUrl } from '../utils/env'
 
@@ -83,7 +87,8 @@ async function getMessages(sessionId: number): Promise<{ messages: StudyMessage[
 async function sendMessageStream(
   sessionId: number,
   content: string,
-  model?: string,
+  model: string | undefined,
+  highlightContext: string | undefined,
   onChunk: (chunk: { type: string; data: string }) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -94,7 +99,7 @@ async function sendMessageStream(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ content, model }),
+    body: JSON.stringify({ content, model, highlight_context: highlightContext }),
     signal,
   })
 
@@ -174,6 +179,83 @@ async function submitQuiz(quizId: number, answers: { question_id: number; user_a
   return res.data
 }
 
+async function generateMap(materialId: number, mapType: 'mindmap' | 'concept_graph'): Promise<any> {
+  const res = await api.post(`/learn/materials/${materialId}/maps`, null, { params: { map_type: mapType } })
+  return res.data
+}
+
+async function getMap(materialId: number, mapType: 'mindmap' | 'concept_graph'): Promise<any> {
+  const res = await api.get(`/learn/materials/${materialId}/maps`, { params: { map_type: mapType } })
+  return res.data
+}
+
+async function getWrongQuestions(materialId: number): Promise<{ wrong_questions: QuizQuestion[] }> {
+  const res = await api.get(`/learn/materials/${materialId}/wrong-questions`)
+  return res.data
+}
+
+async function getEvaluationReport(materialId: number): Promise<EvaluationReport> {
+  const res = await api.get(`/learn/materials/${materialId}/evaluation`)
+  return res.data
+}
+
+async function generateAdaptiveQuiz(materialId: number): Promise<StudyQuiz> {
+  const res = await api.post(`/learn/materials/${materialId}/adaptive-quiz`)
+  return res.data
+}
+
+async function getAnnotations(materialId: number): Promise<{ annotations: MaterialAnnotation[] }> {
+  const res = await api.get(`/learn/materials/${materialId}/annotations`)
+  return res.data
+}
+
+async function createAnnotation(
+  materialId: number,
+  selectedText: string,
+  note?: string,
+  color?: string,
+  startOffset?: number | null,
+  endOffset?: number | null,
+): Promise<MaterialAnnotation> {
+  const res = await api.post(`/learn/materials/${materialId}/annotations`, {
+    selected_text: selectedText,
+    note,
+    color,
+    start_offset: startOffset,
+    end_offset: endOffset,
+  })
+  return res.data
+}
+
+async function deleteAnnotation(annotationId: number): Promise<{ success: boolean }> {
+  const res = await api.delete(`/learn/annotations/${annotationId}`)
+  return res.data
+}
+
+
+// ---- 有声书/播客 ----
+
+async function generateSummaryAudio(materialId: number): Promise<Blob> {
+  const res = await api.post(`/learn/materials/${materialId}/audio/summary`, {}, {
+    responseType: 'blob',
+    timeout: 120000,
+  })
+  return res.data
+}
+
+async function generatePodcastAudio(materialId: number): Promise<Blob> {
+  const res = await api.post(`/learn/materials/${materialId}/audio/podcast`, {}, {
+    responseType: 'blob',
+    timeout: 180000,
+  })
+  return res.data
+}
+
+async function generatePodcastScript(materialId: number): Promise<{ script: { speaker: string; text: string }[] }> {
+  const res = await api.post(`/learn/materials/${materialId}/audio/podcast/script`)
+  return res.data
+}
+
 export const learnService = {
   uploadMaterial,
   createTextMaterial,
@@ -193,4 +275,15 @@ export const learnService = {
   getQuizzes,
   getQuizDetail,
   submitQuiz,
+  generateMap,
+  getMap,
+  getWrongQuestions,
+  getEvaluationReport,
+  generateAdaptiveQuiz,
+  getAnnotations,
+  createAnnotation,
+  deleteAnnotation,
+  generateSummaryAudio,
+  generatePodcastAudio,
+  generatePodcastScript,
 }

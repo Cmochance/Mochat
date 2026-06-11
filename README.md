@@ -7,6 +7,9 @@
 - 🖌️ **水墨风格UI** - 传统中国美学设计
 - 💬 **流式对话** - 实时流式输出AI回复
 - 🧠 **思考展示** - Thinking内容独立显示，默认折叠
+- 📚 **智能学习伴侣** - 文献研读、闪卡记忆、自适应测验、知识导图
+- 🔍 **混合检索引擎** - BM25 + TF-IDF + 轻量级重排，精准定位知识片段
+- 🖼️ **多模态输入** - 支持图片对话和文档问答
 - 🔐 **用户系统** - 完整的登录注册功能
 - 📊 **后台管理** - 用户管理和系统配置
 
@@ -63,6 +66,10 @@ cd backend
 python -m venv venv
 venv\Scripts\activate  # Windows
 pip install -r requirements.txt
+
+# 可选：安装向量检索增强依赖（需要 PyTorch，约 2GB）
+# pip install -r requirements-enhanced.txt
+
 python -m uvicorn app.main:app --reload --port 9527
 ```
 

@@ -12,7 +12,7 @@ async def test_sse():
     from app.main import app
     from app.db.database import AsyncSessionLocal
     from app.db import crud
-    from app.services.auth_service import AuthService
+    from app.core.security import create_access_token
     
     # 创建测试用户并获取 token
     async with AsyncSessionLocal() as db:
@@ -23,7 +23,7 @@ async def test_sse():
             return
         
         user = users[0]
-        token = AuthService.create_access_token(data={"sub": user.username})
+        token = create_access_token(data={"sub": str(user.id), "username": user.username, "role": user.role})
         print(f"使用用户: {user.username}")
         
         # 获取会话

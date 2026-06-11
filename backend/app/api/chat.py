@@ -335,7 +335,9 @@ async def generate_image_stream(
         started_at = datetime.now(timezone.utc)
 
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            # 限制连接超时为 5 秒，读取超时为 300 秒
+            timeout_cfg = httpx.Timeout(300.0, connect=5.0)
+            async with httpx.AsyncClient(timeout=timeout_cfg) as client:
                 async with client.stream(
                     "POST",
                     f"{settings.PICGEN_INTERNAL_URL}/api/generate/stream",
@@ -378,6 +380,11 @@ async def generate_image_stream(
             stream_success = False
             error_code = "image_stream_cancelled"
             raise
+        except httpx.RequestError as exc:
+            stream_success = False
+            error_code = "image_gateway_connection_error"
+            yield _sse({"type": "error", "data": "无法连接到图像生成微服务，请确保微服务已启动并正常运行"})
+            yield _sse({"type": "done", "data": ""})
         except Exception as exc:
             stream_success = False
             error_code = "image_gateway_exception"
@@ -441,7 +448,8 @@ async def generate_image(
     error_code = None
     response_data = {}
     try:
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        timeout_cfg = httpx.Timeout(300.0, connect=5.0)
+        async with httpx.AsyncClient(timeout=timeout_cfg) as client:
             upstream = await client.post(
                 f"{settings.PICGEN_INTERNAL_URL}/api/generate",
                 headers={"X-Request-ID": request_id},
@@ -463,6 +471,9 @@ async def generate_image(
         return response_data
     except HTTPException:
         raise
+    except httpx.RequestError as exc:
+        error_code = "image_gateway_connection_error"
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="无法连接到图像生成微服务，请确保微服务已启动并正常运行")
     except Exception as exc:
         error_code = "image_gateway_exception"
         raise HTTPException(status_code=500, detail=f"图像网关异常: {str(exc)}")
@@ -499,7 +510,9 @@ async def generate_ppt_stream(
         started_at = datetime.now(timezone.utc)
 
         try:
-            async with httpx.AsyncClient(timeout=360.0) as client:
+            # 限制连接超时为 5 秒，读取超时为 360 秒
+            timeout_cfg = httpx.Timeout(360.0, connect=5.0)
+            async with httpx.AsyncClient(timeout=timeout_cfg) as client:
                 async with client.stream(
                     "POST",
                     f"{settings.PPTGEN_INTERNAL_URL}/api/generate/stream",
@@ -540,6 +553,11 @@ async def generate_ppt_stream(
             stream_success = False
             error_code = "ppt_stream_cancelled"
             raise
+        except httpx.RequestError as exc:
+            stream_success = False
+            error_code = "ppt_gateway_connection_error"
+            yield _sse({"type": "error", "data": "无法连接到 PPT 生成微服务，请确保微服务已启动并正常运行"})
+            yield _sse({"type": "done", "data": ""})
         except Exception as exc:
             stream_success = False
             error_code = "ppt_gateway_exception"
@@ -588,7 +606,8 @@ async def generate_ppt(
     error_code = None
 
     try:
-        async with httpx.AsyncClient(timeout=360.0) as client:
+        timeout_cfg = httpx.Timeout(360.0, connect=5.0)
+        async with httpx.AsyncClient(timeout=timeout_cfg) as client:
             upstream = await client.post(
                 f"{settings.PPTGEN_INTERNAL_URL}/api/generate",
                 headers={"X-Request-ID": request_id},
@@ -608,6 +627,9 @@ async def generate_ppt(
         return response_data
     except HTTPException:
         raise
+    except httpx.RequestError as exc:
+        error_code = "ppt_gateway_connection_error"
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="无法连接到 PPT 生成微服务，请确保微服务已启动并正常运行")
     except Exception as exc:
         error_code = "ppt_gateway_exception"
         raise HTTPException(status_code=500, detail=f"PPT 网关异常: {str(exc)}")

@@ -1,49 +1,59 @@
+import io
 """
 学习模块 API 路由
 """
-import json
-import os
-import logging
 import asyncio
+import json
+import logging
+import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db.database import get_db
-from ..db import crud
-from ..db.models import User
 from ..core.dependencies import get_current_active_user
-from ..core.config import settings
+from ..db import crud
+from ..db.database import get_db
+from ..db.models import User
 from ..schemas.learn import (
-    MaterialTextCreate,
-    MaterialResponse,
+    AnnotationCreate,
+    AnnotationListResponse,
+    AnnotationResponse,
+    EvaluationReportResponse,
+    FlashcardListResponse,
+    FlashcardResponse,
+    FlashcardStatusUpdate,
+    LearningMapResponse,
     MaterialDetailResponse,
     MaterialListResponse,
-    StudySessionCreate,
-    StudySessionResponse,
-    StudySessionListResponse,
-    StudyMessageCreate,
-    StudyMessageResponse,
-    StudyMessagesResponse,
-    FlashcardResponse,
-    FlashcardListResponse,
-    FlashcardStatusUpdate,
-    StudyQuizResponse,
-    StudyQuizDetailResponse,
+    MaterialResponse,
+    MaterialTextCreate,
     QuizSubmitRequest,
+    StudyMessageCreate,
+    StudyMessagesResponse,
     StudyQuizListResponse,
-    QuizQuestionResponse,
+    StudyQuizResponse,
+    StudySessionCreate,
+    StudySessionListResponse,
+    StudySessionResponse,
+    WrongQuestionsListResponse,
+)
+from ..services.audio_service import (
+    generate_summary_audio,
+    generate_podcast_audio,
 )
 from ..services.learn_service import (
-    extract_text,
     chunk_text,
-    retrieve_relevant_chunks,
-    generate_summary,
-    study_chat_stream,
+    extract_text,
+    generate_adaptive_quiz,
+    generate_evaluation_report,
     generate_flashcards,
+    generate_learning_map,
     generate_quiz,
+    generate_summary,
+    retrieve_relevant_chunks,
+    study_chat_stream,
 )
 
 logger = logging.getLogger(__name__)
@@ -297,6 +307,8 @@ async def send_study_message(
     relevant = retrieve_relevant_chunks(body.content, chunks, top_k=5)
     context_texts = [c.content for c, _score in relevant]
     cited_indices = [c.chunk_index for c, _score in relevant]
+    if body.highlight_context:
+        context_texts = [f"[用户选中的文本片段（重点理解）]: {body.highlight_context}"] + context_texts
 
     # 构建对话历史
     history_msgs = await crud.get_study_messages(db, session_id, limit=20)
@@ -466,6 +478,63 @@ async def create_quiz_for_material(
     return quiz
 
 
+# ============ 划词高亮与批注 (Annotations) ============
+
+@router.post("/materials/{material_id}/annotations", response_model=AnnotationResponse)
+async def add_material_annotation(
+    material_id: int,
+    body: AnnotationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """为学习资料添加划词批注高亮"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    anno = await crud.create_annotation(
+        db,
+        material_id=material_id,
+        user_id=current_user.id,
+        selected_text=body.selected_text,
+        note=body.note,
+        color=body.color or "yellow",
+        start_offset=body.start_offset,
+        end_offset=body.end_offset,
+    )
+    await db.commit()
+    return anno
+
+
+@router.get("/materials/{material_id}/annotations", response_model=AnnotationListResponse)
+async def list_material_annotations(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取学习资料的全部划词批注"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    annos = await crud.get_annotations_by_material(db, material_id, current_user.id)
+    return {"annotations": annos}
+
+
+@router.delete("/annotations/{annotation_id}")
+async def delete_material_annotation(
+    annotation_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """删除划词批注"""
+    success = await crud.delete_annotation(db, annotation_id, current_user.id)
+    if not success:
+        raise HTTPException(status_code=404, detail="批注不存在")
+    await db.commit()
+    return {"success": True}
+
+
 @router.get("/quizzes", response_model=StudyQuizListResponse)
 async def list_quizzes(
     material_id: Optional[int] = None,
@@ -535,14 +604,14 @@ async def submit_quiz(
         q = q_map.get(ans.question_id)
         if not q:
             continue
-        
+
         user_ans = ans.user_answer.strip()
         correct_ans = q.correct_answer.strip()
         is_correct = (user_ans == correct_ans)
-        
+
         if is_correct:
             correct_count += 1
-            
+
         await crud.submit_quiz_answer(db, q.id, user_ans, is_correct)
 
     await crud.complete_study_quiz(db, quiz_id, correct_count)
@@ -574,3 +643,240 @@ async def submit_quiz(
             for q in questions
         ]
     }
+
+
+# ============ 知识导图 / 图谱 (LearningMap) ============
+
+
+@router.post("/materials/{material_id}/maps", response_model=LearningMapResponse)
+async def generate_material_map(
+    material_id: int,
+    map_type: str,  # mindmap / concept_graph
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """为资料生成思维导图或概念关系图谱"""
+    if map_type not in ("mindmap", "concept_graph"):
+        raise HTTPException(status_code=400, detail="不支持的图谱类型")
+
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    # AI 生成
+    map_dict = await generate_learning_map(material.raw_text, map_type)
+    if not map_dict:
+        raise HTTPException(status_code=500, detail="生成失败，请稍后重试")
+
+    # 保存/覆盖数据
+    lmap = await crud.create_learning_map(
+        db=db,
+        material_id=material_id,
+        map_type=map_type,
+        map_data=json.dumps(map_dict, ensure_ascii=False),
+    )
+    await db.commit()
+    return lmap
+
+
+@router.get("/materials/{material_id}/maps", response_model=LearningMapResponse)
+async def get_material_map(
+    material_id: int,
+    map_type: str,  # mindmap / concept_graph
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取资料的思维导图或概念关系图谱"""
+    if map_type not in ("mindmap", "concept_graph"):
+        raise HTTPException(status_code=400, detail="不支持的图谱类型")
+
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    lmap = await crud.get_learning_map_by_type(db, material_id, map_type)
+    if not lmap:
+        raise HTTPException(status_code=404, detail="图谱尚未生成")
+
+    return lmap
+
+
+# ============ 错题本与学习诊断评估 (Evaluation & Wrong Questions) ============
+
+@router.get("/materials/{material_id}/wrong-questions", response_model=WrongQuestionsListResponse)
+async def get_wrong_questions_for_material(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取指定资料下用户的所有错题"""
+    wrong_questions = await crud.get_wrong_questions(db, current_user.id, material_id)
+    return {"wrong_questions": wrong_questions}
+
+
+@router.get("/materials/{material_id}/evaluation", response_model=EvaluationReportResponse)
+async def get_evaluation_for_material(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """获取AI学习诊断评估报告"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    # 1. 测验统计
+    quizzes = await crud.get_user_quizzes(db, current_user.id, material_id)
+    completed_quizzes = [q for q in quizzes if q.is_completed]
+    quizzes_count = len(completed_quizzes)
+
+    total_score = sum(q.score or 0 for q in completed_quizzes)
+    total_questions = sum(q.total_questions for q in completed_quizzes)
+    average_accuracy = (total_score / total_questions * 100) if total_questions > 0 else 0.0
+
+    # 2. 错题集统计
+    wrong_questions = await crud.get_wrong_questions(db, current_user.id, material_id)
+    wrong_questions_count = len(wrong_questions)
+
+    # 3. 闪卡统计
+    flashcards = await crud.get_flashcards_by_material(db, material_id)
+    flashcards_total = len(flashcards)
+    flashcards_by_box = [0, 0, 0, 0, 0]
+    for card in flashcards:
+        box = card.box_number or 1
+        box = max(1, min(5, box))
+        flashcards_by_box[box - 1] += 1
+
+    # 4. 生成 AI 诊断报告
+    flashcard_progress_str = ", ".join([f"第{i+1}盒: {count}张" for i, count in enumerate(flashcards_by_box)])
+    material_summary = material.summary or material.raw_text[:2000]
+
+    ai_diagnostic = await generate_evaluation_report(
+        material_summary=material_summary,
+        quiz_accuracy=average_accuracy,
+        wrong_questions=wrong_questions,
+        flashcard_progress=flashcard_progress_str,
+    )
+
+    return {
+        "quizzes_count": quizzes_count,
+        "average_accuracy": average_accuracy,
+        "wrong_questions_count": wrong_questions_count,
+        "flashcards_total": flashcards_total,
+        "flashcards_by_box": flashcards_by_box,
+        "ai_diagnostic": ai_diagnostic,
+    }
+
+
+@router.post("/materials/{material_id}/adaptive-quiz", response_model=StudyQuizResponse)
+async def create_adaptive_quiz(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """为资料生成基于错题的自适应强化测验"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    # 查询错题
+    wrong_questions = await crud.get_wrong_questions(db, current_user.id, material_id)
+
+    # AI 生成针对性的自适应题目
+    ai_questions = await generate_adaptive_quiz(material.raw_text, wrong_questions)
+    if not ai_questions:
+        raise HTTPException(status_code=500, detail="生成自适应强化测验试题失败，请重试")
+
+    # 创建测验主记录
+    quiz = await crud.create_study_quiz(db, material_id, current_user.id, len(ai_questions))
+
+    # 转换并保存题目
+    db_questions = []
+    for q in ai_questions:
+        opts_json = json.dumps(q.get("options")) if q.get("options") else None
+        db_questions.append({
+            "question_type": q["question_type"],
+            "question_text": q["question_text"],
+            "options": opts_json,
+            "correct_answer": q["correct_answer"],
+            "explanation": q.get("explanation"),
+        })
+
+    await crud.create_quiz_questions(db, quiz.id, db_questions)
+    await db.commit()
+    return quiz
+
+# ============ 有声书/播客 API ============
+
+@router.post("/materials/{material_id}/audio/summary")
+async def generate_audio_summary(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """生成摘要朗读音频"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    try:
+        audio_bytes, summary_text = await generate_summary_audio(material.raw_text)
+        return StreamingResponse(
+            io.BytesIO(audio_bytes),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": f"attachment; filename=summary_{material_id}.mp3",
+                "X-Summary-Text": summary_text[:500],
+            },
+        )
+    except Exception as e:
+        logger.error("生成摘要音频失败: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/materials/{material_id}/audio/podcast")
+async def generate_audio_podcast(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """生成双人播客音频"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    try:
+        audio_bytes, dialogue = await generate_podcast_audio(material.raw_text)
+        return StreamingResponse(
+            io.BytesIO(audio_bytes),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": f"attachment; filename=podcast_{material_id}.mp3",
+                "X-Dialogue-Count": str(len(dialogue)),
+            },
+        )
+    except Exception as e:
+        logger.error("生成播客音频失败: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/materials/{material_id}/audio/podcast/script")
+async def generate_podcast_script(
+    material_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """仅生成播客对话脚本（不生成音频）"""
+    material = await crud.get_material_by_id(db, material_id, current_user.id)
+    if not material:
+        raise HTTPException(status_code=404, detail="资料不存在")
+
+    try:
+        from ..services.audio_service import _generate_podcast_script
+        dialogue = await _generate_podcast_script(material.raw_text)
+        return {
+            "script": [{"speaker": s, "text": t} for s, t in dialogue],
+        }
+    except Exception as e:
+        logger.error("生成播客脚本失败: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))

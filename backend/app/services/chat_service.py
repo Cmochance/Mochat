@@ -11,6 +11,7 @@ from ..db import crud
 from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
 from .content_filter import content_filter, RESTRICTED_MESSAGE
+from .knowledge_service import knowledge_service
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -19,8 +20,14 @@ logger = logging.getLogger(__name__)
 class ChatService:
     """对话业务服务类"""
     
-    @staticmethod
-    async def expand_doc_content(content: str) -> str:
+    def __init__(self):
+        self.http_client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+    
+    async def close(self):
+        """关闭HTTP连接"""
+        await self.http_client.aclose()
+    
+    async def expand_doc_content(self, content: str) -> str:
         """
         展开消息中的文档标记，从 upword 服务获取文档内容
         
@@ -41,30 +48,30 @@ class ChatService:
             
             try:
                 # 调用 upword 服务获取文档内容
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        f"{settings.UPWORD_INTERNAL_URL}/api/parse",
-                        json={"objectKey": object_key}
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get("success") and data.get("markdown"):
-                            # 替换为包含内容的格式
-                            doc_content = f"<!-- DOC:{filename} -->\n以下是用户上传的文档内容:\n\n{data['markdown']}\n<!-- /DOC -->"
-                            result = result.replace(match.group(0), doc_content)
-                            logger.info("成功获取文档内容: %s", filename)
-                        else:
-                            logger.warning("文档解析失败: %s", data.get('error'))
+                response = await self.http_client.post(
+                    f"{settings.UPWORD_INTERNAL_URL}/api/parse",
+                    json={"objectKey": object_key}
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success") and data.get("markdown"):
+                        # 替换为包含内容的格式
+                        doc_content = f"<!-- DOC:{filename} -->\n以下是用户上传的文档内容:\n\n{data['markdown']}\n<!-- /DOC -->"
+                        result = result.replace(match.group(0), doc_content)
+                        logger.info("成功获取文档内容: %s", filename)
                     else:
-                        logger.warning("upword 服务响应错误: %s", response.status_code)
+                        logger.warning("文档解析失败: %s", data.get('error'))
+                else:
+                    logger.warning("upword 服务响应错误: %s", response.status_code)
             except Exception as e:
                 logger.error("获取文档内容失败: %s", e)
         
         return result
     
-    @staticmethod
+    
     async def create_session(
+        self,
         db: AsyncSession,
         user: User,
         title: str = "新对话"
@@ -72,8 +79,9 @@ class ChatService:
         """创建新会话"""
         return await crud.create_session(db, user.id, title)
     
-    @staticmethod
+    
     async def get_user_sessions(
+        self,
         db: AsyncSession,
         user: User,
         skip: int = 0,
@@ -82,8 +90,9 @@ class ChatService:
         """获取用户的会话列表"""
         return await crud.get_user_sessions(db, user.id, skip, limit)
     
-    @staticmethod
+    
     async def get_session(
+        self,
         db: AsyncSession,
         session_id: int,
         user: User
@@ -94,8 +103,9 @@ class ChatService:
             return session
         return None
     
-    @staticmethod
+    
     async def delete_session(
+        self,
         db: AsyncSession,
         session_id: int,
         user: User
@@ -106,8 +116,9 @@ class ChatService:
             return await crud.delete_session(db, session_id)
         return False
     
-    @staticmethod
+    
     async def get_session_messages(
+        self,
         db: AsyncSession,
         session_id: int,
         user: User
@@ -118,8 +129,9 @@ class ChatService:
             return None
         return await crud.get_session_messages(db, session_id)
     
-    @staticmethod
+    
     async def get_session_messages_paginated(
+        self,
         db: AsyncSession,
         session_id: int,
         user: User,
@@ -151,8 +163,9 @@ class ChatService:
             "total": total
         }
     
-    @staticmethod
+    
     async def send_message_stream(
+        self,
         db: AsyncSession,
         session_id: int,
         user: User,
@@ -199,12 +212,25 @@ class ChatService:
             msg_content = msg.content
             # 对于用户消息，展开文档标记获取实际内容
             if msg.role == "user":
-                msg_content = await ChatService.expand_doc_content(msg_content)
+                msg_content = await self.expand_doc_content(msg_content)
             messages.append({"role": msg.role, "content": msg_content})
         
         # 使用环境变量配置（避免数据库查询延迟）
         max_tokens = settings.AI_MAX_TOKENS
         temperature = settings.AI_TEMPERATURE
+        
+        # RAG 流程：在发送给 AI 之前，先在用户私有知识库中进行语义检索
+        retrieved_chunks = await knowledge_service.search_knowledge(user.id, content)
+        system_prompt = None
+        if retrieved_chunks:
+            context_text = "\n".join([f"- {chunk}" for chunk in retrieved_chunks])
+            system_prompt = f"""你是墨语（Mochat）的AI助手。
+以下是从用户私有知识库中检索到的参考资料，请优先基于这些资料回答用户的问题。如果资料中没有相关信息，请基于你的通用知识进行回答。
+
+【参考资料】
+{context_text}
+
+请用友好、专业的方式回答用户问题，并确保在回答中如果引用了资料，请明确标注。"""
         
         # 调用AI服务获取流式响应
         thinking_full = ""
@@ -213,6 +239,7 @@ class ChatService:
         
         async for chunk in ai_service.chat_stream(
             messages, 
+            system_prompt=system_prompt,
             model=model,
             max_tokens=max_tokens,
             temperature=temperature
@@ -267,8 +294,9 @@ class ChatService:
             # 明确无内容返回为失败路径，便于上层准确计数
             yield {"type": "error", "data": "AI 未返回有效内容"}
     
-    @staticmethod
+    
     async def regenerate_response(
+        self,
         db: AsyncSession,
         session_id: int,
         user: User

@@ -10,7 +10,7 @@ from ..core.config import settings
 logger = logging.getLogger(__name__)
 
 # 当前 schema 版本号，每次新增迁移时递增
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 7
 
 # 创建异步引擎
 engine = create_async_engine(
@@ -154,6 +154,18 @@ async def migrate_db(conn):
             "next_review_at",
             "ALTER TABLE flashcards ADD COLUMN next_review_at DATETIME",
         )
+
+        # material_annotations 新增划词位置偏移量字段
+        add_column_if_missing(
+            "material_annotations",
+            "start_offset",
+            "ALTER TABLE material_annotations ADD COLUMN start_offset INTEGER",
+        )
+        add_column_if_missing(
+            "material_annotations",
+            "end_offset",
+            "ALTER TABLE material_annotations ADD COLUMN end_offset INTEGER",
+        )
     
     await conn.run_sync(check_and_migrate)
 
@@ -167,20 +179,21 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
 
         # 更新 schema 版本
-        conn.execute(text(
+        await conn.execute(text(
             "CREATE TABLE IF NOT EXISTS schema_version ("
             "  id INTEGER PRIMARY KEY CHECK (id = 1),"
             "  version INTEGER NOT NULL,"
             "  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
             ")"
         ))
-        row = conn.execute(text("SELECT version FROM schema_version WHERE id = 1")).fetchone()
+        result = await conn.execute(text("SELECT version FROM schema_version WHERE id = 1"))
+        row = result.fetchone()
         if row is None:
-            conn.execute(text(
+            await conn.execute(text(
                 "INSERT INTO schema_version (id, version) VALUES (1, :ver)"
             ), {"ver": SCHEMA_VERSION})
         elif row[0] < SCHEMA_VERSION:
-            conn.execute(text(
+            await conn.execute(text(
                 "UPDATE schema_version SET version = :ver, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
             ), {"ver": SCHEMA_VERSION})
             logger.info("Schema upgraded: %s → %s", row[0], SCHEMA_VERSION)

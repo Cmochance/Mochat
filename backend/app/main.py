@@ -11,6 +11,8 @@ from .db.database import init_db, close_db
 from .api import api_router
 from .services.auth_service import AuthService
 from .services.ai_service import ai_service
+from .services.chat_service import chat_service
+from .services.supabase_auth_service import supabase_auth_service
 from .db.database import AsyncSessionLocal
 
 from verify import verify_router
@@ -55,6 +57,8 @@ async def lifespan(app: FastAPI):
     
     # 关闭时清理资源
     await ai_service.close()
+    await chat_service.close()
+    await supabase_auth_service.close()
     await close_db()
 
 

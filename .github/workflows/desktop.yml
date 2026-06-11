@@ -8,13 +8,6 @@ on:
       - "backend/**"
       - "modules/**"
       - "desktop/**"
-  pull_request:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - "backend/**"
-      - "modules/**"
-      - "desktop/**"
   workflow_dispatch:
 
 jobs:

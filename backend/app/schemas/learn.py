@@ -81,6 +81,7 @@ class StudyMessageCreate(BaseModel):
     """发送学习提问"""
     content: str = Field(..., min_length=1)
     model: Optional[str] = None
+    highlight_context: Optional[str] = None
 
 
 class StudyMessageResponse(BaseModel):
@@ -186,3 +187,65 @@ class QuizSubmitRequest(BaseModel):
 class StudyQuizListResponse(BaseModel):
     """测验历史列表响应"""
     quizzes: List[StudyQuizResponse]
+
+
+# ---- 知识导图 / 图谱 (LearningMap) ----
+
+class LearningMapResponse(BaseModel):
+    """知识导图/关系图谱响应"""
+    id: int
+    material_id: int
+    map_type: str
+    map_data: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---- 错题本与学习评估 (WrongQuestions & Evaluation) ----
+
+class WrongQuestionsListResponse(BaseModel):
+    """错题集响应"""
+    wrong_questions: List[QuizQuestionDetailResponse]
+
+
+class EvaluationReportResponse(BaseModel):
+    """评估报告响应"""
+    quizzes_count: int
+    average_accuracy: float
+    wrong_questions_count: int
+    flashcards_total: int
+    flashcards_by_box: List[int]
+    ai_diagnostic: str
+
+
+# ---- 划词高亮与批注 (Annotations) ----
+
+class AnnotationCreate(BaseModel):
+    """创建批注请求"""
+    selected_text: str = Field(..., min_length=1)
+    note: Optional[str] = None
+    color: Optional[str] = "yellow"
+    start_offset: Optional[int] = None
+    end_offset: Optional[int] = None
+
+
+class AnnotationResponse(BaseModel):
+    """批注响应"""
+    id: int
+    material_id: int
+    selected_text: str
+    note: Optional[str] = None
+    color: str
+    start_offset: Optional[int] = None
+    end_offset: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AnnotationListResponse(BaseModel):
+    """批注列表响应"""
+    annotations: List[AnnotationResponse]

@@ -14,7 +14,10 @@ class SupabaseAuthService:
     """封装 Supabase Auth REST API 调用"""
 
     def __init__(self) -> None:
-        self._timeout = httpx.Timeout(20.0, connect=10.0)
+        self.http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(20.0, connect=10.0),
+            follow_redirects=True,
+        )
 
     @property
     def enabled(self) -> bool:
@@ -56,8 +59,7 @@ class SupabaseAuthService:
 
         url = self._auth_url("token?grant_type=password")
         payload = {"email": email, "password": password}
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(url, json=payload, headers=self._public_headers())
+        response = await self.http_client.post(url, json=payload, headers=self._public_headers())
         if response.status_code >= 400:
             try:
                 data = response.json()
@@ -72,8 +74,7 @@ class SupabaseAuthService:
 
         url = self._auth_url("token?grant_type=refresh_token")
         payload = {"refresh_token": refresh_token}
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(url, json=payload, headers=self._public_headers())
+        response = await self.http_client.post(url, json=payload, headers=self._public_headers())
         if response.status_code >= 400:
             try:
                 data = response.json()
@@ -89,8 +90,7 @@ class SupabaseAuthService:
         url = self._auth_url("user")
         headers = self._public_headers()
         headers["Authorization"] = f"Bearer {access_token}"
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, headers=headers)
+        response = await self.http_client.get(url, headers=headers)
         if response.status_code >= 400:
             try:
                 data = response.json()
@@ -119,8 +119,7 @@ class SupabaseAuthService:
             payload["user_metadata"] = user_metadata
 
         url = self._auth_url("admin/users")
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(url, json=payload, headers=self._service_headers())
+        response = await self.http_client.post(url, json=payload, headers=self._service_headers())
         if response.status_code >= 400:
             try:
                 data = response.json()
@@ -139,8 +138,7 @@ class SupabaseAuthService:
             return False, "Supabase 配置未完整设置"
         url = self._auth_url(f"admin/users/{supabase_user_id}")
         payload = {"password": new_password}
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.put(url, json=payload, headers=self._service_headers())
+        response = await self.http_client.put(url, json=payload, headers=self._service_headers())
         if response.status_code >= 400:
             try:
                 data = response.json()

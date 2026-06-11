@@ -1,6 +1,5 @@
 import { useCallback, useState, useEffect } from 'react'
 import {
-  BookOpen,
   Plus,
   ArrowLeft,
   Loader2,
@@ -15,7 +14,6 @@ import { useTranslation } from 'react-i18next'
 import { useLearnStore } from '../../../stores/learnStore'
 import { learnService } from '../../../services/learnService'
 import Button from '../../../components/common/Button'
-import type { QuizQuestion, StudyQuiz } from '../../../types'
 
 interface QuizViewProps {
   materialId: number

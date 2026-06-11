@@ -1,12 +1,12 @@
 import { create } from 'zustand'
-import type { LearningMaterial, StudySession, StudyMessage, Flashcard, StudyQuiz, QuizQuestion, QuizDetail } from '../types'
+import type { LearningMaterial, LearningMaterialDetail, StudySession, StudyMessage, Flashcard, StudyQuiz, QuizDetail, MindmapNode, ConceptGraphData, EvaluationReport, QuizQuestion, MaterialAnnotation } from '../types'
 
 let _tempIdCounter = 0
 
 interface LearnState {
   // 资料
   materials: LearningMaterial[]
-  currentMaterial: LearningMaterial | null
+  currentMaterial: LearningMaterialDetail | null
 
   // 会话
   sessions: StudySession[]
@@ -27,6 +27,19 @@ interface LearnState {
   currentQuizDetail: QuizDetail | null
   quizLoading: boolean
 
+  // 知识图谱/思维导图
+  mindmap: MindmapNode | null
+  conceptGraph: ConceptGraphData | null
+  mapLoading: boolean
+
+  // 学习评估与错题集
+  wrongQuestions: QuizQuestion[]
+  evaluationReport: EvaluationReport | null
+  evaluationLoading: boolean
+
+  // 划词与批注
+  annotations: MaterialAnnotation[]
+
   // 状态
   isLoading: boolean
   isStreaming: boolean
@@ -37,7 +50,7 @@ interface LearnState {
   setMaterials: (materials: LearningMaterial[]) => void
   addMaterial: (material: LearningMaterial) => void
   removeMaterial: (id: number) => void
-  setCurrentMaterial: (material: LearningMaterial | null) => void
+  setCurrentMaterial: (material: LearningMaterialDetail | null) => void
   updateMaterialSummary: (id: number, summary: string) => void
 
   // 会话 Actions
@@ -73,6 +86,21 @@ interface LearnState {
   setCurrentQuizDetail: (detail: QuizDetail | null) => void
   setQuizLoading: (loading: boolean) => void
   submitQuestionAnswer: (questionId: number, answer: string) => void
+
+  // 评估与错题 Actions
+  setWrongQuestions: (questions: QuizQuestion[]) => void
+  setEvaluationReport: (report: EvaluationReport | null) => void
+  setEvaluationLoading: (loading: boolean) => void
+
+  // 批注 Actions
+  setAnnotations: (annotations: MaterialAnnotation[]) => void
+  addAnnotation: (annotation: MaterialAnnotation) => void
+  removeAnnotation: (id: number) => void
+
+  // 导图 / 图谱 Actions
+  setMindmap: (node: MindmapNode | null) => void
+  setConceptGraph: (graph: ConceptGraphData | null) => void
+  setMapLoading: (loading: boolean) => void
 }
 
 export const useLearnStore = create<LearnState>((set, get) => ({
@@ -89,6 +117,13 @@ export const useLearnStore = create<LearnState>((set, get) => ({
   quizzes: [],
   currentQuizDetail: null,
   quizLoading: false,
+  mindmap: null,
+  conceptGraph: null,
+  mapLoading: false,
+  wrongQuestions: [],
+  evaluationReport: null,
+  evaluationLoading: false,
+  annotations: [],
   isLoading: false,
   isStreaming: false,
   streamingContent: '',
@@ -176,4 +211,19 @@ export const useLearnStore = create<LearnState>((set, get) => ({
       },
     }
   }),
+
+  // 评估与错题
+  setWrongQuestions: (questions) => set({ wrongQuestions: questions }),
+  setEvaluationReport: (report) => set({ evaluationReport: report }),
+  setEvaluationLoading: (loading) => set({ evaluationLoading: loading }),
+
+  // 批注
+  setAnnotations: (annotations) => set({ annotations }),
+  addAnnotation: (annotation) => set((s) => ({ annotations: [...s.annotations, annotation] })),
+  removeAnnotation: (id) => set((s) => ({ annotations: s.annotations.filter((a) => a.id !== id) })),
+
+  // 导图 / 图谱
+  setMindmap: (node) => set({ mindmap: node }),
+  setConceptGraph: (graph) => set({ conceptGraph: graph }),
+  setMapLoading: (loading) => set({ mapLoading: loading }),
 }))

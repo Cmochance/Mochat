@@ -174,51 +174,7 @@ export const chatService = {
       throw new Error('发送消息失败')
     }
 
-    const reader = response.body?.getReader()
-    if (!reader) return
-
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let chunkCount = 0
-
-    console.log('[Stream] 开始接收流式数据...')
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        console.log(`[Stream] 流式传输完成，共收到 ${chunkCount} 个数据块`)
-        break
-      }
-
-      chunkCount++
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6)) as StreamChunk
-            onChunk(data)
-          } catch {
-            // 忽略解析错误
-          }
-        }
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 0))
-    }
-
-    // 处理剩余的 buffer
-    if (buffer.startsWith('data: ')) {
-      try {
-        const data = JSON.parse(buffer.slice(6)) as StreamChunk
-        onChunk(data)
-      } catch {
-        // 忽略
-      }
-    }
+    await handleStreamResponse(response, onChunk, 'Stream')
   },
 
   // 重新生成响应
@@ -237,52 +193,7 @@ export const chatService = {
       throw new Error('重新生成失败')
     }
 
-    const reader = response.body?.getReader()
-    if (!reader) return
-
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let chunkCount = 0
-
-    console.log('[Stream/Regenerate] 开始接收流式数据...')
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) {
-        console.log(`[Stream/Regenerate] 流式传输完成，共收到 ${chunkCount} 个数据块`)
-        break
-      }
-
-      chunkCount++
-      console.log(`[Stream/Regenerate] 收到数据块 #${chunkCount}: ${value?.length || 0} bytes`)
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6)) as StreamChunk
-            onChunk(data)
-          } catch {
-            // 忽略解析错误
-          }
-        }
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 0))
-    }
-
-    // 处理剩余的 buffer
-    if (buffer.startsWith('data: ')) {
-      try {
-        const data = JSON.parse(buffer.slice(6)) as StreamChunk
-        onChunk(data)
-      } catch {
-        // 忽略
-      }
-    }
+    await handleStreamResponse(response, onChunk, 'Stream/Regenerate')
   },
 
   // 保存消息到数据库（用于绘图、PPT等非AI对话生成的消息）
@@ -325,4 +236,59 @@ export const chatService = {
     document.body.removeChild(a)
     window.URL.revokeObjectURL(url)
   },
+}
+
+/**
+ * 辅助函数：处理 Server-Sent Events (SSE) 流式响应
+ */
+async function handleStreamResponse(
+  response: Response,
+  onChunk: (chunk: StreamChunk) => void,
+  logPrefix: string
+): Promise<void> {
+  const reader = response.body?.getReader()
+  if (!reader) return
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let chunkCount = 0
+
+  console.log(`[${logPrefix}] 开始接收流式数据...`)
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      console.log(`[${logPrefix}] 流式传输完成，共收到 ${chunkCount} 个数据块`)
+      break
+    }
+
+    chunkCount++
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(line.slice(6)) as StreamChunk
+          onChunk(data)
+        } catch {
+          // 忽略解析错误
+        }
+      }
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+  }
+
+  // 处理剩余的 buffer
+  if (buffer.startsWith('data: ')) {
+    try {
+      const data = JSON.parse(buffer.slice(6)) as StreamChunk
+      onChunk(data)
+    } catch {
+      // 忽略
+    }
+  }
 }

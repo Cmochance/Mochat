@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from .models import (
     User, ChatSession, Message, SystemConfig, RestrictedKeyword, AllowedModel,
     LearningMaterial, StudySession, StudyMessage, MaterialChunk,
-    Flashcard, StudyQuiz, QuizQuestion,
+    Flashcard, StudyQuiz, QuizQuestion, LearningMap, MaterialAnnotation,
 )
 from ..core.config import settings
 from ..core.security import get_password_hash, verify_password, encrypt_password
@@ -223,6 +223,67 @@ async def complete_study_quiz(
         await db.flush()
         await db.refresh(quiz)
     return quiz
+
+async def get_wrong_questions(
+    db: AsyncSession,
+    user_id: int,
+    material_id: int,
+) -> List[QuizQuestion]:
+    """获取指定资料下用户的所有错题"""
+    result = await db.execute(
+        select(QuizQuestion)
+        .join(StudyQuiz)
+        .where(
+            StudyQuiz.material_id == material_id,
+            StudyQuiz.user_id == user_id,
+            QuizQuestion.is_correct == False,
+        )
+        .order_by(QuizQuestion.id.desc())
+    )
+    return list(result.scalars().all())
+
+
+
+
+# ---- 知识导图 / 图谱 (LearningMap) ----
+
+
+async def create_learning_map(
+    db: AsyncSession,
+    material_id: int,
+    map_type: str,
+    map_data: str,
+) -> LearningMap:
+    """创建或覆盖导图/关系图谱"""
+    # 先删除旧的
+    await db.execute(
+        delete(LearningMap)
+        .where(LearningMap.material_id == material_id, LearningMap.map_type == map_type)
+    )
+    
+    # 插入新的
+    lmap = LearningMap(
+        material_id=material_id,
+        map_type=map_type,
+        map_data=map_data,
+    )
+    db.add(lmap)
+    await db.flush()
+    await db.refresh(lmap)
+    return lmap
+
+
+async def get_learning_map_by_type(
+    db: AsyncSession,
+    material_id: int,
+    map_type: str,
+) -> Optional[LearningMap]:
+    """获取指定资料和类型的导图"""
+    result = await db.execute(
+        select(LearningMap)
+        .where(LearningMap.material_id == material_id, LearningMap.map_type == map_type)
+    )
+    return result.scalar_one_or_none()
 
 
 # ---- 闪卡 ----
@@ -933,3 +994,67 @@ async def get_study_messages(
         .limit(limit)
     )
     return result.scalars().all()
+
+
+# ---- 划词与批注 (MaterialAnnotation) ----
+
+async def create_annotation(
+    db: AsyncSession,
+    material_id: int,
+    user_id: int,
+    selected_text: str,
+    note: Optional[str] = None,
+    color: str = "yellow",
+    start_offset: Optional[int] = None,
+    end_offset: Optional[int] = None,
+) -> MaterialAnnotation:
+    """创建批注高亮"""
+    annotation = MaterialAnnotation(
+        material_id=material_id,
+        user_id=user_id,
+        selected_text=selected_text,
+        note=note,
+        color=color,
+        start_offset=start_offset,
+        end_offset=end_offset,
+    )
+    db.add(annotation)
+    await db.flush()
+    await db.refresh(annotation)
+    return annotation
+
+async def get_annotations_by_material(
+    db: AsyncSession,
+    material_id: int,
+    user_id: int,
+) -> List[MaterialAnnotation]:
+    """获取资料的所有批注"""
+    result = await db.execute(
+        select(MaterialAnnotation)
+        .where(
+            MaterialAnnotation.material_id == material_id,
+            MaterialAnnotation.user_id == user_id,
+        )
+        .order_by(MaterialAnnotation.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+async def delete_annotation(
+    db: AsyncSession,
+    annotation_id: int,
+    user_id: int,
+) -> bool:
+    """删除批注"""
+    result = await db.execute(
+        select(MaterialAnnotation)
+        .where(
+            MaterialAnnotation.id == annotation_id,
+            MaterialAnnotation.user_id == user_id,
+        )
+    )
+    anno = result.scalar_one_or_none()
+    if anno:
+        await db.delete(anno)
+        await db.flush()
+        return True
+    return False

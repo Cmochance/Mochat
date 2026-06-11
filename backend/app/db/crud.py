@@ -229,7 +229,7 @@ async def get_wrong_questions(
         .where(
             StudyQuiz.material_id == material_id,
             StudyQuiz.user_id == user_id,
-            QuizQuestion.is_correct == False,
+            not QuizQuestion.is_correct,
         )
         .order_by(QuizQuestion.id.desc())
     )
@@ -549,14 +549,14 @@ async def get_all_keywords(db: AsyncSession, active_only: bool = False) -> List[
     """获取所有限制词"""
     query = select(RestrictedKeyword).order_by(RestrictedKeyword.created_at.desc())
     if active_only:
-        query = query.where(RestrictedKeyword.is_active == True)
+        query = query.where(RestrictedKeyword.is_active)
     result = await db.execute(query)
     return result.scalars().all()
 
 
 async def get_active_keywords(db: AsyncSession) -> List[str]:
     """获取所有启用的限制词（仅返回关键词字符串列表）"""
-    result = await db.execute(select(RestrictedKeyword.keyword).where(RestrictedKeyword.is_active == True))
+    result = await db.execute(select(RestrictedKeyword.keyword).where(RestrictedKeyword.is_active))
     return [row[0] for row in result.fetchall()]
 
 
@@ -604,7 +604,7 @@ async def get_all_allowed_models(db: AsyncSession, active_only: bool = False) ->
     """获取所有允许的模型"""
     query = select(AllowedModel).order_by(AllowedModel.sort_order.asc(), AllowedModel.created_at.asc())
     if active_only:
-        query = query.where(AllowedModel.is_active == True)
+        query = query.where(AllowedModel.is_active)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -612,7 +612,7 @@ async def get_all_allowed_models(db: AsyncSession, active_only: bool = False) ->
 async def get_active_model_ids(db: AsyncSession) -> List[str]:
     """获取所有启用的模型 ID 列表"""
     result = await db.execute(
-        select(AllowedModel.model_id).where(AllowedModel.is_active == True).order_by(AllowedModel.sort_order.asc())
+        select(AllowedModel.model_id).where(AllowedModel.is_active).order_by(AllowedModel.sort_order.asc())
     )
     return [row[0] for row in result.fetchall()]
 

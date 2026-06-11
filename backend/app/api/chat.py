@@ -78,7 +78,7 @@ async def get_models(current_user: User = Depends(get_current_active_user), db: 
 
     if allowed_models:
         # 如果数据库中有配置，则只返回允许的模型
-        allowed_ids = {m.model_id for m in allowed_models}
+        {m.model_id for m in allowed_models}
         # 保留顺序，使用 allowed_models 的排序
         models = []
         for allowed in allowed_models:

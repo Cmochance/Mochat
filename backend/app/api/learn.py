@@ -1,9 +1,8 @@
-import io
-
 """
 学习模块 API 路由
 """
 import asyncio
+import io
 import json
 import logging
 import os

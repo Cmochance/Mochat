@@ -343,7 +343,7 @@ class AIService:
                     part_type = part.get("type")
                     if part_type == "image_url":
                         img_url = part.get("image_url", {}).get("url", "N/A")
-                        url_type = type(img_url).__name__
+                        type(img_url).__name__
                         # 检查是否是 Base64 格式
                         if img_url.startswith("data:"):
                             logger.debug(f"  [Part {j}] type=image_url, format=BASE64, size={len(img_url)} chars")

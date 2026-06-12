@@ -282,6 +282,9 @@ class ChatService:
                         logger.error(f"工具 {func_name} 执行失败: {e}")
                 else:
                     tool_result_str = f"未知工具: {func_name}。可用工具: {list(TOOL_EXECUTORS.keys())}"
+
+                messages.append({"role": "tool", "tool_call_id": tc_id, "content": tool_result_str})
+        else:
             yield {"type": "error", "data": "工具调用次数过多，请简化您的请求。"}
             return
 

@@ -29,6 +29,7 @@ export default function Chat() {
     isStreaming,
     streamingContent,
     streamingThinking,
+    streamingToolStatus,
     setSessions,
     setCurrentSession,
     setMessages,
@@ -660,6 +661,7 @@ export default function Chat() {
           isStreaming={isStreaming}
           streamingContent={streamingContent}
           streamingThinking={streamingThinking}
+        streamingToolStatus={streamingToolStatus}
           sessionId={currentSession?.id}
           hasMore={hasMoreMessages}
           loadingMore={loadingMore}

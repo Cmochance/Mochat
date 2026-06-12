@@ -13,16 +13,15 @@ interface MessageListProps {
   isStreaming: boolean
   streamingContent: string
   streamingThinking: string
-  sessionId?: number  // 用于保存/恢复滚动位置
-  hasMore?: boolean  // 是否还有更多历史消息
-  loadingMore?: boolean  // 是否正在加载更多
-  onLoadMore?: () => void  // 加载更多回调
-  onRegenerate?: () => void  // 重新生成最后一条AI消息
+  streamingToolStatus: string
+  sessionId?: number
+  hasMore?: boolean
+  loadingMore?: boolean
+  onLoadMore?: () => void
+  onRegenerate?: () => void
 }
 
-// 获取滚动位置存储的 key（sessionStorage - 标签页关闭后自动清理）
 const getScrollKey = (sessionId: number) => `mochat_scroll_${sessionId}`
-// 获取"已访问过"标记的 key（sessionStorage - 标签页关闭后清除）
 const getVisitedKey = (sessionId: number) => `mochat_visited_${sessionId}`
 
 export default function MessageList({
@@ -31,215 +30,166 @@ export default function MessageList({
   isStreaming,
   streamingContent,
   streamingThinking,
+  streamingToolStatus,
   sessionId,
-  hasMore = false,
-  loadingMore = false,
+  hasMore,
+  loadingMore,
   onLoadMore,
   onRegenerate,
 }: MessageListProps) {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-  const prevScrollHeightRef = useRef(0)
-  const hasInitializedRef = useRef(false)  // 防止重复初始化
-  const isAtBottomRef = useRef(true)  // 追踪用户是否处于页面底部
+  const lastMessageRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true)
+  const hasRestoredScroll = useRef(false)
 
-  // 保存滚动位置
   const saveScrollPosition = useCallback(() => {
     if (containerRef.current && sessionId) {
-      const scrollTop = containerRef.current.scrollTop
+      const { scrollTop } = containerRef.current
       sessionStorage.setItem(getScrollKey(sessionId), String(scrollTop))
     }
   }, [sessionId])
 
-  // 恢复滚动位置或滚动到底部（仅在首次打开标签页时滚动到底部）
-  useEffect(() => {
-    if (!isLoading && messages.length > 0 && sessionId && containerRef.current && !hasInitializedRef.current) {
-      hasInitializedRef.current = true
-      
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior })
+    }
+  }, [])
+
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current || !sessionId) return
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current
+    isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 50
+    saveScrollPosition()
+    if (scrollTop === 0 && hasMore && !loadingMore) {
+      const prevHeight = scrollHeight
+      onLoadMore?.()
       requestAnimationFrame(() => {
-        const container = containerRef.current
-        if (!container) return
-        
-        const visitedKey = getVisitedKey(sessionId)
-        const scrollKey = getScrollKey(sessionId)
-        const hasVisited = sessionStorage.getItem(visitedKey)
-        const savedPosition = sessionStorage.getItem(scrollKey)
-        
-        if (!hasVisited) {
-          // 首次打开此标签页：滚动到底部
-          container.scrollTop = container.scrollHeight
-          // 标记为已访问
-          sessionStorage.setItem(visitedKey, 'true')
-        } else if (savedPosition) {
-          // 已访问过且有保存的位置：恢复到保存的位置
-          container.scrollTop = Number(savedPosition)
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight - prevHeight
         }
-        // 其他情况：保持默认位置（通常是顶部，但由于消息已渲染，会保持当前位置）
       })
     }
-  }, [isLoading, messages.length, sessionId])
+  }, [sessionId, hasMore, loadingMore, onLoadMore, saveScrollPosition])
 
-  // 会话切换时，重置初始化标记
+  // 恢复滚动位置
   useEffect(() => {
-    hasInitializedRef.current = false
-  }, [sessionId])
+    if (!sessionId || !containerRef.current) return
+    if (hasRestoredScroll.current) return
+    const savedScroll = sessionStorage.getItem(getScrollKey(sessionId))
+    if (savedScroll) {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = parseInt(savedScroll, 10)
+          hasRestoredScroll.current = true
+        }
+      })
+    } else {
+      const hasVisited = sessionStorage.getItem(getVisitedKey(sessionId))
+      if (!hasVisited) {
+        scrollToBottom('instant')
+        sessionStorage.setItem(getVisitedKey(sessionId), '1')
+      }
+      hasRestoredScroll.current = true
+    }
+  }, [sessionId, scrollToBottom])
 
-  // 交互逻辑：
-  // 1. 当用户自己发送新消息时，强制平滑滚动到底部
+  // 流式输出时自动滚动
   useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage.role === 'user') {
-        requestAnimationFrame(() => {
-          containerRef.current?.scrollTo({
-            top: containerRef.current.scrollHeight,
-            behavior: 'smooth'
-          })
-          isAtBottomRef.current = true
-        })
+    if (isStreaming && isAtBottomRef.current) {
+      scrollToBottom('instant')
+    }
+  }, [streamingContent, streamingThinking, isStreaming, scrollToBottom])
+
+  useEffect(() => {
+    if (!isLoading && messages.length > 0 && !isStreaming) {
+      const lastMsg = messages[messages.length - 1]
+      if (lastMsg.role === 'user' && isAtBottomRef.current) {
+        scrollToBottom('smooth')
       }
     }
-  }, [messages.length])
-
-  // 2. 当 AI 正在流式输出并且用户在底部时，跟随自动滚动
-  useEffect(() => {
-    if (isStreaming && isAtBottomRef.current && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight
-    }
-  }, [isStreaming, streamingContent, streamingThinking])
-
-  // 监听滚动事件保存位置 & 检测滚动到顶部加载更多
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const handleScroll = () => {
-      // 保存滚动位置
-      saveScrollPosition()
-      
-      // 判断用户是否接近底部 (阈值定为 120px)
-      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120
-      isAtBottomRef.current = isAtBottom
-      
-      // 检测是否滚动到顶部附近（距离顶部 50px 内）
-      if (container.scrollTop < 50 && hasMore && !loadingMore && onLoadMore) {
-        // 保存当前滚动高度，用于加载后恢复位置
-        prevScrollHeightRef.current = container.scrollHeight
-        onLoadMore()
-      }
-    }
-
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    return () => container.removeEventListener('scroll', handleScroll)
-  }, [saveScrollPosition, hasMore, loadingMore, onLoadMore])
-
-  // 加载更多消息后，保持滚动位置
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container || loadingMore) return
-    
-    // 如果滚动高度增加了，说明加载了更多消息，需要调整滚动位置
-    if (prevScrollHeightRef.current > 0) {
-      const newScrollHeight = container.scrollHeight
-      const heightDiff = newScrollHeight - prevScrollHeightRef.current
-      if (heightDiff > 0) {
-        container.scrollTop += heightDiff
-      }
-      prevScrollHeightRef.current = 0
-    }
-  }, [messages.length, loadingMore])
-
-  // 页面离开时保存滚动位置
-  useEffect(() => {
-    const handleBeforeUnload = () => saveScrollPosition()
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [saveScrollPosition])
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loading text={t('common.loading')} />
-      </div>
-    )
-  }
+  }, [messages, isLoading, isStreaming, scrollToBottom])
 
   return (
-    <div ref={containerRef} className="h-0 flex-grow overflow-y-auto px-4 py-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* 加载更多历史消息 */}
-        {hasMore && (
-          <div ref={topRef} className="flex justify-center py-2">
-            {loadingMore ? (
-              <div className="flex items-center gap-2 text-ink-light text-sm">
-                <div className="w-4 h-4 border-2 border-ink-faint border-t-ink-medium rounded-full animate-spin" />
-                <span>加载中...</span>
-              </div>
-            ) : (
-              <button
-                onClick={onLoadMore}
-                className="text-sm text-ink-light hover:text-ink-medium transition-colors"
-              >
-                ↑ 加载更早的消息
-              </button>
-            )}
-          </div>
-        )}
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth"
+    >
+      {/* 加载更多 */}
+      {hasMore && (
+        <div className="text-center py-4">
+          {loadingMore ? (
+            <Loading text="" />
+          ) : (
+            <button onClick={onLoadMore} className="text-ink-light hover:text-ink-black text-sm">
+              {t('chat.loadMore')}
+            </button>
+          )}
+        </div>
+      )}
 
-        {/* 空状态 */}
-        {messages.length === 0 && !isStreaming && !hasMore && (
+      {/* 空状态 */}
+      {!isLoading && messages.length === 0 && !isStreaming && (
+        <EmptyState 
+          title={t('chat.emptyTitle', '开始新的对话')} 
+          description={t('chat.emptyDesc', '与 AI 助手开始对话吧。')} 
+        />
+      )}
+
+      {/* 消息列表 */}
+      <AnimatePresence mode="popLayout">
+        {messages.map((message, index) => (
           <motion.div
-            className="py-14"
+            key={message.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            ref={index === messages.length - 1 ? lastMessageRef : undefined}
           >
-            <EmptyState
-              icon={<div className="text-6xl font-title text-ink-light/50">墨</div>}
-              title={t('chat.empty.title')}
-              description={t('chat.empty.description')}
+            <MessageItem
+              message={message}
+              index={index}
+              isLastAiMessage={index === messages.length - 1 && message.role === 'assistant'}
+              onRegenerate={onRegenerate}
             />
           </motion.div>
-        )}
+        ))}
+      </AnimatePresence>
 
-        {/* 消息列表 */}
-        <AnimatePresence>
-          {messages.map((message, index) => {
-            // 找出最后一条 AI 消息的索引
-            const lastAiIndex = messages.map((m, i) => m.role === 'assistant' ? i : -1)
-              .filter(i => i !== -1).pop()
-            const isLastAiMessage = message.role === 'assistant' && index === lastAiIndex
-            
-            return (
-              <MessageItem
-                key={message.id}
-                message={message}
-                index={index}
-                isLastAiMessage={isLastAiMessage}
-                onRegenerate={onRegenerate}
-              />
-            )
-          })}
-        </AnimatePresence>
+      {/* 流式输出 */}
+      {isStreaming && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          {/* 工具调用状态展示 */}
+          {streamingToolStatus && (
+            <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              {streamingToolStatus}
+            </div>
+          )}
+          <StreamingMessage content={streamingContent} thinking={streamingThinking} />
+        </motion.div>
+      )}
 
-        {/* 流式响应中的消息 - 使用专门的流式组件，直接操作 DOM */}
-        {isStreaming && (streamingContent || streamingThinking) && (
-          <StreamingMessage
-            content={streamingContent}
-            thinking={streamingThinking}
-          />
-        )}
-
-        {/* 等待响应的加载动画 */}
-        {isStreaming && !streamingContent && !streamingThinking && (
-          <motion.div
-            className="flex gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className="w-10 h-10 rounded-full bg-ink-black flex items-center justify-center shrink-0">
-              <span className="text-paper-white font-title">墨</span>
+      {/* 加载中 */}
+      {isLoading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex justify-start mb-6"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-ink-black flex items-center justify-center text-paper-white text-xs">
+              AI
             </div>
             <div className="flex-1 p-4 bg-paper-white rounded-sm border border-paper-aged">
               <div className="flex items-center text-ink-light">
@@ -267,11 +217,11 @@ export default function MessageList({
                 </motion.span>
               </div>
             </div>
-          </motion.div>
-        )}
+          </div>
+        </motion.div>
+      )}
 
-        <div ref={bottomRef} />
-      </div>
+      <div ref={bottomRef} />
     </div>
   )
 }

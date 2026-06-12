@@ -8,10 +8,10 @@
 
 使用方式：
     from verify import verify_router, VerificationService
-    
+
     # 注册路由
     app.include_router(verify_router, prefix="/api")
-    
+
     # 验证验证码
     is_valid, msg = VerificationService.verify_code(email, code, "register")
 """

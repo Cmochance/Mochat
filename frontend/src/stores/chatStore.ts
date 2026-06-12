@@ -12,6 +12,7 @@ interface ChatState {
   isStreaming: boolean
   streamingContent: string
   streamingThinking: string
+  streamingToolStatus: string
   
   // Actions
   setSessions: (sessions: ChatSession[]) => void
@@ -25,6 +26,7 @@ interface ChatState {
   setStreaming: (streaming: boolean) => void
   appendStreamingContent: (content: string) => void
   appendStreamingThinking: (thinking: string) => void
+  setStreamingToolStatus: (status: string) => void
   clearStreaming: () => void  // 只清空内容
   endStreaming: () => void    // 完全结束（清空内容 + isStreaming=false）
   finalizeStreaming: (thinking: string, content: string) => void
@@ -38,6 +40,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isStreaming: false,
   streamingContent: '',
   streamingThinking: '',
+  streamingToolStatus: '',
 
   setSessions: (sessions) => set({ sessions }),
   
@@ -77,17 +80,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
   appendStreamingThinking: (thinking) => set((state) => ({
     streamingThinking: state.streamingThinking + thinking,
   })),
+
+  setStreamingToolStatus: (status) => set({ streamingToolStatus: status }),
   
   // 只清空流式内容，不改变 isStreaming 状态
   clearStreaming: () => set({
     streamingContent: '',
     streamingThinking: '',
+    streamingToolStatus: '',
   }),
   
   // 完全结束流式状态（包括 isStreaming）
   endStreaming: () => set({
     streamingContent: '',
     streamingThinking: '',
+    streamingToolStatus: '',
     isStreaming: false,
   }),
   
@@ -104,6 +111,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [...state.messages, newMessage],
       streamingContent: '',
       streamingThinking: '',
+      streamingToolStatus: '',
       isStreaming: false,
     }))
   },

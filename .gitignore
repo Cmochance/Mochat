@@ -44,3 +44,7 @@ Thumbs.db
 # test
 .test
 使用量统计_审查结论与执行计划.md
+
+# Generated static files
+backend/app/static/generated/
+node_modules

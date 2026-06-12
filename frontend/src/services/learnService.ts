@@ -21,6 +21,23 @@ const apiUrl = (path: string): string => {
   return path
 }
 
+// ---- 知识库 (Knowledge) ----
+
+async function uploadKnowledgeDocument(file: File): Promise<any> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await api.post('/knowledge/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  })
+  return res.data
+}
+
+async function getKnowledgeGraph(): Promise<any> {
+  const res = await api.get('/knowledge/graph')
+  return res.data
+}
+
 // ---- 资料 ----
 
 async function uploadMaterial(file: File): Promise<LearningMaterial> {
@@ -257,6 +274,8 @@ async function generatePodcastScript(materialId: number): Promise<{ script: { sp
 }
 
 export const learnService = {
+  uploadKnowledgeDocument,
+  getKnowledgeGraph,
   uploadMaterial,
   createTextMaterial,
   getMaterials,

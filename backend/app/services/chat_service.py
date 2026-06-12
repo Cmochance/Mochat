@@ -1,5 +1,5 @@
 """
-对话业务服务 - 处理对话相关的业务逻辑
+对话业务服务 - 处理对话相关的业务逻辑（支持智能体工具调用）
 """
 
 import logging
@@ -12,12 +12,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 from ..db import crud
-from ..db.models import ChatSession, Message, User
+from ..db.models import ChatSession, Message
 from .ai_service import ai_service
 from .content_filter import RESTRICTED_MESSAGE, content_filter
-from .knowledge_service import knowledge_service
+from .learn_service import hybrid_retrieve_chunks
+from .tools.code_interpreter import TOOL_DEFINITION as CODE_INTERPRETER_TOOL
+from .tools.code_interpreter import execute_python_code
+
+# 导入工具定义
+from .tools.web_search import TOOL_DEFINITION as WEB_SEARCH_TOOL
+from .tools.web_search import search_web
 
 logger = logging.getLogger(__name__)
+
+# 注册所有可用工具
+AVAILABLE_TOOLS = [WEB_SEARCH_TOOL, CODE_INTERPRETER_TOOL]
+TOOL_EXECUTORS = {"search_web": search_web, "execute_python_code": execute_python_code}
 
 
 class ChatService:
@@ -33,263 +43,199 @@ class ChatService:
     async def expand_doc_content(self, content: str) -> str:
         """
         展开消息中的文档标记，从 upword 服务获取文档内容
-
-        格式: <!-- DOC:filename:key --><!-- /DOC -->
-        展开为: <!-- DOC:filename -->文档内容<!-- /DOC -->
         """
-        # 匹配格式: <!-- DOC:filename:key --><!-- /DOC -->
         pattern = r"<!-- DOC:(.+?):(.+?) --><!-- /DOC -->"
         matches = list(re.finditer(pattern, content))
-
         if not matches:
             return content
 
-        result = content
         for match in matches:
             filename = match.group(1)
-            object_key = match.group(2)
-
+            doc_key = match.group(2)
             try:
-                # 调用 upword 服务获取文档内容
-                response = await self.http_client.post(
-                    f"{settings.UPWORD_INTERNAL_URL}/api/parse", json={"objectKey": object_key}
-                )
-
+                response = await self.http_client.get(f"{settings.UPWORD_INTERNAL_URL}/api/v1/documents/{doc_key}/raw")
                 if response.status_code == 200:
-                    data = response.json()
-                    if data.get("success") and data.get("markdown"):
-                        # 替换为包含内容的格式
-                        doc_content = (
-                            f"<!-- DOC:{filename} -->\n以下是用户上传的文档内容:\n\n{data['markdown']}\n<!-- /DOC -->"
-                        )
-                        result = result.replace(match.group(0), doc_content)
-                        logger.info("成功获取文档内容: %s", filename)
-                    else:
-                        logger.warning("文档解析失败: %s", data.get("error"))
-                else:
-                    logger.warning("upword 服务响应错误: %s", response.status_code)
+                    doc_content = response.text
+                    expanded = f"<!-- DOC:{filename} -->\n{doc_content}\n<!-- /DOC -->"
+                    content = content.replace(match.group(0), expanded)
             except Exception as e:
-                logger.error("获取文档内容失败: %s", e)
+                logger.warning(f"获取文档异常: {filename} ({e})")
+        return content
 
-        return result
+    async def get_or_create_session(
+        self, db: AsyncSession, user_id: int, session_id: Optional[int] = None
+    ) -> ChatSession:
+        if session_id:
+            session = await crud.get_session_by_id(db, session_id, user_id)
+            if session:
+                return session
+        return await crud.create_session(db, user_id)
 
-    async def create_session(self, db: AsyncSession, user: User, title: str = "新对话") -> ChatSession:
-        """创建新会话"""
-        return await crud.create_session(db, user.id, title)
+    async def get_sessions(self, db: AsyncSession, user_id: int, skip: int = 0, limit: int = 50) -> List[ChatSession]:
+        return await crud.get_user_sessions(db, user_id, skip=skip, limit=limit)
 
-    async def get_user_sessions(
-        self, db: AsyncSession, user: User, skip: int = 0, limit: int = 50
-    ) -> List[ChatSession]:
-        """获取用户的会话列表"""
-        return await crud.get_user_sessions(db, user.id, skip, limit)
-
-    async def get_session(self, db: AsyncSession, session_id: int, user: User) -> Optional[ChatSession]:
-        """获取会话（验证所有权）"""
-        session = await crud.get_session_by_id(db, session_id)
-        if session and session.user_id == user.id:
-            return session
-        return None
-
-    async def delete_session(self, db: AsyncSession, session_id: int, user: User) -> bool:
-        """删除会话（验证所有权）"""
-        session = await crud.get_session_by_id(db, session_id)
-        if session and session.user_id == user.id:
-            return await crud.delete_session(db, session_id)
-        return False
-
-    async def get_session_messages(self, db: AsyncSession, session_id: int, user: User) -> Optional[List[Message]]:
-        """获取会话消息（验证所有权）"""
-        session = await crud.get_session_by_id(db, session_id)
-        if not session or session.user_id != user.id:
-            return None
+    async def get_session_messages(self, db: AsyncSession, session_id: int, user_id: int) -> List[Message]:
+        session = await crud.get_session_by_id(db, session_id, user_id)
+        if not session:
+            raise ValueError("会话不存在")
         return await crud.get_session_messages(db, session_id)
 
-    async def get_session_messages_paginated(
-        self, db: AsyncSession, session_id: int, user: User, limit: int = 10, before_id: int = None
-    ) -> Optional[dict]:
-        """
-        分页获取会话消息（验证所有权）
+    async def delete_session(self, db: AsyncSession, session_id: int, user_id: int) -> bool:
+        session = await crud.get_session_by_id(db, session_id, user_id)
+        if not session:
+            return False
+        await crud.delete_session(db, session_id)
+        return True
 
-        Returns:
-            {
-                "messages": [...],
-                "has_more": bool,
-                "total": int
-            }
-        """
-        session = await crud.get_session_by_id(db, session_id)
-        if not session or session.user_id != user.id:
-            return None
-
-        messages, has_more = await crud.get_session_messages_paginated(db, session_id, limit, before_id)
-        total = await crud.get_session_message_count(db, session_id)
-
-        return {"messages": messages, "has_more": has_more, "total": total}
+    async def clear_session_messages(self, db: AsyncSession, session_id: int, user_id: int) -> bool:
+        session = await crud.get_session_by_id(db, session_id, user_id)
+        if not session:
+            return False
+        await crud.clear_session_messages(db, session_id)
+        return True
 
     async def send_message_stream(
-        self, db: AsyncSession, session_id: int, user: User, content: str, model: Optional[str] = None
+        self,
+        db: AsyncSession,
+        session_id: int,
+        user_id: int,
+        content: str,
+        model: Optional[str] = None,
+        thinking_enabled: bool = True,
     ) -> AsyncGenerator[dict, None]:
-        """
-        发送消息并获取AI流式响应
-
-        Args:
-            model: 可选的模型名称，不传则使用默认模型
-
-        Yields:
-            dict: {"type": "thinking" | "content" | "done" | "error", "data": str}
-        """
-        # 验证会话所有权
-        session = await crud.get_session_by_id(db, session_id)
-        if not session or session.user_id != user.id:
-            yield {"type": "error", "data": "会话不存在或无权访问"}
+        """发送消息并获取流式响应（支持 Agent 工具调用链）"""
+        session = await crud.get_session_by_id(db, session_id, user_id)
+        if not session:
+            yield {"type": "error", "data": "会话不存在"}
             return
 
-        # 检查用户输入是否包含限制词
-        input_passed, filtered_input = await content_filter.filter_input(db, content)
-        if not input_passed:
-            # 保存用户原始消息
-            await crud.create_message(db, session_id, "user", content)
-            await db.commit()
-            # 返回限制消息
-            yield {"type": "content", "data": RESTRICTED_MESSAGE}
-            yield {"type": "done", "data": ""}
-            # 保存限制消息作为 AI 响应
-            await crud.create_message(db, session_id, "assistant", RESTRICTED_MESSAGE)
-            await db.commit()
+        user = await crud.get_user_by_id(db, user_id)
+        if not user:
+            yield {"type": "error", "data": "用户不存在"}
             return
 
-        # 保存用户消息（保存原始内容，不含文档实际内容）
+        if content_filter.is_restricted(content):
+            yield {"type": "error", "data": RESTRICTED_MESSAGE}
+            return
+
         await crud.create_message(db, session_id, "user", content)
         await db.commit()
 
-        # 获取历史消息构建上下文
         history = await crud.get_session_messages(db, session_id)
         messages = []
-        for msg in history[-10:]:  # 最近10条消息作为上下文
+        for msg in history[-10:]:
             msg_content = msg.content
-            # 对于用户消息，展开文档标记获取实际内容
             if msg.role == "user":
                 msg_content = await self.expand_doc_content(msg_content)
             messages.append({"role": msg.role, "content": msg_content})
 
-        # 使用环境变量配置（避免数据库查询延迟）
         max_tokens = settings.AI_MAX_TOKENS
         temperature = settings.AI_TEMPERATURE
 
-        # RAG 流程：在发送给 AI 之前，先在用户私有知识库中进行语义检索
-        retrieved_chunks = await knowledge_service.search_knowledge(user.id, content)
+        # RAG 流程：混合检索
+        retrieved_chunks = await hybrid_retrieve_chunks(user.id, content, [], top_k=5)
         system_prompt = None
         if retrieved_chunks:
-            context_text = "\n".join([f"- {chunk}" for chunk in retrieved_chunks])
-            system_prompt = f"""你是墨语（Mochat）的AI助手。
-以下是从用户私有知识库中检索到的参考资料，请优先基于这些资料回答用户的问题。如果资料中没有相关信息，请基于你的通用知识进行回答。
+            context_text = "\n".join(
+                [f"- {chunk.content if hasattr(chunk, 'content') else chunk}" for chunk, score in retrieved_chunks]
+            )
+            system_prompt = f"""你是墨语（Mochat）的AI助手，具备联网搜索与代码沙箱执行能力。
+以下是从用户私有知识库中检索到的参考资料，请优先基于这些资料回答。
+如果资料中没有相关信息，请使用 search_web 工具在互联网上搜索后回答。
+如果需要进行数学计算、数据分析或绘制图表，请使用 execute_python_code 工具。
+如果问题涉及最新新闻、实时天气、股价等动态信息，请务必使用工具搜索。
 
 【参考资料】
-{context_text}
-
-请用友好、专业的方式回答用户问题，并确保在回答中如果引用了资料，请明确标注。"""
-
-        # 调用AI服务获取流式响应
-        thinking_full = ""
-        content_full = ""
-        output_restricted = False
-
-        async for chunk in ai_service.chat_stream(
-            messages, system_prompt=system_prompt, model=model, max_tokens=max_tokens, temperature=temperature
-        ):
-            if chunk["type"] == "thinking":
-                thinking_full += chunk["data"]
-                yield chunk  # 立即推送，不阻塞
-            elif chunk["type"] == "content":
-                content_full += chunk["data"]
-                yield chunk  # 立即推送，不做任何阻塞检查
-            else:
-                yield chunk
-
-        # 流结束后再检查内容（不影响流式输出）
-        if content_full:
-            output_passed, _ = await content_filter.check_content(db, content_full)
-            if not output_passed:
-                output_restricted = True
-
-        # 如果输出被限制
-        if output_restricted:
-            yield {"type": "content", "data": f"\n\n{RESTRICTED_MESSAGE}"}
-            yield {"type": "done", "data": ""}
-            # 保存限制消息
-            await crud.create_message(
-                db, session_id, "assistant", RESTRICTED_MESSAGE, thinking=thinking_full if thinking_full else None
-            )
-            await db.commit()
-            return
-
-        # 保存AI响应
-        if content_full:
-            await crud.create_message(
-                db, session_id, "assistant", content_full, thinking=thinking_full if thinking_full else None
-            )
-
-            # 如果是第一条消息，更新会话标题
-            if len(history) <= 1:
-                title = await ai_service.generate_title(content)
-                await crud.update_session(db, session_id, title=title)
-
-            await db.commit()
+{context_text}"""
         else:
-            # 明确无内容返回为失败路径，便于上层准确计数
-            yield {"type": "error", "data": "AI 未返回有效内容"}
+            system_prompt = "你是墨语（Mochat）的AI助手，具备联网搜索与代码沙箱执行能力。如果用户的问题超出了你的知识范围，或涉及最新新闻、实时信息，请使用 search_web 工具进行搜索；若涉及数学计算、数据分析或生成图表，请使用 execute_python_code 工具。"
 
-    async def regenerate_response(self, db: AsyncSession, session_id: int, user: User) -> AsyncGenerator[dict, None]:
-        """重新生成最后一条AI响应"""
-        # 验证会话所有权
-        session = await crud.get_session_by_id(db, session_id)
-        if not session or session.user_id != user.id:
-            yield {"type": "error", "data": "会话不存在或无权访问"}
-            return
+        # 工具调用循环（最多 3 轮）
+        max_tool_rounds = 3
+        for round_num in range(max_tool_rounds):
+            tool_calls_buffer = {}
+            thinking_full = ""
+            content_full = ""
 
-        # 获取历史消息
-        history = await crud.get_session_messages(db, session_id)
-        if not history:
-            yield {"type": "error", "data": "没有消息可以重新生成"}
-            return
+            async for chunk in ai_service.chat_stream(
+                messages,
+                system_prompt=system_prompt,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                tools=AVAILABLE_TOOLS,
+            ):
+                if chunk["type"] == "thinking":
+                    thinking_full += chunk["data"]
+                    yield chunk
+                elif chunk["type"] == "content":
+                    content_full += chunk["data"]
+                    yield chunk
+                elif chunk["type"] == "tool_calls":
+                    try:
+                        import json
 
-        # 找到最后一条用户消息
-        messages = []
-        for msg in history:
-            if msg.role == "user":
-                messages.append({"role": "user", "content": msg.content})
-            elif msg.role == "assistant" and messages:
-                messages.append({"role": "assistant", "content": msg.content})
+                        tool_calls_list = json.loads(chunk["data"])
+                        for tc in tool_calls_list:
+                            tool_calls_buffer[tc["id"]] = tc
+                    except Exception as e:
+                        logger.error(f"解析工具调用失败: {e}")
+                elif chunk["type"] == "error":
+                    yield chunk
+                    return
 
-        if not messages or messages[-1]["role"] != "user":
-            # 移除最后一条assistant消息，重新生成
-            messages = messages[:-1] if messages else []
+            if not tool_calls_buffer:
+                # 没有工具调用，对话结束
+                if content_full and not content_filter.is_restricted(content_full):
+                    await crud.create_message(
+                        db, session_id, "assistant", content_full, thinking=thinking_full if thinking_full else None
+                    )
+                    await db.commit()
+                elif content_filter.is_restricted(content_full):
+                    yield {"type": "error", "data": RESTRICTED_MESSAGE}
+                return
 
-        if not messages:
-            yield {"type": "error", "data": "没有用户消息"}
-            return
+            # 执行工具调用
+            # 1. 将 Assistant 的回复（包含工具调用意图）加入历史
+            assistant_msg = {
+                "role": "assistant",
+                "content": content_full or None,
+                "tool_calls": [
+                    {"id": tc["id"], "type": "function", "function": tc["function"]}
+                    for tc in tool_calls_buffer.values()
+                ],
+            }
+            messages.append(assistant_msg)
 
-        # 使用环境变量配置
-        max_tokens = settings.AI_MAX_TOKENS
-        temperature = settings.AI_TEMPERATURE
+            # 2. 逐个执行工具并加入历史
+            for tc_id, tc in tool_calls_buffer.items():
+                func_name = tc["function"]["name"]
+                try:
+                    import json
 
-        # 调用AI服务
-        thinking_full = ""
-        content_full = ""
+                    args = json.loads(tc["function"]["arguments"])
+                except Exception:
+                    args = {}
 
-        async for chunk in ai_service.chat_stream(messages, max_tokens=max_tokens, temperature=temperature):
-            if chunk["type"] == "thinking":
-                thinking_full += chunk["data"]
-            elif chunk["type"] == "content":
-                content_full += chunk["data"]
-            yield chunk
+                yield {"type": "tool_status", "data": f"正在执行工具: {func_name}({args})..."}
 
-        # 保存新的AI响应
-        if content_full:
-            await crud.create_message(
-                db, session_id, "assistant", content_full, thinking=thinking_full if thinking_full else None
-            )
-            await db.commit()
+                if func_name in TOOL_EXECUTORS:
+                    try:
+                        result = TOOL_EXECUTORS[func_name](**args)
+                        import json
+
+                        tool_result_str = json.dumps(result, ensure_ascii=False)
+                    except Exception as e:
+                        tool_result_str = f"工具执行出错: {str(e)}"
+                else:
+                    tool_result_str = f"未知工具: {func_name}"
+
+                messages.append({"role": "tool", "tool_call_id": tc_id, "content": tool_result_str})
+
+            # 继续下一轮循环让 AI 根据工具结果生成最终回复
+
+        # 超过最大工具调用轮数
+        yield {"type": "error", "data": "工具调用次数过多，请简化您的请求。"}
 
 
 # 创建全局实例

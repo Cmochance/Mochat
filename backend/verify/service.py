@@ -1,18 +1,20 @@
 """
 验证码核心服务（数据库持久化）
 """
+
 from __future__ import annotations
 
 import random
 import string
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import VerificationCode, VerificationIPLimit
+
 from .config import config
 from .email import email_service
-from app.db.models import VerificationCode, VerificationIPLimit
 
 
 class VerificationService:
@@ -58,7 +60,7 @@ class VerificationService:
 
     @classmethod
     async def _check_ip_limit(cls, db: AsyncSession, ip: str) -> tuple[bool, int]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await db.execute(select(VerificationIPLimit).where(VerificationIPLimit.ip == ip))
         record = result.scalar_one_or_none()
         if not record:
@@ -75,7 +77,7 @@ class VerificationService:
 
     @classmethod
     async def _increment_ip_count(cls, db: AsyncSession, ip: str) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = await db.execute(select(VerificationIPLimit).where(VerificationIPLimit.ip == ip))
         record = result.scalar_one_or_none()
         if not record:
@@ -90,13 +92,7 @@ class VerificationService:
         await db.flush()
 
     @classmethod
-    async def send_code(
-        cls,
-        db: AsyncSession,
-        email: str,
-        purpose: str,
-        ip: str
-    ) -> tuple[bool, str, int]:
+    async def send_code(cls, db: AsyncSession, email: str, purpose: str, ip: str) -> tuple[bool, str, int]:
         """
         发送验证码
 
@@ -104,7 +100,7 @@ class VerificationService:
             (success, message, cooldown_seconds)
         """
         normalized_email = cls._normalize_email(email)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # 验证用途
         if purpose not in config.VALID_PURPOSES:
@@ -156,7 +152,7 @@ class VerificationService:
     @classmethod
     async def can_send(cls, db: AsyncSession, email: str, purpose: str) -> tuple[bool, int]:
         """检查是否可以发送验证码（冷却或锁定）"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         record = await cls._get_code_record(db, email, purpose)
         if not record:
             return True, 0
@@ -172,13 +168,7 @@ class VerificationService:
         return True, 0
 
     @classmethod
-    async def verify_code(
-        cls,
-        db: AsyncSession,
-        email: str,
-        code: str,
-        purpose: str
-    ) -> tuple[bool, str, int]:
+    async def verify_code(cls, db: AsyncSession, email: str, code: str, purpose: str) -> tuple[bool, str, int]:
         """
         验证验证码
 
@@ -187,7 +177,7 @@ class VerificationService:
         """
         normalized_email = cls._normalize_email(email)
         input_code = (code or "").strip()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if purpose not in config.VALID_PURPOSES:
             return False, "无效的验证用途", 0
@@ -239,4 +229,3 @@ class VerificationService:
         normalized_email = cls._normalize_email(email)
         can_send, cooldown = await cls.can_send(db, normalized_email, purpose)
         return 0 if can_send else cooldown
-

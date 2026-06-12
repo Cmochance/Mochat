@@ -2,6 +2,7 @@
 对话业务服务 - 处理对话相关的业务逻辑
 """
 
+import json
 import logging
 import re
 from collections.abc import AsyncGenerator
@@ -16,8 +17,19 @@ from ..db.models import ChatSession, Message, User
 from .ai_service import ai_service
 from .content_filter import RESTRICTED_MESSAGE, content_filter
 from .knowledge_service import knowledge_service
+from .tools.code_interpreter import TOOL_DEFINITION as CODE_INTERPRETER_TOOL
+from .tools.code_interpreter import execute_python_code
+from .tools.web_search import TOOL_DEFINITION as WEB_SEARCH_TOOL
+from .tools.web_search import search_web
 
 logger = logging.getLogger(__name__)
+
+# 注册可用工具
+AVAILABLE_TOOLS = [WEB_SEARCH_TOOL, CODE_INTERPRETER_TOOL]
+TOOL_EXECUTORS = {
+    "search_web": search_web,
+    "execute_python_code": execute_python_code,
+}
 
 
 class ChatService:
@@ -189,22 +201,79 @@ class ChatService:
 
 请用友好、专业的方式回答用户问题，并确保在回答中如果引用了资料，请明确标注。"""
 
-        # 调用AI服务获取流式响应
+        # 工具调用循环（最多 3 轮）
+        max_tool_rounds = 3
         thinking_full = ""
         content_full = ""
         output_restricted = False
 
-        async for chunk in ai_service.chat_stream(
-            messages, system_prompt=system_prompt, model=model, max_tokens=max_tokens, temperature=temperature
-        ):
-            if chunk["type"] == "thinking":
-                thinking_full += chunk["data"]
-                yield chunk  # 立即推送，不阻塞
-            elif chunk["type"] == "content":
-                content_full += chunk["data"]
-                yield chunk  # 立即推送，不做任何阻塞检查
-            else:
-                yield chunk
+        for round_num in range(max_tool_rounds):
+            tool_calls_buffer = {}
+            thinking_full = ""
+            content_full = ""
+
+            async for chunk in ai_service.chat_stream(
+                messages,
+                system_prompt=system_prompt,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                tools=AVAILABLE_TOOLS if round_num == 0 else None,
+            ):
+                if chunk["type"] == "thinking":
+                    thinking_full += chunk["data"]
+                    yield chunk
+                elif chunk["type"] == "content":
+                    content_full += chunk["data"]
+                    yield chunk
+                elif chunk["type"] == "tool_calls":
+                    try:
+                        tool_calls_list = json.loads(chunk["data"])
+                        for tc in tool_calls_list:
+                            tool_calls_buffer[tc["id"]] = tc
+                    except Exception as e:
+                        logger.error(f"解析工具调用失败: {e}")
+                elif chunk["type"] == "error":
+                    yield chunk
+                    return
+
+            if not tool_calls_buffer:
+                break
+
+            # 有工具调用：将 Assistant 回复加入历史
+            assistant_msg = {
+                "role": "assistant",
+                "content": content_full or None,
+                "tool_calls": [
+                    {"id": tc["id"], "type": "function", "function": tc["function"]}
+                    for tc in tool_calls_buffer.values()
+                ],
+            }
+            messages.append(assistant_msg)
+
+            # 逐个执行工具
+            for tc_id, tc in tool_calls_buffer.items():
+                func_name = tc["function"]["name"]
+                try:
+                    args = json.loads(tc["function"]["arguments"])
+                except Exception:
+                    args = {}
+
+                yield {"type": "tool_status", "data": f"正在执行工具: {func_name}({args})..."}
+
+                if func_name in TOOL_EXECUTORS:
+                    try:
+                        result = TOOL_EXECUTORS[func_name](**args)
+                        tool_result_str = json.dumps(result, ensure_ascii=False)
+                    except Exception as e:
+                        tool_result_str = f"工具执行出错: {str(e)}"
+                else:
+                    tool_result_str = f"未知工具: {func_name}"
+
+                messages.append({"role": "tool", "tool_call_id": tc_id, "content": tool_result_str})
+        else:
+            yield {"type": "error", "data": "工具调用次数过多，请简化您的请求。"}
+            return
 
         # 流结束后再检查内容（不影响流式输出）
         if content_full:
@@ -216,7 +285,6 @@ class ChatService:
         if output_restricted:
             yield {"type": "content", "data": f"\n\n{RESTRICTED_MESSAGE}"}
             yield {"type": "done", "data": ""}
-            # 保存限制消息
             await crud.create_message(
                 db, session_id, "assistant", RESTRICTED_MESSAGE, thinking=thinking_full if thinking_full else None
             )
@@ -228,15 +296,11 @@ class ChatService:
             await crud.create_message(
                 db, session_id, "assistant", content_full, thinking=thinking_full if thinking_full else None
             )
-
-            # 如果是第一条消息，更新会话标题
             if len(history) <= 1:
                 title = await ai_service.generate_title(content)
                 await crud.update_session(db, session_id, title=title)
-
             await db.commit()
         else:
-            # 明确无内容返回为失败路径，便于上层准确计数
             yield {"type": "error", "data": "AI 未返回有效内容"}
 
     async def regenerate_response(self, db: AsyncSession, session_id: int, user: User) -> AsyncGenerator[dict, None]:

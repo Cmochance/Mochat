@@ -3,10 +3,12 @@ Mochat 后端应用入口
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from verify import verify_router
 
@@ -82,6 +84,12 @@ app.include_router(api_router, prefix="/api")
 
 # 注册验证码模块路由
 app.include_router(verify_router, prefix="/api")
+
+# 静态文件挂载 (用于服务代码解释器等工具生成的临时图表图片)
+BACKEND_ROOT = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BACKEND_ROOT, "static")
+os.makedirs(os.path.join(STATIC_DIR, "generated"), exist_ok=True)
+app.mount("/api/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.get("/")

@@ -1,22 +1,24 @@
 """
 邮件发送服务 - 使用 Resend API
 """
-import resend
-from pathlib import Path
+
 from typing import Optional
+
+import resend
+
 from .config import config
 
 
 class EmailService:
     """邮件发送服务"""
-    
+
     @staticmethod
     def _load_template(purpose: str) -> str:
         """加载邮件模板"""
         template_path = config.TEMPLATE_DIR / "verification.html"
         if template_path.exists():
             return template_path.read_text(encoding="utf-8")
-        
+
         # 默认模板
         return """
 <!DOCTYPE html>
@@ -61,7 +63,7 @@ class EmailService:
 </body>
 </html>
 """
-    
+
     @staticmethod
     def _get_purpose_text(purpose: str) -> str:
         """获取用途说明文本"""
@@ -70,40 +72,35 @@ class EmailService:
             config.PURPOSE_RESET_PASSWORD: "您正在重置 墨语 账号密码，验证码为：",
         }
         return texts.get(purpose, "您的验证码为：")
-    
+
     @classmethod
-    async def send_verification_email(
-        cls,
-        to_email: str,
-        code: str,
-        purpose: str
-    ) -> tuple[bool, Optional[str]]:
+    async def send_verification_email(cls, to_email: str, code: str, purpose: str) -> tuple[bool, Optional[str]]:
         """
         发送验证码邮件
-        
+
         Args:
             to_email: 收件邮箱
             code: 验证码
             purpose: 用途 (register/reset_password)
-            
+
         Returns:
             (success, error_message)
         """
         if not config.RESEND_API_KEY:
             return False, "邮件服务未配置"
-        
+
         try:
             # 设置API密钥
             resend.api_key = config.RESEND_API_KEY
-            
+
             # 加载并渲染模板
             template = cls._load_template(purpose)
             html_content = template.replace("{{code}}", code)
             html_content = html_content.replace("{{purpose_text}}", cls._get_purpose_text(purpose))
-            
+
             # 获取邮件主题
             subject = config.EMAIL_SUBJECTS.get(purpose, "【墨语】您的验证码")
-            
+
             # 发送邮件
             params = {
                 "from": f"墨语 Mochat <{config.FROM_EMAIL}>",
@@ -111,14 +108,14 @@ class EmailService:
                 "subject": subject,
                 "html": html_content,
             }
-            
+
             result = resend.Emails.send(params)
-            
+
             if result and result.get("id"):
                 return True, None
             else:
                 return False, "邮件发送失败"
-                
+
         except Exception as e:
             return False, f"邮件发送异常: {str(e)}"
 

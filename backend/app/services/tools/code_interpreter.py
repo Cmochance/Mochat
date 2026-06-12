@@ -122,6 +122,14 @@ def execute_python_code(code: str) -> Dict[str, Any]:
             stderr += f"\n[Warning: Failed to capture generated images: {str(e)}]"
 
         markdown_images = ""
+        # 截断过长输出，避免撑爆上下文窗口
+        MAX_OUTPUT_CHARS = 4000
+        if len(stdout) > MAX_OUTPUT_CHARS:
+            stdout = stdout[:MAX_OUTPUT_CHARS] + f"\n... [输出被截断，共 {len(stdout)} 字符]"
+        if len(stderr) > MAX_OUTPUT_CHARS:
+            stderr = stderr[:MAX_OUTPUT_CHARS] + f"\n... [错误输出被截断，共 {len(stderr)} 字符]"
+
+        markdown_images = ""
         if images:
             markdown_images = "\n\n" + "\n".join([f"![Generated Image]({url})" for url in images])
 

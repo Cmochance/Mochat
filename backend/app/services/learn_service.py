@@ -13,8 +13,11 @@ import logging
 import math
 import re
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Set, Tuple  # noqa: UP035
+from typing import Any, Dict, List, Optional, Set, Tuple  # noqa: UP035
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..db import crud
 from ..db.models import MaterialChunk
 from .ai_service import ai_service
 from .knowledge_service import knowledge_service
@@ -394,7 +397,7 @@ async def hybrid_retrieve_chunks(
         semantic_texts = []
 
     # 构建已有的稀疏检索结果内容映射，用于去重
-    sparse_contents = {chunk.content for chunk, _ in sparse_results}
+    # sparse_contents = {chunk.content for chunk, _ in sparse_results}  # unused
 
     final_results: Dict[str, Tuple[MaterialChunk, float]] = {}
 
@@ -714,7 +717,7 @@ async def generate_adaptive_quiz(
         wrong_questions_context = "暂无具体错题记录，请围绕资料核心知识点生成基础题目。"
 
     prompt = ADAPTIVE_QUIZ_SYSTEM_PROMPT.format(
-        content=truncated,
+        content=content,
         wrong_questions_context=wrong_questions_context,
     )
 

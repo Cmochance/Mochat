@@ -213,8 +213,11 @@ class ChatService:
             content_full = ""
 
             async for chunk in ai_service.chat_stream(
-                messages, system_prompt=system_prompt, model=model,
-                max_tokens=max_tokens, temperature=temperature,
+                messages,
+                system_prompt=system_prompt,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
                 tools=AVAILABLE_TOOLS if round_num == 0 else None,
             ):
                 if chunk["type"] == "thinking":

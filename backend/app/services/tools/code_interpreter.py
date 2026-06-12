@@ -26,17 +26,17 @@ URL_PREFIX = "/api/static/generated/"
 
 # 基本安全检查：阻止明显危险的代码模式
 _BLOCKED_PATTERNS = [
-    r'\bimport\s+os\b',
-    r'\bimport\s+subprocess\b',
-    r'\bimport\s+shutil\b',
-    r'\bfrom\s+os\s+import\b',
-    r'\bfrom\s+subprocess\s+import\b',
-    r'\bos\.(system|popen|exec|remove|rmdir|makedirs)\s*\(',
-    r'\bsubprocess\.(run|Popen|call|check_output)\s*\(',
+    r"\bimport\s+os\b",
+    r"\bimport\s+subprocess\b",
+    r"\bimport\s+shutil\b",
+    r"\bfrom\s+os\s+import\b",
+    r"\bfrom\s+subprocess\s+import\b",
+    r"\bos\.(system|popen|exec|remove|rmdir|makedirs)\s*\(",
+    r"\bsubprocess\.(run|Popen|call|check_output)\s*\(",
     r'\bopen\s*\(\s*["\']/',
-    r'\b__import__\s*\(',
-    r'\beval\s*\(',
-    r'\bexec\s*\(',
+    r"\b__import__\s*\(",
+    r"\beval\s*\(",
+    r"\bexec\s*\(",
 ]
 
 

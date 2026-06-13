@@ -2,6 +2,16 @@ import api from './api'
 import type { ChatSession, Message, StreamChunk } from '../types'
 import { clearAuthAndRedirect } from '../utils/auth'
 import { getApiBaseUrl } from '../utils/env'
+import { getAccessToken, setAccessToken } from './api'
+
+/** 判断是否为桌面环境 */
+const isDesktopEnv = (): boolean => {
+  try {
+    return !!(window as any).electronAPI
+  } catch {
+    return false
+  }
+}
 
 // 桌面模式下将相对路径转为绝对 URL
 // 桌面模式下将相对路径转为绝对 URL；Web 模式原样返回
@@ -27,15 +37,23 @@ const generateRequestId = () => {
 }
 
 const refreshAccessToken = async (): Promise<string | null> => {
-  const refreshToken = localStorage.getItem('refresh_token')
-  if (!refreshToken) return null
+
+  // 桌面端: 从 localStorage 读取 refresh_token 放入 body
+  // Web 端: HttpOnly Cookie 自动携带，body 为空
+  const body = isDesktopEnv()
+    ? JSON.stringify({ refresh_token: localStorage.getItem('refresh_token') })
+    : '{}'
+
+  // Web 端如果没有 refresh token cookie，直接返回
+  if (isDesktopEnv() && !localStorage.getItem('refresh_token')) return null
 
   const response = await fetch(apiUrl('/api/auth/refresh'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ refresh_token: refreshToken }),
+    credentials: isDesktopEnv() ? 'same-origin' : 'include',
+    body,
   })
   if (!response.ok) return null
 
@@ -45,10 +63,16 @@ const refreshAccessToken = async (): Promise<string | null> => {
   }
   if (!data.access_token) return null
 
-  localStorage.setItem('token', data.access_token)
-  if (data.refresh_token) {
-    localStorage.setItem('refresh_token', data.refresh_token)
+  if (isDesktopEnv()) {
+    localStorage.setItem('token', data.access_token)
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token)
+    }
+  } else {
+    // Web 端: token 存内存
+    setAccessToken(data.access_token)
   }
+
   return data.access_token
 }
 
@@ -57,13 +81,19 @@ const fetchWithAuthRetry = async (
   init: RequestInit,
   retried: boolean = false
 ): Promise<Response> => {
-  const token = localStorage.getItem('token')
+  // 获取 token: Web 端从内存，桌面端从 localStorage
+  const token = isDesktopEnv() ? localStorage.getItem('token') : getAccessToken()
   const headers = new Headers(init.headers || {})
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const response = await fetch(url, { ...init, headers })
+  // Web 端发送请求时携带 Cookie
+  const response = await fetch(url, {
+    ...init,
+    headers,
+    credentials: isDesktopEnv() ? 'same-origin' : 'include',
+  })
   if (response.status !== 401 || retried) {
     if (response.status === 401 && retried) {
       clearAuthAndRedirect()

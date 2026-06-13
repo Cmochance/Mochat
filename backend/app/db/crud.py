@@ -9,7 +9,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
-from ..core.security import encrypt_password, get_password_hash, verify_password
+from ..core.security import get_password_hash, verify_password
 from .models import (
     AllowedModel,
     ChatSession,
@@ -70,7 +70,8 @@ async def create_user(
         supabase_auth_id=supabase_auth_id,
         password_hash=get_password_hash(password),
         # Supabase Auth 模式下不再存储可逆加密密码（避免重复存储敏感信息）
-        password_encrypted=encrypt_password(password) if settings.AUTH_PROVIDER == "legacy" else None,
+        # 仅使用 bcrypt 哈希存储密码，移除不安全的可逆加密功能
+        password_encrypted=None,
         role=role,
     )
     db.add(user)

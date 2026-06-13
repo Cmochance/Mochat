@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24小时
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # Refresh token 有效期（天）
+    COOKIE_SECURE: bool = True  # 生产环境设为 True，仅通过 HTTPS 传输
+    COOKIE_SAMESITE: str = "lax"  # Cookie SameSite 策略：strict | lax | none
+    COOKIE_DOMAIN: str = ""  # Cookie 域名，留空则使用当前域名
 
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./mochat.db"

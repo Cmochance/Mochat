@@ -58,7 +58,7 @@ class ChatRequest(BaseModel):
     """对话请求模型"""
 
     session_id: int
-    content: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1, max_length=50000)
     model: Optional[str] = None  # 可选模型，不传则使用默认
 
 

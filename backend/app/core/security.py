@@ -1,59 +1,26 @@
 """
 安全模块 - JWT令牌和密码处理
 """
-
-import base64
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Optional
 
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from .config import settings
 
-# 密码加密上下文
+# 密码加密上下文 - 使用 bcrypt 单向哈希
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def _get_fernet_key() -> bytes:
-    """从 SECRET_KEY 派生 Fernet 密钥"""
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b"mochat_password_salt",  # 固定盐值
-        iterations=100000,
-    )
-    key = base64.urlsafe_b64encode(kdf.derive(settings.SECRET_KEY.encode()))
-    return key
-
-
-def encrypt_password(plain_password: str) -> str:
-    """使用 AES 加密密码（可逆）"""
-    f = Fernet(_get_fernet_key())
-    encrypted = f.encrypt(plain_password.encode())
-    return encrypted.decode()
-
-
-def decrypt_password(encrypted_password: str) -> str:
-    """解密密码"""
-    try:
-        f = Fernet(_get_fernet_key())
-        decrypted = f.decrypt(encrypted_password.encode())
-        return decrypted.decode()
-    except Exception:
-        return "******"
-
-
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
+    """验证密码 - 使用 bcrypt 哈希验证"""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """获取密码哈希"""
+    """获取密码哈希 - 使用 bcrypt 单向哈希"""
     return pwd_context.hash(password)
 
 
@@ -76,3 +43,29 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
+
+def generate_secure_random_string(length: int = 32) -> str:
+    """生成安全的随机字符串，用于密钥和令牌生成"""
+    return secrets.token_urlsafe(length)
+
+
+def validate_secret_key_strength(key: str) -> tuple[bool, str]:
+    """
+    验证密钥强度
+    返回: (is_valid, error_message)
+    """
+    if len(key) < 32:
+        return False, "密钥长度至少需要 32 个字符"
+    
+    # 检查密钥是否包含足够的熵（至少包含三种字符类型）
+    has_lower = any(c.islower() for c in key)
+    has_upper = any(c.isupper() for c in key)
+    has_digit = any(c.isdigit() for c in key)
+    has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in key)
+    
+    complexity_count = sum([has_lower, has_upper, has_digit, has_special])
+    if complexity_count < 3:
+        return False, "密钥必须包含至少三种字符类型（大小写字母、数字、特殊符号）"
+    
+    return True, ""

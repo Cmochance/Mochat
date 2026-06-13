@@ -14,6 +14,10 @@ from verify import verify_router
 
 from .api import api_router
 from .core.config import settings
+from .core.security import validate_secret_key_strength
+from .core.security_headers import SecurityHeadersMiddleware
+from .core.cors_validation import validate_cors_origins
+from .core.error_handler import register_error_handlers
 from .db.database import AsyncSessionLocal, close_db, init_db
 from .services.ai_service import ai_service
 from .services.auth_service import AuthService
@@ -36,12 +40,33 @@ _INSECURE_SECRET_KEYS = frozenset(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    # 验证 SECRET_KEY 强度
+    is_valid, error_msg = validate_secret_key_strength(settings.SECRET_KEY)
+    if not is_valid:
+        logger.error(
+            f"🚨 SECRET_KEY 强度不足：{error_msg} "
+            "请在 .env 中设置一个足够强度的密钥（至少32字符，包含三种字符类型）。"
+            "可以使用以下命令生成安全密钥：python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+        raise RuntimeError("SECRET_KEY 强度不足，无法启动应用")
+
     # 检测不安全的 SECRET_KEY
     if settings.SECRET_KEY in _INSECURE_SECRET_KEYS:
-        logger.warning(
-            "⚠️  SECRET_KEY 使用了不安全的默认值，请在 .env 中设置一个随机密钥！"
-            " 当前 JWT 签名可被任意伪造，所有用户令牌均不安全。"
+        logger.error(
+            "🚨 SECRET_KEY 使用了不安全的默认值，所有用户令牌均不安全！"
+            "请在 .env 中设置一个随机密钥。"
         )
+        raise RuntimeError("检测到不安全的默认 SECRET_KEY")
+
+    logger.info("✅ SECRET_KEY 强度验证通过")
+
+    # 验证 CORS 配置
+    _, cors_warnings = validate_cors_origins(settings.cors_origins_list, settings.DEBUG)
+    for warning in cors_warnings:
+        logger.warning(f"⚠️  CORS: {warning}")
+
+    if not cors_warnings:
+        logger.info("✅ CORS 配置验证通过")
 
     # 检测 SQLite 用于非调试环境
     if "sqlite" in settings.DATABASE_URL.lower() and not settings.DEBUG:
@@ -70,6 +95,9 @@ async def lifespan(app: FastAPI):
 # 创建FastAPI应用
 app = FastAPI(title="Mochat API", description="水墨风格AI对话平台后端API", version="1.0.0", lifespan=lifespan)
 
+# 注册全局错误处理器
+register_error_handlers(app)
+
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
@@ -78,6 +106,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 安全 HTTP 头中间件（在 CORS 之后添加，确保安全头不被覆盖）
+app.add_middleware(SecurityHeadersMiddleware)
 
 # 注册路由
 app.include_router(api_router, prefix="/api")

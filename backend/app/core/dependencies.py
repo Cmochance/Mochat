@@ -12,6 +12,7 @@ from ..db.models import User
 from ..services.supabase_auth_service import supabase_auth_service
 from .config import settings
 from .security import decode_access_token
+from .security_audit import log_account_disabled, log_permission_denied, log_token_invalid
 
 security = HTTPBearer()
 
@@ -53,6 +54,7 @@ async def get_current_user(
 
     payload = decode_access_token(token)
     if payload is None:
+        log_token_invalid(token_type="access")
         raise credentials_exception
 
     user_id_str = payload.get("sub")
@@ -74,6 +76,7 @@ async def get_current_user(
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """获取当前活跃用户"""
     if not current_user.is_active:
+        log_account_disabled(user_id=current_user.id)
         raise HTTPException(status_code=400, detail="用户已被禁用")
     return current_user
 
@@ -81,5 +84,6 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
 async def get_admin_user(current_user: User = Depends(get_current_active_user)) -> User:
     """获取管理员用户"""
     if current_user.role != "admin":
+        log_permission_denied(user_id=current_user.id, resource="admin")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
     return current_user

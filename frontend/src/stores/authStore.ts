@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, UserUsage } from '../types'
+import { setAccessToken, getAccessToken } from '../services/api'
+
+/** 判断是否为桌面环境 */
+const isDesktop = (): boolean => {
+  try {
+    return !!(window as any).electronAPI
+  } catch {
+    return false
+  }
+}
 
 interface AuthState {
   token: string | null
@@ -8,7 +18,7 @@ interface AuthState {
   user: User | null
   usage: UserUsage | null
   isAuthenticated: boolean
-  
+
   // Actions
   setAuth: (token: string, refreshToken: string | null, user: User) => void
   logout: () => void
@@ -27,19 +37,30 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       setAuth: (token, refreshToken, user) => {
-        localStorage.setItem('token', token)
-        if (refreshToken) {
-          localStorage.setItem('refresh_token', refreshToken)
+        // Web 端: access token 存内存（不写 localStorage），refresh token 由 HttpOnly Cookie 管理
+        // 桌面端: 保持原有 localStorage 方式
+        if (isDesktop()) {
+          localStorage.setItem('token', token)
+          if (refreshToken) {
+            localStorage.setItem('refresh_token', refreshToken)
+          } else {
+            localStorage.removeItem('refresh_token')
+          }
         } else {
-          localStorage.removeItem('refresh_token')
+          // Web 端仅存内存
+          setAccessToken(token)
         }
+
         set({ token, refreshToken, user, isAuthenticated: true })
       },
 
       logout: () => {
+        // 清除所有存储
         localStorage.removeItem('token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('auth-storage')
+        setAccessToken(null)
+
         set({ token: null, refreshToken: null, user: null, usage: null, isAuthenticated: false })
       },
 
@@ -61,13 +82,24 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({
-        token: state.token,
-        refreshToken: state.refreshToken,
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-        // 不持久化 usage，每次刷新时重新获取
-      }),
+      partialize: (state) => {
+        // Web 端不持久化 token（安全改进）
+        // 桌面端保留完整持久化
+        if (isDesktop()) {
+          return {
+            token: state.token,
+            refreshToken: state.refreshToken,
+            user: state.user,
+            isAuthenticated: state.isAuthenticated,
+          }
+        }
+        // Web 端: 仅持久化用户信息和认证状态
+        // 页面刷新后需要通过 refresh token（Cookie）自动恢复 access token
+        return {
+          user: state.user,
+          isAuthenticated: state.isAuthenticated,
+        }
+      },
     }
   )
 )

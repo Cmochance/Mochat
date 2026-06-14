@@ -14,7 +14,7 @@ class MaterialTextCreate(BaseModel):
     """通过粘贴文本创建资料"""
 
     title: str = Field(..., min_length=1, max_length=300)
-    content: str = Field(..., min_length=1)
+    content: str = Field(..., min_length=1, max_length=500000)
 
 
 class MaterialResponse(BaseModel):

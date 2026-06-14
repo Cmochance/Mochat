@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
-from ..core.security import create_access_token, encrypt_password, get_password_hash, verify_password
+from ..core.security import create_access_token, get_password_hash, verify_password
 from ..db import crud
 from ..db.models import User
 from .supabase_auth_service import supabase_auth_service
@@ -238,7 +238,8 @@ class AuthService:
             db,
             user.id,
             password_hash=get_password_hash(new_password),
-            password_encrypted=encrypt_password(new_password),
+            # 移除不安全的可逆加密功能
+            password_encrypted=None,
         )
         return True, None
 
@@ -264,7 +265,8 @@ class AuthService:
             if not success:
                 return False, update_error or "密码重置失败"
 
-        password_encrypted = None if AuthService._use_supabase_auth() else encrypt_password(new_password)
+        # 移除不安全的可逆加密功能
+        password_encrypted = None
         await crud.update_user(
             db,
             user.id,
@@ -320,16 +322,24 @@ class AuthService:
     def validate_password(password: str) -> tuple[bool, str]:
         """
         验证密码格式
-        规则：仅支持数字/小写字母/大写字母且至少有两种
+
+        规则:
+        - 长度 6~100 位
+        - 允许字母、数字、常见特殊符号（!@#$%^&*()_+-=）
+        - 至少包含大小写字母、数字中的两种
+
         返回: (is_valid, error_message)
         """
         import re
 
-        # 检查是否只包含数字、小写字母、大写字母
-        if not re.match(r"^[a-zA-Z0-9]+$", password):
-            return False, "失败，密码不支持特殊符号！"
+        if len(password) < 6:
+            return False, "密码长度不能少于 6 位"
+        if len(password) > 100:
+            return False, "密码长度不能超过 100 位"
 
-        # 检查是否至少包含两种字符类型
+        if not re.match(r"^[a-zA-Z0-9!@#$%^&*()_\+\-=]+$", password):
+            return False, "密码仅允许字母、数字和常见特殊符号（!@#$%^&*()_+-=）"
+
         has_lower = bool(re.search(r"[a-z]", password))
         has_upper = bool(re.search(r"[A-Z]", password))
         has_digit = bool(re.search(r"[0-9]", password))

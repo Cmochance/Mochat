@@ -13,11 +13,12 @@ from typing import List
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import settings
 from ..core.dependencies import get_current_active_user
+from ..core.input_validation import detect_path_traversal, sanitize_filename
 from ..db import crud
 from ..db.database import get_db
 from ..db.models import User
@@ -46,16 +47,16 @@ CUSTOM_REFERENCE_PATH = os.path.join(
 class ImageGenerateRequest(BaseModel):
     """图像生成网关请求"""
 
-    prompt: str
-    size: str = "1024x1024"
-    quality: str = "standard"
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    size: str = Field(default="1024x1024", pattern=r"^\d+x\d+$")
+    quality: str = Field(default="standard", pattern="^(standard|hd)$")
     user_id: str | None = None  # 仅兼容旧参数，网关会忽略
 
 
 class PPTGenerateRequest(BaseModel):
     """PPT 生成网关请求"""
 
-    prompt: str
+    prompt: str = Field(..., min_length=1, max_length=4000)
     user_id: str | None = None  # 仅兼容旧参数，网关会忽略
 
 
@@ -653,7 +654,7 @@ class ExportRequest(BaseModel):
     """导出请求"""
 
     content: str
-    filename: str = "export"
+    filename: str = Field(default="export", max_length=200)
 
 
 @router.post("/export/docx")
@@ -663,6 +664,13 @@ async def export_to_docx(request: ExportRequest, current_user: User = Depends(ge
 
     使用 pandoc 和自定义模板进行转换
     """
+    # 净化文件名，防止路径遍历
+    safe_filename = sanitize_filename(request.filename)
+    if detect_path_traversal(request.filename):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="文件名包含非法字符",
+        )
     import pypandoc
     from fastapi.responses import Response
 
@@ -699,7 +707,7 @@ async def export_to_docx(request: ExportRequest, current_user: User = Depends(ge
         # 安全的文件名（处理中文）
         from urllib.parse import quote
 
-        filename = f"{request.filename}.docx"
+        filename = f"{safe_filename}.docx"
         # ASCII 回退文件名（用于不支持 RFC 5987 的客户端）
         ascii_filename = "export.docx"
         # UTF-8 编码的文件名

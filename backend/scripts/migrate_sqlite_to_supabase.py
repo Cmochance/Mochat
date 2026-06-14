@@ -2,6 +2,12 @@
 """
 SQLite -> Supabase(Postgres + Auth) 迁移脚本
 
+⚠️ 安全警告：此脚本包含用于数据迁移的密码解密功能。
+   此功能仅用于从旧系统迁移到新系统的过渡阶段。
+   迁移完成后应立即删除或禁用此脚本。
+   不要在生产环境中使用此脚本进行其他目的。
+
+
 用法示例：
   # 仅校验（默认）
   python backend/scripts/migrate_sqlite_to_supabase.py \

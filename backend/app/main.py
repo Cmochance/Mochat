@@ -52,10 +52,7 @@ async def lifespan(app: FastAPI):
 
     # 检测不安全的 SECRET_KEY
     if settings.SECRET_KEY in _INSECURE_SECRET_KEYS:
-        logger.error(
-            "🚨 SECRET_KEY 使用了不安全的默认值，所有用户令牌均不安全！"
-            "请在 .env 中设置一个随机密钥。"
-        )
+        logger.error("🚨 SECRET_KEY 使用了不安全的默认值，所有用户令牌均不安全！请在 .env 中设置一个随机密钥。")
         raise RuntimeError("检测到不安全的默认 SECRET_KEY")
 
     logger.info("✅ SECRET_KEY 强度验证通过")

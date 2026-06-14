@@ -28,11 +28,11 @@ def get_client_ip(request: Request) -> str:
 
 # 认证端点限流规则：{端点名: (最大请求数, 时间窗口秒)}
 AUTH_RATE_LIMITS: dict[str, tuple[int, int]] = {
-    "register": (5, 3600),        # 5次/小时
-    "login": (10, 60),            # 10次/分钟
-    "refresh": (20, 60),          # 20次/分钟
+    "register": (5, 3600),  # 5次/小时
+    "login": (10, 60),  # 10次/分钟
+    "refresh": (20, 60),  # 20次/分钟
     "reset_password": (3, 3600),  # 3次/小时
-    "verify_send": (10, 60),      # 10次/分钟
+    "verify_send": (10, 60),  # 10次/分钟
 }
 
 _DEFAULT_AUTH_LIMIT: tuple[int, int] = (20, 60)  # 默认 20次/分钟
@@ -69,11 +69,7 @@ class IPRateLimiter:
             del self.blocked_ips[ip]
 
         # 清理过期记录（滑动窗口）
-        self.ip_requests[ip] = [
-            (ts, ep)
-            for ts, ep in self.ip_requests[ip]
-            if current_time - ts < time_window
-        ]
+        self.ip_requests[ip] = [(ts, ep) for ts, ep in self.ip_requests[ip] if current_time - ts < time_window]
 
         request_count = len(self.ip_requests[ip])
 
@@ -115,14 +111,10 @@ def check_auth_rate_limit(request: Request, endpoint: str = "auth") -> None:
     ip = get_client_ip(request)
     max_requests, time_window = AUTH_RATE_LIMITS.get(endpoint, _DEFAULT_AUTH_LIMIT)
 
-    allowed, retry_after = ip_rate_limiter.check_rate_limit(
-        ip, endpoint, max_requests, time_window
-    )
+    allowed, retry_after = ip_rate_limiter.check_rate_limit(ip, endpoint, max_requests, time_window)
 
     if not allowed:
-        log_rate_limit_hit(
-            ip=ip, endpoint=endpoint, limit=f"{max_requests}/{time_window}s"
-        )
+        log_rate_limit_hit(ip=ip, endpoint=endpoint, limit=f"{max_requests}/{time_window}s")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={

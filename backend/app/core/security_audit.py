@@ -76,6 +76,7 @@ def _mask_identifier(identifier: str) -> str:
 
 # ============ 认证事件 ============
 
+
 def log_login_success(user_id: int, ip: Optional[str] = None, auth_provider: str = "legacy") -> None:
     """记录登录成功事件"""
     _log_event(
@@ -137,6 +138,7 @@ def log_password_reset(email: str, ip: Optional[str] = None) -> None:
 
 # ============ Token 事件 ============
 
+
 def log_token_refresh_success(user_id: int, ip: Optional[str] = None, source: str = "cookie") -> None:
     """记录 token 刷新成功事件"""
     _log_event(
@@ -173,6 +175,7 @@ def log_token_invalid(ip: Optional[str] = None, token_type: str = "access") -> N
 
 # ============ 权限事件 ============
 
+
 def log_permission_denied(user_id: Optional[int], ip: Optional[str] = None, resource: str = "") -> None:
     """记录权限拒绝事件"""
     _log_event(
@@ -198,6 +201,7 @@ def log_account_disabled(user_id: int, ip: Optional[str] = None) -> None:
 
 # ============ 速率限制事件 ============
 
+
 def log_rate_limit_hit(ip: str, endpoint: str = "", limit: str = "") -> None:
     """记录速率限制触发事件"""
     _log_event(
@@ -222,6 +226,7 @@ def log_ip_blocked(ip: str, duration_seconds: int = 300) -> None:
 
 
 # ============ 可疑输入事件 ============
+
 
 def log_suspicious_input(ip: Optional[str], field: str = "", attack_type: str = "") -> None:
     """记录可疑输入事件"""

@@ -91,7 +91,9 @@ async def register(request: RegisterRequest, http_request: Request, db: AsyncSes
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request_body: LoginRequest, response: Response, http_request: Request, db: AsyncSession = Depends(get_db)):
+async def login(
+    request_body: LoginRequest, response: Response, http_request: Request, db: AsyncSession = Depends(get_db)
+):
     """用户登录"""
 
     check_auth_rate_limit(http_request, endpoint="login")
@@ -100,7 +102,11 @@ async def login(request_body: LoginRequest, response: Response, http_request: Re
     auth_payload, user, error = await AuthService.login(db, identifier=identifier, password=request_body.password)
 
     if error or not auth_payload or not user:
-        log_login_failure(identifier=identifier, ip=http_request.client.host if http_request.client else None, reason=error or "登录失败")
+        log_login_failure(
+            identifier=identifier,
+            ip=http_request.client.host if http_request.client else None,
+            reason=error or "登录失败",
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error or "登录失败")
 
     log_login_success(user_id=user.id, ip=http_request.client.host if http_request.client else None)

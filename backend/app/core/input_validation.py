@@ -27,9 +27,7 @@ _SQL_INJECTION_PATTERNS = [
     r"(?:;\s*(?:drop|delete|update|insert|alter|exec))",
 ]
 
-_SQL_INJECTION_REGEX = re.compile(
-    "|".join(_SQL_INJECTION_PATTERNS), re.IGNORECASE
-)
+_SQL_INJECTION_REGEX = re.compile("|".join(_SQL_INJECTION_PATTERNS), re.IGNORECASE)
 
 # 路径遍历模式
 _PATH_TRAVERSAL_REGEX = re.compile(r"\.\./|\.\.\\|%2e%2e%2f|%2e%2e/|\.\.%2f")

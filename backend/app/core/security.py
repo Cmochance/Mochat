@@ -1,6 +1,7 @@
 """
 安全模块 - JWT令牌和密码处理
 """
+
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Optional

@@ -44,9 +44,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         # Permissions-Policy: 限制浏览器功能（按需开放）
-        response.headers["Permissions-Policy"] = (
-            "camera=(), microphone=(), geolocation=(), payment=()"
-        )
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
 
         # Content-Security-Policy: 限制资源加载来源
         # 开发模式允许 localhost 和 eval/inline（开发工具需要）
@@ -76,16 +74,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # 仅在生产环境且非 localhost 时启用
         is_localhost = "localhost" in str(request.url) or "127.0.0.1" in str(request.url)
         if not settings.DEBUG and not is_localhost:
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains; preload"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
         # Cache-Control: 敏感页面禁止缓存
         path = request.url.path
         if path.startswith("/api/auth/") or path.startswith("/api/user/"):
-            response.headers["Cache-Control"] = (
-                "no-store, no-cache, must-revalidate, max-age=0"
-            )
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
 
         return response

@@ -44,22 +44,16 @@ def validate_cors_origins(origins: List[str], is_debug: bool = True) -> Tuple[Li
 
         # 验证 URL 格式
         if not origin.startswith(("http://", "https://")):
-            warnings.append(
-                f"CORS 来源格式无效: '{origin}'。必须以 http:// 或 https:// 开头。"
-            )
+            warnings.append(f"CORS 来源格式无效: '{origin}'。必须以 http:// 或 https:// 开头。")
             continue
 
         # 检测 HTTP 在非调试环境中的使用
         if origin.startswith("http://") and not is_debug:
-            warnings.append(
-                f"CORS 来源使用不安全的 HTTP 协议: '{origin}'。生产环境建议使用 HTTPS。"
-            )
+            warnings.append(f"CORS 来源使用不安全的 HTTP 协议: '{origin}'。生产环境建议使用 HTTPS。")
 
         # 检测 localhost 在非调试环境中的使用
         if "localhost" in origin and not is_debug:
-            warnings.append(
-                f"CORS 来源包含 localhost: '{origin}'。生产环境不应允许 localhost 来源。"
-            )
+            warnings.append(f"CORS 来源包含 localhost: '{origin}'。生产环境不应允许 localhost 来源。")
 
         valid_origins.append(origin)
 

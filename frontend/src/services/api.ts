@@ -13,9 +13,17 @@ const apiBaseUrl = getApiBaseUrl()
 /** 内存中的 access token（页面刷新后丢失，需要通过 refresh 恢复） */
 let memoryAccessToken: string | null = null
 
+/** 内存中的 refresh token（仅 Supabase 模式使用，Legacy 模式走 HttpOnly Cookie） */
+let memoryRefreshToken: string | null = null
+
 /** 设置内存中的 access token */
 export const setAccessToken = (token: string | null) => {
   memoryAccessToken = token
+}
+
+/** 设置内存中的 refresh token（Supabase 模式专用） */
+export const setRefreshToken = (token: string | null) => {
+  memoryRefreshToken = token
 }
 
 /** 获取内存中的 access token */
@@ -95,12 +103,20 @@ const requestTokenRefresh = async (): Promise<string | null> => {
   }
 
   // Web 端: refresh token 在 HttpOnly Cookie 中自动发送
+  // Supabase 模式下 refresh token 不在 Cookie 中，需从内存取出放入请求体
   try {
-    const response = await refreshClient.post('/auth/refresh', {})
+    const body = memoryRefreshToken ? { refresh_token: memoryRefreshToken } : {}
+    const response = await refreshClient.post('/auth/refresh', body)
     const data = response.data as {
       access_token?: string
+      refresh_token?: string | null
     }
     if (!data?.access_token) return null
+
+    // Supabase 模式会返回新的 refresh_token，更新内存
+    if (data.refresh_token) {
+      memoryRefreshToken = data.refresh_token
+    }
 
     // 新 token 存入内存
     memoryAccessToken = data.access_token

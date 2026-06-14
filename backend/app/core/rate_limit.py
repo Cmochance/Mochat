@@ -19,10 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request: Request) -> str:
-    """提取客户端 IP 地址（优先读取反向代理头）"""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """
+    提取客户端 IP 地址
+
+    生产环境应在反向代理（nginx/cloudflare）后面运行 uvicorn --proxy-headers，
+    此时 request.client.host 已是真实客户端 IP，无需在此手动解析 X-Forwarded-For。
+    不在此处信任 X-Forwarded-For，以防直接暴露时被伪造绕过限流。
+    """
     return request.client.host if request.client else "unknown"
 
 
@@ -71,7 +74,9 @@ class IPRateLimiter:
         # 清理过期记录（滑动窗口）
         self.ip_requests[ip] = [(ts, ep) for ts, ep in self.ip_requests[ip] if current_time - ts < time_window]
 
-        request_count = len(self.ip_requests[ip])
+        # 仅统计当前端点的请求次数
+        endpoint_entries = [(ts, ep) for ts, ep in self.ip_requests[ip] if ep == endpoint]
+        request_count = len(endpoint_entries)
 
         # 超过限制
         if request_count >= max_requests:
@@ -83,7 +88,7 @@ class IPRateLimiter:
                 logger.warning("IP %s 因严重超过速率限制被阻止 5 分钟", ip)
                 return False, 300
 
-            oldest = min(self.ip_requests[ip], key=lambda x: x[0])[0]
+            oldest = min(endpoint_entries, key=lambda x: x[0])[0]
             return False, int(oldest + time_window - current_time)
 
         # 记录本次请求

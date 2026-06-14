@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, UserUsage } from '../types'
-import { setAccessToken } from '../services/api'
+import api, { setAccessToken, setRefreshToken } from '../services/api'
 
 /** 判断是否为桌面环境 */
 const isDesktop = (): boolean => {
@@ -49,17 +49,26 @@ export const useAuthStore = create<AuthState>()(
         } else {
           // Web 端仅存内存
           setAccessToken(token)
+          // Supabase 模式会返回 refresh_token，存入内存供刷新使用
+          if (refreshToken) {
+            setRefreshToken(refreshToken)
+          }
         }
 
         set({ token, refreshToken, user, isAuthenticated: true })
       },
 
       logout: () => {
-        // 清除所有存储
+        // 调用后端登出接口清除 HttpOnly Cookie（Web 端）
+        if (!isDesktop()) {
+          api.post('/auth/logout', null, { withCredentials: true }).catch(() => {})
+        }
+        // 清除所有本地存储
         localStorage.removeItem('token')
         localStorage.removeItem('refresh_token')
         localStorage.removeItem('auth-storage')
         setAccessToken(null)
+        setRefreshToken(null)
 
         set({ token: null, refreshToken: null, user: null, usage: null, isAuthenticated: false })
       },

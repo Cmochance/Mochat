@@ -101,7 +101,8 @@ def _build_error_response(
         "error": {
             "code": error_code,
             "message": message,
-        }
+        },
+        "detail": message,
     }
     if details:
         body["error"]["details"] = details

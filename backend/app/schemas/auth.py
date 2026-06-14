@@ -35,7 +35,7 @@ class LoginRequest(BaseModel):
 class RefreshTokenRequest(BaseModel):
     """刷新令牌请求模型"""
 
-    refresh_token: str = Field(..., min_length=1)
+    refresh_token: str | None = Field(default=None, min_length=1)
 
 
 class TokenResponse(BaseModel):

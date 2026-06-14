@@ -26,7 +26,7 @@ def _build_cookie_params(
 ) -> dict:
     """
     构建 Cookie 参数，根据环境自动适配安全策略
-    
+
     开发环境（localhost）: Secure=False（HTTP 也能传 Cookie）
     生产环境: Secure=True（仅 HTTPS）, SameSite=Lax
     """

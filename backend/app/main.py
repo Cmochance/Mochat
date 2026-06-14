@@ -14,10 +14,10 @@ from verify import verify_router
 
 from .api import api_router
 from .core.config import settings
-from .core.security import validate_secret_key_strength
-from .core.security_headers import SecurityHeadersMiddleware
 from .core.cors_validation import validate_cors_origins
 from .core.error_handler import register_error_handlers
+from .core.security import validate_secret_key_strength
+from .core.security_headers import SecurityHeadersMiddleware
 from .db.database import AsyncSessionLocal, close_db, init_db
 from .services.ai_service import ai_service
 from .services.auth_service import AuthService

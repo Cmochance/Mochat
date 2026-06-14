@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User, UserUsage } from '../types'
-import { setAccessToken, getAccessToken } from '../services/api'
+import { setAccessToken } from '../services/api'
 
 /** 判断是否为桌面环境 */
 const isDesktop = (): boolean => {

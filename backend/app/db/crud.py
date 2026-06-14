@@ -8,7 +8,6 @@ from typing import List, Optional
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.config import settings
 from ..core.security import get_password_hash, verify_password
 from .models import (
     AllowedModel,

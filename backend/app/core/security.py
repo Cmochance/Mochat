@@ -57,15 +57,15 @@ def validate_secret_key_strength(key: str) -> tuple[bool, str]:
     """
     if len(key) < 32:
         return False, "密钥长度至少需要 32 个字符"
-    
+
     # 检查密钥是否包含足够的熵（至少包含三种字符类型）
     has_lower = any(c.islower() for c in key)
     has_upper = any(c.isupper() for c in key)
     has_digit = any(c.isdigit() for c in key)
     has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in key)
-    
+
     complexity_count = sum([has_lower, has_upper, has_digit, has_special])
     if complexity_count < 3:
         return False, "密钥必须包含至少三种字符类型（大小写字母、数字、特殊符号）"
-    
+
     return True, ""

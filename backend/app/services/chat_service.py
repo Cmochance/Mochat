@@ -259,16 +259,29 @@ class ChatService:
                 except Exception:
                     args = {}
 
-                yield {"type": "tool_status", "data": f"正在执行工具: {func_name}({args})..."}
+                yield {"type": "tool_status", "data": f"正在执行工具: {func_name}..."}
 
                 if func_name in TOOL_EXECUTORS:
                     try:
                         result = TOOL_EXECUTORS[func_name](**args)
                         tool_result_str = json.dumps(result, ensure_ascii=False)
+
+                        # 截断过长的工具结果，防止撑爆上下文
+                        MAX_TOOL_RESULT = 6000
+                        if len(tool_result_str) > MAX_TOOL_RESULT:
+                            tool_result_str = (
+                                tool_result_str[:MAX_TOOL_RESULT]
+                                + f"\n... [结果被截断，共 {len(tool_result_str)} 字符]"
+                            )
+                    except TypeError as e:
+                        # 参数不匹配：帮助 AI 理解正确用法
+                        tool_result_str = f"工具参数错误: {str(e)}。请检查参数名称和类型后重试。"
+                        logger.warning(f"工具 {func_name} 参数错误: {e}")
                     except Exception as e:
-                        tool_result_str = f"工具执行出错: {str(e)}"
+                        tool_result_str = f"工具执行出错: {str(e)}。请基于已有信息回答用户。"
+                        logger.error(f"工具 {func_name} 执行失败: {e}")
                 else:
-                    tool_result_str = f"未知工具: {func_name}"
+                    tool_result_str = f"未知工具: {func_name}。可用工具: {list(TOOL_EXECUTORS.keys())}"
 
                 messages.append({"role": "tool", "tool_call_id": tc_id, "content": tool_result_str})
         else:
